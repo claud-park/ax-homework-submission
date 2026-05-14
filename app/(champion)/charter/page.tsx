@@ -46,33 +46,42 @@ export default function CharterPage() {
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
+  const contentRef = useRef<CharterContent>({})
 
   useEffect(() => {
     apiFetch<ProjectCharter | null>('/api/charter').then(c => {
       if (c) {
         setProjectName(c.project_name ?? '')
-        setContent(c.content ?? {})
+        const charterContent = c.content ?? {}
+        setContent(charterContent)
+        contentRef.current = charterContent
       }
     })
   }, [])
 
   async function save(newContent: CharterContent, name: string) {
     setSaving(true)
-    await apiFetch('/api/charter', { method: 'PUT', body: JSON.stringify({ project_name: name, content: newContent }) })
-    setLastSaved(new Date())
-    setSaving(false)
+    try {
+      await apiFetch('/api/charter', { method: 'PUT', body: JSON.stringify({ project_name: name, content: newContent }) })
+      setLastSaved(new Date())
+    } catch {
+      // save failed silently — saving indicator will reset
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleSectionBlur(key: SectionKey, html: string) {
     const updated: CharterContent = { ...content, [key]: html }
     setContent(updated)
+    contentRef.current = updated
     clearTimeout(saveTimeout.current)
     saveTimeout.current = setTimeout(() => save(updated, projectName), 800)
   }
 
   function handleNameBlur() {
     clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => save(content, projectName), 800)
+    saveTimeout.current = setTimeout(() => save(contentRef.current, projectName), 800)
   }
 
   async function exportPdf() {
