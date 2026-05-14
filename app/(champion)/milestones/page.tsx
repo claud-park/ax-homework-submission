@@ -19,6 +19,7 @@ export default function MilestonesPage() {
   const [form, setForm] = useState<NewMilestone>({ week_number: '1', title: '', start_date: '', due_date: '' })
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     apiFetch<Milestone[]>('/api/milestones').then(setMilestones)
@@ -26,39 +27,59 @@ export default function MilestonesPage() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    const created = await apiFetch<Milestone>('/api/milestones', {
-      method: 'POST',
-      body: JSON.stringify({ ...form, week_number: parseInt(form.week_number) }),
-    })
-    setMilestones(prev => [...prev, created])
-    setShowForm(false)
-    setForm({ week_number: '1', title: '', start_date: '', due_date: '' })
+    setError(null)
+    try {
+      const created = await apiFetch<Milestone>('/api/milestones', {
+        method: 'POST',
+        body: JSON.stringify({ ...form, week_number: parseInt(form.week_number) }),
+      })
+      setMilestones(prev => [...prev, created])
+      setShowForm(false)
+      setForm({ week_number: '1', title: '', start_date: '', due_date: '' })
+    } catch {
+      setError('마일스톤 추가에 실패했습니다.')
+    }
   }
 
   async function handleUpload(id: string, file: File) {
-    const body = new FormData()
-    body.append('file', file)
-    await apiUpload(`/api/milestones/${id}/deliverables`, body)
-    const updated = await apiFetch<Milestone[]>('/api/milestones')
-    setMilestones(updated)
+    setError(null)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      await apiUpload(`/api/milestones/${id}/deliverables`, body)
+      const updated = await apiFetch<Milestone[]>('/api/milestones')
+      setMilestones(updated)
+    } catch {
+      setError('파일 업로드에 실패했습니다.')
+    }
   }
 
   async function handleMarkProgress(id: string) {
-    const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
-      method: 'PATCH', body: JSON.stringify({ is_manual_progress: true }),
-    })
-    setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+    setError(null)
+    try {
+      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+        method: 'PATCH', body: JSON.stringify({ is_manual_progress: true }),
+      })
+      setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+    } catch {
+      setError('상태 변경에 실패했습니다.')
+    }
   }
 
   async function handleDeadlineRequest(e: React.FormEvent) {
     e.preventDefault()
     if (!deadlineModal) return
-    await apiFetch('/api/deadline-requests', {
-      method: 'POST',
-      body: JSON.stringify({ milestone_id: deadlineModal.id, ...reqForm }),
-    })
-    setDeadlineModal(null)
-    setReqForm({ requested_due_date: '', reason: '' })
+    setError(null)
+    try {
+      await apiFetch('/api/deadline-requests', {
+        method: 'POST',
+        body: JSON.stringify({ milestone_id: deadlineModal.id, ...reqForm }),
+      })
+      setDeadlineModal(null)
+      setReqForm({ requested_due_date: '', reason: '' })
+    } catch {
+      setError('기한 변경 요청에 실패했습니다.')
+    }
   }
 
   const inputStyle = { background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
@@ -85,6 +106,12 @@ export default function MilestonesPage() {
           </div>
           <button type="submit" className="px-4 py-2 rounded-lg text-xs font-semibold self-start" style={{ background: 'var(--blue-600)', color: '#fff' }}>저장</button>
         </form>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
+          {error}
+        </div>
       )}
 
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>

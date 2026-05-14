@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
 
   await supabase.from('milestone_deliverables').insert({ milestone_id: params.id, file_path: filePath, file_name: file.name })
-  await supabase.from('milestones').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', params.id)
+  await supabase.from('milestones').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', params.id).eq('user_id', user.id)
 
   return NextResponse.json({ ok: true }, { status: 201 })
 }
