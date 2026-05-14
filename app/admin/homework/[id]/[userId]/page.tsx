@@ -15,6 +15,7 @@ function FilePreview({ submission, downloadUrl }: { submission: Submission; down
   const [mdContent, setMdContent] = useState<string | null>(null)
 
   useEffect(() => {
+    setMdContent(null)
     if (ext === 'md') {
       fetch(downloadUrl).then(r => r.text()).then(setMdContent)
     }
@@ -24,21 +25,23 @@ function FilePreview({ submission, downloadUrl }: { submission: Submission; down
     <div className="mt-3 rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
       {ext === 'md' && mdContent !== null ? (
         <div className="p-4 prose prose-invert max-w-none text-sm" style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}>
-          <ReactMarkdown>{mdContent}</ReactMarkdown>
+          <ReactMarkdown disallowedElements={['script', 'iframe', 'object', 'embed']} unwrapDisallowed>{mdContent}</ReactMarkdown>
         </div>
       ) : ext === 'pdf' ? (
-        <iframe src={downloadUrl} className="w-full" style={{ height: '500px', background: '#fff' }} title="PDF preview" />
+        <iframe src={downloadUrl} className="w-full" style={{ height: '500px', background: '#fff' }} title="PDF preview" sandbox="allow-scripts allow-same-origin" />
       ) : (
         <div className="p-4 text-center" style={{ background: 'var(--surface-secondary)' }}>
           <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>미리보기를 지원하지 않는 파일 형식입니다.</p>
         </div>
       )}
       <div className="p-3 border-t" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-        <a href={downloadUrl} download={submission.file_name}>
-          <button className="px-4 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)' }}>
-            ⬇ 다운로드 ({submission.file_name})
-          </button>
-        </a>
+        <button
+          onClick={() => window.open(downloadUrl, '_blank')}
+          className="px-4 py-2 rounded-lg text-xs font-semibold"
+          style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)' }}
+        >
+          ⬇ 다운로드 ({submission.file_name})
+        </button>
       </div>
     </div>
   )
@@ -47,7 +50,6 @@ function FilePreview({ submission, downloadUrl }: { submission: Submission; down
 export default function SubmissionReviewPage() {
   const { id, userId } = useParams<{ id: string; userId: string }>()
   const [submissions, setSubmissions] = useState<Submission[]>([])
-  const [downloadUrls, setDownloadUrls] = useState<Record<string, string>>({})
   const [comment, setComment] = useState('')
   const [saving, setSaving] = useState(false)
   const [activeSubId, setActiveSubId] = useState<string | null>(null)
@@ -56,28 +58,31 @@ export default function SubmissionReviewPage() {
     apiFetch<Submission[]>(`/api/admin/homeworks/${id}/submissions/${userId}`).then(subs => {
       setSubmissions(subs)
       if (subs.length > 0) setActiveSubId(subs[0].id)
-      subs.forEach(sub => {
-        setDownloadUrls(prev => ({ ...prev, [sub.id]: `/api/admin/storage/${sub.id}/download` }))
-      })
     })
   }, [id, userId])
 
   async function handleStatus(subId: string, status: string) {
     setSaving(true)
-    await apiFetch(`/api/admin/submissions/${subId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
-    setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: status as Submission['status'] } : s))
-    setSaving(false)
+    try {
+      await apiFetch(`/api/admin/submissions/${subId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+      setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: status as Submission['status'] } : s))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleComment(subId: string) {
     if (!comment.trim()) return
     setSaving(true)
-    const newComment = await apiFetch<Comment>(`/api/admin/submissions/${subId}/comments`, {
-      method: 'POST', body: JSON.stringify({ body: comment }),
-    })
-    setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, comments: [...(s.comments ?? []), newComment] } : s))
-    setComment('')
-    setSaving(false)
+    try {
+      const newComment = await apiFetch<Comment>(`/api/admin/submissions/${subId}/comments`, {
+        method: 'POST', body: JSON.stringify({ body: comment }),
+      })
+      setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, comments: [...(s.comments ?? []), newComment] } : s))
+      setComment('')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const activeSub = submissions.find(s => s.id === activeSubId)
@@ -117,9 +122,7 @@ export default function SubmissionReviewPage() {
             </span>
           </div>
 
-          {downloadUrls[activeSub.id] && (
-            <FilePreview submission={activeSub} downloadUrl={downloadUrls[activeSub.id]} />
-          )}
+          <FilePreview submission={activeSub} downloadUrl={`/api/admin/storage/${activeSub.id}/download`} />
 
           <div className="mt-4 flex gap-2">
             <button onClick={() => handleStatus(activeSub.id, 'accepted')} disabled={saving}
