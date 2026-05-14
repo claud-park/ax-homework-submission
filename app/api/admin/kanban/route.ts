@@ -20,14 +20,19 @@ export async function GET(req: NextRequest) {
   const { data: submissions, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  // Supabase returns the joined row as `users` (table name); rename to `user` for the client
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const normalize = (list: any[]) => list.map(({ users, ...rest }) => ({ ...rest, user: users }))
+
   const { data: allUsers } = await supabase.from('users').select('*')
   const submittedUserIds = new Set((submissions ?? []).map((s: { user_id: string }) => s.user_id))
   const notSubmitted = (allUsers ?? []).filter((u: { id: string }) => !submittedUserIds.has(u.id))
 
+  const all = submissions ?? []
   return NextResponse.json({
-    pending: (submissions ?? []).filter((s: { status: string }) => s.status === 'pending'),
-    accepted: (submissions ?? []).filter((s: { status: string }) => s.status === 'accepted'),
-    declined: (submissions ?? []).filter((s: { status: string }) => s.status === 'declined'),
+    pending: normalize(all.filter((s: { status: string }) => s.status === 'pending')),
+    accepted: normalize(all.filter((s: { status: string }) => s.status === 'accepted')),
+    declined: normalize(all.filter((s: { status: string }) => s.status === 'declined')),
     not_submitted: homeworkId ? notSubmitted : [],
   })
 }

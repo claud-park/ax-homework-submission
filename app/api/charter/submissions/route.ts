@@ -7,27 +7,23 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
   const { data, error } = await supabase
-    .from('milestones')
-    .select('*, milestone_deliverables(*)')
+    .from('charter_submissions')
+    .select('*')
     .eq('user_id', user.id)
-    .order('week_number').order('display_order')
+    .order('submitted_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalized = (data ?? []).map(({ milestone_deliverables, ...rest }: any) => ({ ...rest, deliverables: milestone_deliverables }))
-  return NextResponse.json(normalized)
+  return NextResponse.json(data)
 }
 
 export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json()
-  const { week_number, title, start_date, due_date, description } = body
-  if (!week_number || !title || !start_date || !due_date)
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  const { project_name, content } = await req.json()
+  if (!content) return NextResponse.json({ error: 'Missing content' }, { status: 400 })
   const supabase = createServiceClient()
   const { data, error } = await supabase
-    .from('milestones')
-    .insert({ user_id: user.id, week_number, title, start_date, due_date, description })
+    .from('charter_submissions')
+    .insert({ user_id: user.id, project_name, content })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

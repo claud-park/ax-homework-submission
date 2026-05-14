@@ -5,6 +5,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
+import DatePicker from '@/components/DatePicker'
 
 function TipTapEditor({ editor }: { editor: ReturnType<typeof useEditor> }) {
   if (!editor) return null
@@ -31,7 +32,7 @@ function TipTapEditor({ editor }: { editor: ReturnType<typeof useEditor> }) {
           <button key={b.label} onMouseDown={e => { e.preventDefault(); b.cmd() }} style={btnStyle(b.active)}>{b.label}</button>
         ))}
       </div>
-      <EditorContent editor={editor} className="p-3 min-h-32 text-sm prose prose-invert max-w-none" />
+      <EditorContent editor={editor} className="p-3 min-h-32 text-sm prose max-w-none" />
     </div>
   )
 }
@@ -85,7 +86,7 @@ export default function CreateHomeworkPage() {
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input type="text" placeholder="과제 제목" value={title} onChange={e => setTitle(e.target.value)} required style={inputStyle} />
-        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required style={inputStyle} />
+        <DatePicker value={dueDate} onChange={setDueDate} required placeholder="마감일 선택" style={inputStyle} />
         <div>
           <p className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-secondary)' }}>과제 설명</p>
           <TipTapEditor editor={editor} />

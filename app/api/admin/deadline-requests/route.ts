@@ -11,5 +11,7 @@ export async function GET(req: NextRequest) {
     .select('*, milestones(*), users!deadline_change_requests_user_id_fkey(*)')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const normalized = (data ?? []).map(({ users, milestones, ...rest }: any) => ({ ...rest, user: users, milestone: milestones }))
+  return NextResponse.json(normalized)
 }

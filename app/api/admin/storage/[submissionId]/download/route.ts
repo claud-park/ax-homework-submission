@@ -18,5 +18,5 @@ export async function GET(req: NextRequest, { params }: { params: { submissionId
     .createSignedUrl(submission.file_path, 60)
   if (signError || !signedData)
     return NextResponse.json({ error: 'Could not generate download URL' }, { status: 500 })
-  return NextResponse.redirect(signedData.signedUrl)
+  return NextResponse.json({ url: signedData.signedUrl })
 }

@@ -4,7 +4,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 const NAV = [
   { label: '📋 과제', href: '/' },
-  { label: '📄 제정의서', href: '/charter' },
+  { label: '📄 과제정의서', href: '/charter' },
   { label: '📅 WBS', href: '/milestones' },
   { label: '📊 진척도', href: '/progress' },
 ]
@@ -32,7 +32,7 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
               className="text-xs px-3 py-2 rounded-lg font-medium transition-colors"
               style={{
                 background: active ? 'rgba(37,99,235,0.15)' : 'transparent',
-                color: active ? '#7dd3fc' : 'var(--text-secondary)',
+                color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
               }}
             >
               {item.label}

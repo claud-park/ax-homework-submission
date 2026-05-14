@@ -34,7 +34,7 @@ export default function AdminReportsPage() {
     if (!reportRef.current) return
     const { default: jsPDF } = await import('jspdf')
     const { default: html2canvas } = await import('html2canvas')
-    const canvas = await html2canvas(reportRef.current, { backgroundColor: '#141414', scale: 2 })
+    const canvas = await html2canvas(reportRef.current, { backgroundColor: '#ffffff', scale: 2 })
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const imgData = canvas.toDataURL('image/png')
     const pageWidth = pdf.internal.pageSize.getWidth()

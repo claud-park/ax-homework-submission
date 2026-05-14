@@ -22,18 +22,46 @@ export default function AdminRequestsPage() {
     setRequests(prev => prev.map(r => r.id === id ? updated : r))
   }
 
+  // Per milestone: all pending + most recent resolved
+  const displayed = (() => {
+    const byMilestone = new Map<string, DeadlineChangeRequest[]>()
+    for (const r of requests) {
+      const list = byMilestone.get(r.milestone_id) ?? []
+      list.push(r)
+      byMilestone.set(r.milestone_id, list)
+    }
+    const result: DeadlineChangeRequest[] = []
+    Array.from(byMilestone.values()).forEach(reqs => {
+      reqs.filter((r: DeadlineChangeRequest) => r.status === 'pending').forEach((r: DeadlineChangeRequest) => result.push(r))
+      const resolved = reqs.find((r: DeadlineChangeRequest) => r.status === 'approved' || r.status === 'rejected')
+      if (resolved) result.push(resolved)
+    })
+    return result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  })()
+
   return (
     <div>
       <h1 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>기한 변경 요청</h1>
       <div className="flex flex-col gap-3">
-        {requests.map(req => (
+        {displayed.map(req => (
           <div key={req.id} className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
             <div className="flex items-center justify-between mb-2">
               <div>
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  {req.user?.name} · {req.milestone?.title}
-                </p>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  {req.user?.avatar_url && (
+                    <img src={req.user.avatar_url} alt={req.user.name} className="w-5 h-5 rounded-full" />
+                  )}
+                  <span className="text-xs font-semibold" style={{ color: 'var(--blue-600)' }}>{req.user?.name}</span>
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  {req.milestone?.week_number && (
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' }}>
+                      {req.milestone.week_number}주차
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{req.milestone?.title}</span>
+                </div>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                   {req.original_due_date} → {req.requested_due_date}
                 </p>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>사유: {req.reason}</p>
@@ -54,7 +82,7 @@ export default function AdminRequestsPage() {
             )}
           </div>
         ))}
-        {requests.length === 0 && <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>기한 변경 요청이 없습니다.</p>}
+        {displayed.length === 0 && <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>기한 변경 요청이 없습니다.</p>}
       </div>
     </div>
   )

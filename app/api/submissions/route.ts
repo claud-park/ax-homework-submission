@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
+function sanitizeFileName(name: string): string {
+  const dotIdx = name.lastIndexOf('.')
+  const ext = dotIdx !== -1 ? name.slice(dotIdx) : ''
+  const base = dotIdx !== -1 ? name.slice(0, dotIdx) : name
+  return base.replace(/[^a-zA-Z0-9._-]/g, '_') + ext
+}
+
 export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -24,7 +31,8 @@ export async function POST(req: NextRequest) {
   const attemptNumber = (count ?? 0) + 1
 
   // Upload file
-  const filePath = `${user.id}/${homeworkId}/${attemptNumber}/${file.name}`
+  const safeFileName = sanitizeFileName(file.name)
+  const filePath = `${user.id}/${homeworkId}/${attemptNumber}/${safeFileName}`
   const arrayBuffer = await file.arrayBuffer()
   const { error: uploadError } = await supabase.storage
     .from('submissions')

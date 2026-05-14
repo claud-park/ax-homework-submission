@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const { data, error } = await supabase
     .from('deadline_change_requests')
-    .update({ status, review_note, support_assignee, reviewed_by: admin.id, reviewed_at: new Date().toISOString() })
+    .update({ status, review_note, support_assignee, reviewed_at: new Date().toISOString() })
     .eq('id', params.id)
     .select()
     .single()

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string; commentId: string } }) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { body: commentBody } = await req.json()
@@ -11,9 +11,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('comments')
-    .insert({ submission_id: params.id, body: commentBody.trim(), author_role: 'admin' })
+    .update({ body: commentBody.trim(), updated_at: new Date().toISOString() })
+    .eq('id', params.commentId)
+    .eq('submission_id', params.id)
+    .eq('author_role', 'admin')
     .select()
     .single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data, { status: 201 })
+  if (error || !data) return NextResponse.json({ error: error?.message ?? 'Not found' }, { status: 404 })
+  return NextResponse.json(data)
 }

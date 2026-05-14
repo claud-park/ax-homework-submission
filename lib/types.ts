@@ -35,7 +35,18 @@ export interface Comment {
   id: string
   submission_id: string
   body: string
+  author_role: 'admin' | 'user'
+  author_id: string | null
   created_at: string
+  updated_at: string
+}
+
+export interface CharterSubmission {
+  id: string
+  user_id: string
+  project_name: string | null
+  content: ProjectCharter['content']
+  submitted_at: string
 }
 
 export interface ProjectCharter {

@@ -6,7 +6,7 @@ const NAV = [
   { label: '📋 대시보드', href: '/admin' },
   { label: '📦 제출 현황', href: '/admin/kanban' },
   { label: '📊 진척도', href: '/admin/progress' },
-  { label: '📅 기한 요청', href: '/admin/requests' },
+  { label: '📅 기한 변경 요청', href: '/admin/requests' },
   { label: '📄 주간 리포트', href: '/admin/reports' },
 ]
 
@@ -35,7 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className="text-xs px-3 py-2 rounded-lg font-medium"
               style={{
                 background: active ? 'rgba(37,99,235,0.15)' : 'transparent',
-                color: active ? '#7dd3fc' : 'var(--text-secondary)',
+                color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
               }}
             >
               {item.label}

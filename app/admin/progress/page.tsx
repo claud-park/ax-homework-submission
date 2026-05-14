@@ -41,7 +41,7 @@ export default function AdminProgressPage() {
       <h1 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>챔피언 진척도 비교</h1>
       <div className="flex gap-2 flex-wrap mb-6">
         {users.map(u => (
-          <label key={u.id} className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg border text-xs" style={{ background: selectedUsers.has(u.id) ? 'rgba(37,99,235,0.15)' : 'var(--surface-primary)', borderColor: selectedUsers.has(u.id) ? 'var(--blue-600)' : 'var(--border-subtle)', color: selectedUsers.has(u.id) ? '#7dd3fc' : 'var(--text-secondary)' }}>
+          <label key={u.id} className="flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg border text-xs" style={{ background: selectedUsers.has(u.id) ? 'rgba(37,99,235,0.15)' : 'var(--surface-primary)', borderColor: selectedUsers.has(u.id) ? 'var(--blue-600)' : 'var(--border-subtle)', color: selectedUsers.has(u.id) ? 'var(--blue-600)' : 'var(--text-secondary)' }}>
             <input type="checkbox" checked={selectedUsers.has(u.id)} onChange={() => toggleUser(u.id)} className="hidden" />
             {u.name}
           </label>

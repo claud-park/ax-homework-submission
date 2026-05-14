@@ -12,5 +12,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('homework_id', parseInt(params.id))
     .order('submitted_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  // Rename `users` → `user` to match client type (Supabase join uses table name as key)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const normalized = (data ?? []).map(({ users, ...rest }: any) => ({ ...rest, user: users }))
+  return NextResponse.json(normalized)
 }

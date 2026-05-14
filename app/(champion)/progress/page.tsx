@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone } from '@/lib/types'
 
@@ -19,29 +19,35 @@ export default function ProgressPage() {
 
   useEffect(() => {
     apiFetch<Milestone[]>('/api/milestones').then(setMilestones)
-    import('gantt-task-react').then(m => setGanttComponent(m.Gantt as React.ComponentType<any>))
+    import('gantt-task-react').then(m => setGanttComponent(() => m.Gantt as React.ComponentType<any>))
   }, [])
 
   const delayed = milestones.filter(m => m.status === 'delayed')
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
 
-  const tasks = milestones.map(m => ({
-    id: m.id,
-    name: m.title,
-    start: new Date(m.start_date),
-    end: new Date(m.due_date),
-    type: 'task' as const,
-    progress: m.status === 'completed' ? 100 : m.status === 'in_progress' ? 50 : 0,
-    styles: {
-      progressColor: STATUS_COLOR[m.status],
-      progressSelectedColor: STATUS_COLOR[m.status],
-      backgroundColor: STATUS_COLOR[m.status] + '40',
-      backgroundSelectedColor: STATUS_COLOR[m.status] + '60',
-    },
-    isDisabled: true,
-    project: `${m.week_number}주차`,
-  }))
+  const tasks = useMemo(() => milestones
+    .filter(m => m.start_date && m.due_date)
+    .map(m => {
+      const start = new Date(m.start_date)
+      let end = new Date(m.due_date)
+      if (end <= start) end = new Date(start.getTime() + 86400000)
+      return {
+        id: m.id,
+        name: m.title,
+        start,
+        end,
+        type: 'task' as const,
+        progress: m.status === 'completed' ? 100 : m.status === 'in_progress' ? 50 : 0,
+        styles: {
+          progressColor: STATUS_COLOR[m.status],
+          progressSelectedColor: STATUS_COLOR[m.status],
+          backgroundColor: STATUS_COLOR[m.status] + '40',
+          backgroundSelectedColor: STATUS_COLOR[m.status] + '60',
+        },
+        isDisabled: true,
+      }
+    }), [milestones])
 
   return (
     <div>

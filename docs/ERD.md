@@ -41,8 +41,11 @@
 |---|---|---|
 | 🔑 id | uuid PK | |
 | 🔗 submission_id | uuid FK | → submissions.id |
-| body | text NOT NULL | admin-authored |
+| body | text NOT NULL | |
+| author_role | text | `admin` \| `user` (check constraint) |
+| 🔗 author_id | uuid FK | → users.id (null for admin comments) |
 | created_at | timestamptz | |
+| updated_at | timestamptz | set on edit |
 
 ---
 
@@ -137,6 +140,7 @@ On approve → API route updates `milestones.due_date` to `requested_due_date`.
 users             1 ──< N  submissions
 homeworks         1 ──< N  submissions
 submissions       1 ──< N  comments
+users             1 ──< N  comments (via author_id, nullable)
 
 users             1 ──< 1  project_charters
 users             1 ──< N  milestones

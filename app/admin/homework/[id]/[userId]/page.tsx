@@ -10,25 +10,109 @@ const STATUS_COLOR: Record<string, string> = {
   pending: 'var(--amber)', accepted: 'var(--success)', declined: 'var(--error)',
 }
 
-function FilePreview({ submission, downloadUrl }: { submission: Submission; downloadUrl: string }) {
+function CommentItem({
+  comment, onEdit,
+}: {
+  comment: Comment
+  onEdit: (c: Comment, newBody: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [body, setBody] = useState(comment.body)
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (!body.trim() || body.trim() === comment.body) { setEditing(false); return }
+    setSaving(true)
+    try {
+      await onEdit(comment, body.trim())
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const isAdmin = comment.author_role === 'admin'
+  const badge = isAdmin
+    ? { label: '관리자', color: 'var(--amber)', bg: 'rgba(217,119,6,0.1)' }
+    : { label: '챔피언', color: 'var(--blue-600)', bg: 'rgba(37,99,235,0.1)' }
+
+  return (
+    <div className="mb-2 p-2 rounded-lg" style={{ background: 'var(--surface-secondary)' }}>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold px-1.5 py-0.5 rounded shrink-0"
+          style={{ color: badge.color, background: badge.bg, fontSize: '10px' }}>
+          {badge.label}
+        </span>
+        {editing ? (
+          <div className="flex-1">
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              rows={2}
+              className="w-full text-xs rounded p-2 resize-none"
+              style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+            />
+            <div className="flex gap-2 mt-1">
+              <button onClick={() => { setEditing(false); setBody(comment.body) }}
+                className="text-xs px-2 py-1 rounded"
+                style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                취소
+              </button>
+              <button onClick={save} disabled={saving || !body.trim()}
+                className="text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+                style={{ background: 'var(--blue-600)', color: '#fff' }}>
+                저장
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-between gap-2">
+            <p className="text-xs" style={{ color: 'var(--text-primary)' }}>{comment.body}</p>
+            {isAdmin && (
+              <button onClick={() => setEditing(true)}
+                className="text-xs shrink-0"
+                style={{ color: 'var(--text-disabled)' }}>
+                편집
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <p className="text-xs mt-1 ml-[52px]" style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>
+        {new Date(comment.created_at).toLocaleString('ko-KR')}
+        {comment.updated_at !== comment.created_at && ' · 편집됨'}
+      </p>
+    </div>
+  )
+}
+
+function FilePreview({ submission, fileUrl }: { submission: Submission; fileUrl: string | null }) {
   const ext = submission.file_name.split('.').pop()?.toLowerCase()
   const [mdContent, setMdContent] = useState<string | null>(null)
 
   useEffect(() => {
     setMdContent(null)
-    if (ext === 'md') {
-      fetch(downloadUrl).then(r => r.text()).then(setMdContent)
+    if (ext === 'md' && fileUrl) {
+      fetch(fileUrl).then(r => r.text()).then(setMdContent).catch(() => setMdContent('파일을 불러올 수 없습니다.'))
     }
-  }, [downloadUrl, ext])
+  }, [fileUrl, ext])
+
+  if (!fileUrl) {
+    return (
+      <div className="mt-3 rounded-xl border p-4 text-center" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}>
+        <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>파일 URL 로딩 중...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mt-3 rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
       {ext === 'md' && mdContent !== null ? (
-        <div className="p-4 prose prose-invert max-w-none text-sm" style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}>
+        <div className="p-4 prose max-w-none text-sm" style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}>
           <ReactMarkdown disallowedElements={['script', 'iframe', 'object', 'embed']} unwrapDisallowed>{mdContent}</ReactMarkdown>
         </div>
       ) : ext === 'pdf' ? (
-        <iframe src={downloadUrl} className="w-full" style={{ height: '500px', background: '#fff' }} title="PDF preview" sandbox="allow-scripts allow-same-origin" />
+        <iframe src={fileUrl} className="w-full" style={{ height: '500px', background: '#fff' }} title="PDF preview" sandbox="allow-scripts allow-same-origin" />
       ) : (
         <div className="p-4 text-center" style={{ background: 'var(--surface-secondary)' }}>
           <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>미리보기를 지원하지 않는 파일 형식입니다.</p>
@@ -36,7 +120,7 @@ function FilePreview({ submission, downloadUrl }: { submission: Submission; down
       )}
       <div className="p-3 border-t" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
         <button
-          onClick={() => window.open(downloadUrl, '_blank')}
+          onClick={() => window.open(fileUrl, '_blank')}
           className="px-4 py-2 rounded-lg text-xs font-semibold"
           style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)' }}
         >
@@ -53,6 +137,7 @@ export default function SubmissionReviewPage() {
   const [comment, setComment] = useState('')
   const [saving, setSaving] = useState(false)
   const [activeSubId, setActiveSubId] = useState<string | null>(null)
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
 
   useEffect(() => {
     apiFetch<Submission[]>(`/api/admin/homeworks/${id}/submissions/${userId}`).then(subs => {
@@ -60,6 +145,14 @@ export default function SubmissionReviewPage() {
       if (subs.length > 0) setActiveSubId(subs[0].id)
     })
   }, [id, userId])
+
+  useEffect(() => {
+    if (!activeSubId) return
+    setFileUrl(null)
+    apiFetch<{ url: string }>(`/api/admin/storage/${activeSubId}/download`)
+      .then(data => setFileUrl(data.url))
+      .catch(() => setFileUrl(null))
+  }, [activeSubId])
 
   async function handleStatus(subId: string, status: string) {
     setSaving(true)
@@ -83,6 +176,17 @@ export default function SubmissionReviewPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleEditComment(subId: string, c: Comment, newBody: string) {
+    const updated = await apiFetch<Comment>(`/api/admin/submissions/${subId}/comments/${c.id}`, {
+      method: 'PATCH', body: JSON.stringify({ body: newBody }),
+    })
+    setSubmissions(prev => prev.map(s =>
+      s.id === subId
+        ? { ...s, comments: (s.comments ?? []).map(cm => cm.id === c.id ? updated : cm) }
+        : s
+    ))
   }
 
   const activeSub = submissions.find(s => s.id === activeSubId)
@@ -122,7 +226,7 @@ export default function SubmissionReviewPage() {
             </span>
           </div>
 
-          <FilePreview submission={activeSub} downloadUrl={`/api/admin/storage/${activeSub.id}/download`} />
+          <FilePreview submission={activeSub} fileUrl={fileUrl} />
 
           <div className="mt-4 flex gap-2">
             <button onClick={() => handleStatus(activeSub.id, 'accepted')} disabled={saving}
@@ -137,6 +241,21 @@ export default function SubmissionReviewPage() {
             </button>
           </div>
 
+          {/* Comments */}
+          {activeSub.comments && activeSub.comments.length > 0 && (
+            <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>코멘트</p>
+              {activeSub.comments.map(c => (
+                <CommentItem
+                  key={c.id}
+                  comment={c}
+                  onEdit={(comment, newBody) => handleEditComment(activeSub.id, comment, newBody)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* New comment form */}
           <div className="mt-4">
             <textarea
               value={comment}
@@ -155,17 +274,6 @@ export default function SubmissionReviewPage() {
               코멘트 저장
             </button>
           </div>
-
-          {activeSub.comments && activeSub.comments.length > 0 && (
-            <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-              {activeSub.comments.map(c => (
-                <div key={c.id} className="mb-2 p-2 rounded-lg" style={{ background: 'var(--surface-secondary)' }}>
-                  <p className="text-xs" style={{ color: 'var(--text-primary)' }}>{c.body}</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>{new Date(c.created_at).toLocaleString('ko-KR')}</p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
