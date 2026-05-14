@@ -1,0 +1,61 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/api-client'
+import type { DeadlineChangeRequest } from '@/lib/types'
+
+const STATUS_COLOR: Record<string, string> = {
+  pending: 'var(--amber)', approved: 'var(--success)', rejected: 'var(--error)',
+}
+const STATUS_LABEL: Record<string, string> = { pending: '검토 중', approved: '승인됨', rejected: '반려됨' }
+
+export default function AdminRequestsPage() {
+  const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
+
+  useEffect(() => {
+    apiFetch<DeadlineChangeRequest[]>('/api/admin/deadline-requests').then(setRequests)
+  }, [])
+
+  async function handleReview(id: string, status: 'approved' | 'rejected', review_note?: string) {
+    const updated = await apiFetch<DeadlineChangeRequest>(`/api/admin/deadline-requests/${id}`, {
+      method: 'PATCH', body: JSON.stringify({ status, review_note }),
+    })
+    setRequests(prev => prev.map(r => r.id === id ? updated : r))
+  }
+
+  return (
+    <div>
+      <h1 className="text-lg font-bold mb-6" style={{ color: 'var(--text-primary)' }}>기한 변경 요청</h1>
+      <div className="flex flex-col gap-3">
+        {requests.map(req => (
+          <div key={req.id} className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {req.user?.name} · {req.milestone?.title}
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  {req.original_due_date} → {req.requested_due_date}
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>사유: {req.reason}</p>
+              </div>
+              <span className="text-xs font-semibold px-2 py-1 rounded" style={{ color: STATUS_COLOR[req.status], background: `${STATUS_COLOR[req.status]}20` }}>
+                {STATUS_LABEL[req.status]}
+              </span>
+            </div>
+            {req.status === 'pending' && (
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => handleReview(req.id, 'approved')} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}>
+                  ✓ 승인
+                </button>
+                <button onClick={() => handleReview(req.id, 'rejected')} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
+                  ✗ 반려
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {requests.length === 0 && <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>기한 변경 요청이 없습니다.</p>}
+      </div>
+    </div>
+  )
+}
