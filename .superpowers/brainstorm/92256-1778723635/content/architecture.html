@@ -1,0 +1,70 @@
+<h2>System Architecture</h2>
+<p class="subtitle">How the pieces connect — does this look right?</p>
+
+<div class="section">
+  <h3>Security Boundary</h3>
+  <div class="mockup">
+    <div class="mockup-header">Data Flow (Nothing touches DB from the browser)</div>
+    <div class="mockup-body" style="font-family:monospace;font-size:13px;line-height:2">
+      <div style="display:grid;grid-template-columns:1fr 80px 1fr 80px 1fr;gap:8px;align-items:center;text-align:center">
+        <div style="background:#1a1a2e;border:1px solid #444;padding:12px;border-radius:8px">
+          <div style="color:#7dd3fc;font-weight:bold">Browser (CSR)</div>
+          <div style="color:#aaa;font-size:11px;margin-top:4px">React pages<br>Supabase Auth session<br>(JWT only)</div>
+        </div>
+        <div style="color:#f59e0b;font-weight:bold">→ JWT →</div>
+        <div style="background:#1a2e1a;border:2px solid #4ade80;padding:12px;border-radius:8px">
+          <div style="color:#4ade80;font-weight:bold">Next.js API Routes</div>
+          <div style="color:#aaa;font-size:11px;margin-top:4px">Verify JWT<br>Use service key<br>All DB operations here</div>
+        </div>
+        <div style="color:#f59e0b;font-weight:bold">→ SK →</div>
+        <div style="background:#2e1a1a;border:1px solid #f87171;padding:12px;border-radius:8px">
+          <div style="color:#f87171;font-weight:bold">Supabase</div>
+          <div style="color:#aaa;font-size:11px;margin-top:4px">PostgreSQL DB<br>Auth (JWT issuer)<br>Storage (files)</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:12px;color:#6b7280;font-size:11px">
+        Service key (SK) never leaves the server · Browser only holds a JWT · RLS set to DENY ALL
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Auth Flow</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="background:#111;border:1px solid #333;padding:16px;border-radius:8px">
+      <div style="color:#7dd3fc;font-weight:bold;margin-bottom:8px">👤 User</div>
+      <div style="color:#ccc;font-size:13px;line-height:1.8">
+        1. Click "Sign in with Google"<br>
+        2. Supabase OAuth redirect<br>
+        3. JWT stored in Supabase session<br>
+        4. All API calls include JWT header<br>
+        5. API routes verify JWT → user identity
+      </div>
+    </div>
+    <div style="background:#111;border:1px solid #333;padding:16px;border-radius:8px">
+      <div style="color:#f87171;font-weight:bold;margin-bottom:8px">🔐 Admin</div>
+      <div style="color:#ccc;font-size:13px;line-height:1.8">
+        1. Enter email + password on /admin/login<br>
+        2. Supabase signInWithPassword<br>
+        3. JWT contains <code style="color:#4ade80">role: admin</code> in metadata<br>
+        4. API routes check role claim<br>
+        5. Non-admin JWT → 403 on admin routes
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Tech Stack</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+    <div style="background:#111;border:1px solid #333;padding:10px;border-radius:6px">
+      <span style="color:#7dd3fc">Frontend</span><br>
+      <span style="color:#aaa">Next.js 14 (App Router, CSR)<br>TailwindCSS<br>TipTap (WYSIWYG editor)<br>react-markdown (MD viewer)</span>
+    </div>
+    <div style="background:#111;border:1px solid #333;padding:10px;border-radius:6px">
+      <span style="color:#7dd3fc">Backend</span><br>
+      <span style="color:#aaa">Next.js API Routes (service key)<br>Supabase Auth (JWT)<br>Supabase PostgreSQL<br>Supabase Storage (files)</span>
+    </div>
+  </div>
+</div>

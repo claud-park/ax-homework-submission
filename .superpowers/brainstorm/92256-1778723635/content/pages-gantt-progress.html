@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gantt + Progress Pages</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #141414; color: #f5f5f5; font-family: 'Pretendard', sans-serif; padding: 28px 24px; }
+  h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
+  .screens { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .screen-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .screen-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+  .desktop { background: #1a1a1a; border-radius: 16px; border: 1px solid #2a2a2a; overflow: hidden; }
+  .layout { display: flex; min-height: 520px; }
+  .sidebar { width: 160px; background: #141414; padding: 16px 14px; border-right: 1px solid #222; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px; }
+  .sidebar-logo { font-size: 13px; font-weight: 700; margin-bottom: 16px; }
+  .nav-item { font-size: 12px; padding: 7px 9px; border-radius: 7px; color: #888; display: flex; align-items: center; gap: 7px; }
+  .nav-item.active { background: #1e2d4a; color: #7dd3fc; font-weight: 600; }
+  .sidebar-bottom { margin-top: auto; }
+  .logout-btn { font-size: 12px; color: #555; padding: 7px 9px; }
+  .main { flex: 1; padding: 18px; overflow: hidden; }
+  .page-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .page-sub { font-size: 12px; color: #888; margin-bottom: 16px; }
+
+  /* ── GANTT ── */
+  .gantt-wrap { overflow-x: auto; }
+  .gantt-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .gantt-table th { color: #555; text-align: center; padding: 5px 4px; border-bottom: 1px solid #222; font-weight: 600; font-size: 10px; border-right: 1px solid #1e1e1e; }
+  .gantt-table td { padding: 5px 4px; border-bottom: 1px solid #1a1a1a; border-right: 1px solid #1e1e1e; }
+  .gantt-label { color: #ccc; font-weight: 600; white-space: nowrap; padding-right: 10px !important; min-width: 120px; }
+  .gantt-week { color: #555; font-size: 10px; min-width: 28px; }
+  .bar { height: 18px; border-radius: 4px; display: flex; align-items: center; padding: 0 6px; font-size: 10px; font-weight: 600; white-space: nowrap; overflow: hidden; }
+  .bar-done { background: rgba(74,222,128,0.25); color: #4ade80; border: 1px solid rgba(74,222,128,0.4); }
+  .bar-progress { background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+  .bar-delayed { background: rgba(248,113,113,0.2); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+  .bar-none { background: #222; color: #555; border: 1px solid #333; }
+  .bar-span2 { grid-column: span 2; }
+  .today-col { background: rgba(37,99,235,0.06) !important; }
+
+  /* ── CHAMPION COMPARISON ── */
+  .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+  .filter-label { font-size: 11px; color: #888; font-weight: 600; }
+  .champ-check { display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
+  .champ-check input { accent-color: #2563eb; width: 14px; height: 14px; }
+  .champ-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .report-btn { margin-left: auto; background: #1e2d4a; color: #7dd3fc; border: 1px solid #2d3a5e; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
+
+  .gantt-champion-row td.gantt-label { display: flex; align-items: center; gap: 7px; }
+  .champ-avatar { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .champ-name { font-size: 11px; font-weight: 600; color: #ccc; }
+
+  /* Legend */
+  .legend { display: flex; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #888; }
+  .legend-box { width: 14px; height: 10px; border-radius: 3px; }
+  .l-done { background: rgba(74,222,128,0.3); border: 1px solid rgba(74,222,128,0.5); }
+  .l-progress { background: rgba(251,191,36,0.25); border: 1px solid rgba(251,191,36,0.4); }
+  .l-delayed { background: rgba(248,113,113,0.25); border: 1px solid rgba(248,113,113,0.4); }
+  .l-none { background: #222; border: 1px solid #333; }
+
+  .week-header { background: #141414; }
+  .today-header { background: rgba(37,99,235,0.2) !important; color: #7dd3fc !important; }
+</style>
+</head>
+<body>
+<h2>Gantt Chart + Progress Comparison</h2>
+<p class="subtitle">Personal Gantt (user) · Multi-champion comparison with checkboxes (admin)</p>
+
+<div class="screens">
+
+  <!-- ① PERSONAL GANTT (user view) -->
+  <div class="screen-wrap">
+    <div class="screen-label">① 내 진척도 (Personal Gantt) — User</div>
+    <div class="desktop" style="width:580px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">AX Homework</div>
+          <div class="nav-item">📋 과제</div>
+          <div class="nav-item">📄 제정의서</div>
+          <div class="nav-item">📅 WBS</div>
+          <div class="nav-item active">📊 진척도</div>
+          <div class="sidebar-bottom"><div class="logout-btn">로그아웃</div></div>
+        </div>
+        <div class="main">
+          <div class="page-title">내 진척도</div>
+          <div class="page-sub">AX 물류 자동화 개선 프로젝트</div>
+
+          <div class="legend">
+            <div class="legend-item"><div class="legend-box l-done"></div> 완료</div>
+            <div class="legend-item"><div class="legend-box l-progress"></div> 진행 중</div>
+            <div class="legend-item"><div class="legend-box l-delayed"></div> 지연 ⚠️</div>
+            <div class="legend-item"><div class="legend-box l-none"></div> 미시작</div>
+          </div>
+
+          <div class="gantt-wrap">
+            <table class="gantt-table">
+              <thead>
+                <tr>
+                  <th class="gantt-label week-header" style="text-align:left">마일스톤</th>
+                  <th class="week-header">1주</th>
+                  <th class="week-header">2주</th>
+                  <th class="today-header">3주 ◀</th>
+                  <th class="week-header">4주</th>
+                  <th class="week-header">5주</th>
+                  <th class="week-header">6주</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="gantt-label">AS-IS 현황 분석</td>
+                  <td colspan="1"><div class="bar bar-done">✓ 완료</div></td>
+                  <td></td><td class="today-col"></td><td></td><td></td><td></td>
+                </tr>
+                <tr>
+                  <td class="gantt-label">솔루션 설계</td>
+                  <td></td>
+                  <td colspan="1"><div class="bar bar-done">✓ 완료</div></td>
+                  <td class="today-col"></td><td></td><td></td><td></td>
+                </tr>
+                <tr>
+                  <td class="gantt-label">파일럿 개발</td>
+                  <td></td><td></td>
+                  <td class="today-col" colspan="2"><div class="bar bar-progress" style="width:100%">▶ 진행 중</div></td>
+                  <td></td><td></td>
+                </tr>
+                <tr>
+                  <td class="gantt-label" style="color:#f87171">파일럿 테스트 ⚠️</td>
+                  <td></td><td></td><td class="today-col"></td>
+                  <td colspan="1"><div class="bar bar-delayed">⚠️ 지연</div></td>
+                  <td></td><td></td>
+                </tr>
+                <tr>
+                  <td class="gantt-label" style="color:#555">성과 발표</td>
+                  <td></td><td></td><td class="today-col"></td><td></td>
+                  <td colspan="2"><div class="bar bar-none">미시작</div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top:14px;background:#2e1a00;border:1px solid #7c2d12;border-radius:8px;padding:10px 12px;font-size:11px;color:#fb923c;display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">⚠️</span>
+            <div><strong>4주차 파일럿 테스트</strong> 마감일(05.28)이 지났습니다. 기한을 변경하거나 산출물을 업로드해 주세요.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② MULTI-CHAMPION COMPARISON (admin view) -->
+  <div class="screen-wrap">
+    <div class="screen-label">② Champion 비교 진척도 (Admin) — Gantt + Checkbox Filter</div>
+    <div class="desktop" style="width:680px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">🔐 Admin</div>
+          <div class="nav-item">📋 과제</div>
+          <div class="nav-item">➕ 과제 생성</div>
+          <div class="nav-item active">📊 진척도 비교</div>
+          <div class="nav-item">📅 기한 변경 요청</div>
+          <div class="nav-item">📝 리포트</div>
+          <div class="sidebar-bottom"><div class="logout-btn">로그아웃</div></div>
+        </div>
+        <div class="main">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+            <div>
+              <div class="page-title">Champion 진척도 비교</div>
+              <div class="page-sub">전체 5명 · 주차별 마일스톤 현황</div>
+            </div>
+            <button class="report-btn">📄 주간 리포트 생성</button>
+          </div>
+
+          <!-- Champion filter checkboxes -->
+          <div class="filter-bar">
+            <span class="filter-label">Champion 선택:</span>
+            <label class="champ-check"><input type="checkbox" checked/><div class="champ-dot" style="background:#2563eb"></div>박지영</label>
+            <label class="champ-check"><input type="checkbox" checked/><div class="champ-dot" style="background:#7c3aed"></div>김민준</label>
+            <label class="champ-check"><input type="checkbox" checked/><div class="champ-dot" style="background:#0891b2"></div>이수현</label>
+            <label class="champ-check"><input type="checkbox"/><div class="champ-dot" style="background:#b45309"></div>정예진</label>
+            <label class="champ-check"><input type="checkbox"/><div class="champ-dot" style="background:#065f46"></div>오태양</label>
+          </div>
+
+          <div class="legend" style="margin-bottom:10px">
+            <div class="legend-item"><div class="legend-box l-done"></div> 완료</div>
+            <div class="legend-item"><div class="legend-box l-progress"></div> 진행 중</div>
+            <div class="legend-item"><div class="legend-box l-delayed"></div> 지연 ⚠️</div>
+            <div class="legend-item"><div class="legend-box l-none"></div> 미시작</div>
+            <div class="legend-item" style="margin-left:8px;color:#7dd3fc;font-size:10px">◀ 3주 = 이번 주</div>
+          </div>
+
+          <div class="gantt-wrap">
+            <table class="gantt-table">
+              <thead>
+                <tr>
+                  <th class="gantt-label week-header" style="text-align:left">Champion</th>
+                  <th class="week-header">1주</th>
+                  <th class="week-header">2주</th>
+                  <th class="today-header">3주◀</th>
+                  <th class="week-header">4주</th>
+                  <th class="week-header">5주</th>
+                  <th class="week-header">6주</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- 박지영 -->
+                <tr class="gantt-champion-row">
+                  <td class="gantt-label">
+                    <div class="champ-avatar" style="background:#2563eb">박</div>
+                    <div class="champ-name">박지영</div>
+                  </td>
+                  <td><div class="bar bar-done" style="font-size:9px">✓</div></td>
+                  <td><div class="bar bar-done" style="font-size:9px">✓</div></td>
+                  <td class="today-col"><div class="bar bar-progress" style="font-size:9px">▶</div></td>
+                  <td><div class="bar bar-delayed" style="font-size:9px">⚠️</div></td>
+                  <td><div class="bar bar-none" style="font-size:9px">-</div></td>
+                  <td></td>
+                </tr>
+                <!-- 김민준 -->
+                <tr class="gantt-champion-row">
+                  <td class="gantt-label">
+                    <div class="champ-avatar" style="background:#7c3aed">김</div>
+                    <div class="champ-name">김민준</div>
+                  </td>
+                  <td><div class="bar bar-done" style="font-size:9px">✓</div></td>
+                  <td><div class="bar bar-done" style="font-size:9px">✓</div></td>
+                  <td class="today-col"><div class="bar bar-done" style="font-size:9px">✓</div></td>
+                  <td><div class="bar bar-progress" style="font-size:9px">▶</div></td>
+                  <td><div class="bar bar-none" style="font-size:9px">-</div></td>
+                  <td></td>
+                </tr>
+                <!-- 이수현 -->
+                <tr class="gantt-champion-row">
+                  <td class="gantt-label">
+                    <div class="champ-avatar" style="background:#0891b2">이</div>
+                    <div class="champ-name">이수현</div>
+                  </td>
+                  <td><div class="bar bar-done" style="font-size:9px">✓</div></td>
+                  <td><div class="bar bar-delayed" style="font-size:9px">⚠️</div></td>
+                  <td class="today-col"><div class="bar bar-delayed" style="font-size:9px">⚠️</div></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Deadline change request panel -->
+          <div style="margin-top:14px;background:#111;border:1px solid #2a2a2a;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:12px;font-weight:600;color:#fb923c;margin-bottom:8px">📅 기한 변경 요청 <span style="background:rgba(251,146,60,0.15);color:#fb923c;padding:2px 7px;border-radius:5px;font-size:10px;margin-left:4px">2건 대기 중</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="background:#1a1a1a;border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border:1px solid #2a2a2a">
+                <div>
+                  <div style="font-size:12px;font-weight:600;color:#f5f5f5">이수현 · 2주차 솔루션 설계</div>
+                  <div style="font-size:11px;color:#888">05.14 → 05.21 변경 요청</div>
+                </div>
+                <div style="display:flex;gap:6px">
+                  <button style="background:rgba(74,222,128,0.15);color:#4ade80;border:1px solid rgba(74,222,128,0.3);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">승인</button>
+                  <button style="background:rgba(248,113,113,0.1);color:#f87171;border:1px solid rgba(248,113,113,0.2);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">반려</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

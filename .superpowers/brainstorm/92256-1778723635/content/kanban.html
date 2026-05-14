@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kanban Board</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #141414; color: #f5f5f5; font-family: 'Pretendard', sans-serif; padding: 28px 24px; }
+  h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
+
+  .screens { display: flex; flex-direction: column; gap: 32px; }
+  .screen-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .screen-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+  .desktop { background: #1a1a1a; border-radius: 16px; border: 1px solid #2a2a2a; overflow: hidden; }
+  .layout { display: flex; min-height: 520px; }
+  .sidebar { width: 160px; background: #141414; padding: 16px 14px; border-right: 1px solid #222; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px; }
+  .sidebar-logo { font-size: 13px; font-weight: 700; margin-bottom: 16px; }
+  .nav-item { font-size: 12px; padding: 7px 9px; border-radius: 7px; color: #888; display: flex; align-items: center; gap: 7px; }
+  .nav-item.active { background: #1e2d4a; color: #7dd3fc; font-weight: 600; }
+  .sidebar-bottom { margin-top: auto; }
+  .logout-btn { font-size: 12px; color: #555; padding: 7px 9px; }
+  .main { flex: 1; padding: 18px; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* ── TOP BAR ── */
+  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .page-title { font-size: 16px; font-weight: 700; }
+  .page-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .filter-row { display: flex; align-items: center; gap: 8px; }
+  .hw-select { background: #111; border: 1px solid #2a2a2a; border-radius: 8px; padding: 6px 10px; font-size: 12px; color: #ccc; font-family: inherit; }
+  .view-toggle { display: flex; background: #111; border: 1px solid #2a2a2a; border-radius: 8px; overflow: hidden; }
+  .toggle-btn { padding: 6px 10px; font-size: 11px; color: #555; cursor: pointer; border: none; background: transparent; font-family: inherit; }
+  .toggle-btn.active { background: #1e2d4a; color: #7dd3fc; font-weight: 600; }
+
+  /* ── KANBAN BOARD ── */
+  .board { display: flex; gap: 12px; flex: 1; overflow-x: auto; padding-bottom: 4px; }
+
+  .column { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 0; }
+  .col-header { padding: 10px 12px; border-radius: 10px 10px 0 0; display: flex; align-items: center; justify-content: space-between; }
+  .col-title { font-size: 12px; font-weight: 700; }
+  .col-count { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
+  .col-body { flex: 1; border-radius: 0 0 10px 10px; padding: 8px; min-height: 360px; display: flex; flex-direction: column; gap: 7px; transition: background 0.15s; }
+
+  /* Column themes */
+  .col-none .col-header { background: #1e1e1e; }
+  .col-none .col-title { color: #888; }
+  .col-none .col-count { background: #2a2a2a; color: #666; }
+  .col-none .col-body { background: #161616; border: 1px dashed #222; border-top: none; }
+
+  .col-pending .col-header { background: rgba(251,191,36,0.1); }
+  .col-pending .col-title { color: #fbbf24; }
+  .col-pending .col-count { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .col-pending .col-body { background: rgba(251,191,36,0.04); border: 1px solid rgba(251,191,36,0.12); border-top: none; }
+
+  .col-accepted .col-header { background: rgba(74,222,128,0.1); }
+  .col-accepted .col-title { color: #4ade80; }
+  .col-accepted .col-count { background: rgba(74,222,128,0.12); color: #4ade80; }
+  .col-accepted .col-body { background: rgba(74,222,128,0.03); border: 1px solid rgba(74,222,128,0.1); border-top: none; }
+
+  .col-declined .col-header { background: rgba(248,113,113,0.1); }
+  .col-declined .col-title { color: #f87171; }
+  .col-declined .col-count { background: rgba(248,113,113,0.12); color: #f87171; }
+  .col-declined .col-body { background: rgba(248,113,113,0.03); border: 1px solid rgba(248,113,113,0.1); border-top: none; }
+
+  /* ── CARDS ── */
+  .card {
+    background: #222;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    position: relative;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); border-color: #3a3a3a; }
+  .card.dragging { opacity: 0.5; transform: rotate(2deg) scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.6); cursor: grabbing; }
+  .card.drag-over { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.3); }
+
+  /* Drag handle indicator */
+  .drag-handle { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.15s; }
+  .card:hover .drag-handle { opacity: 1; }
+  .drag-dots { display: grid; grid-template-columns: repeat(2, 4px); gap: 2px; }
+  .drag-dot { width: 3px; height: 3px; border-radius: 50%; background: #555; }
+
+  .card-hw { font-size: 10px; font-weight: 600; color: #2563eb; margin-bottom: 4px; }
+  .card-name { font-size: 12px; font-weight: 600; color: #f5f5f5; margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
+  .avatar { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .card-meta { font-size: 10px; color: #555; display: flex; align-items: center; gap: 8px; }
+  .card-attempt { background: #1a1a1a; padding: 1px 6px; border-radius: 4px; color: #666; }
+  .card-file { display: flex; align-items: center; gap: 4px; color: #666; }
+
+  /* Drop zone highlight */
+  .col-body.drop-target { background: rgba(37,99,235,0.08) !important; border-color: rgba(37,99,235,0.3) !important; }
+
+  /* Drag instruction tooltip */
+  .drag-tip {
+    background: #1e2d4a; border: 1px solid #2d3a5e; border-radius: 8px;
+    padding: 8px 12px; font-size: 11px; color: #7dd3fc;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── CHAMPION VIEW (toggle) ── */
+  .champ-card { cursor: default; }
+  .champ-card:hover { transform: none; box-shadow: none; border-color: #2a2a2a; }
+  .hw-num { font-size: 10px; font-weight: 700; color: #2563eb; }
+  .hw-title { font-size: 12px; font-weight: 600; color: #f5f5f5; margin: 4px 0; }
+  .hw-due { font-size: 10px; color: #555; }
+</style>
+</head>
+<body>
+
+<h2>Kanban Board</h2>
+<p class="subtitle">Admin: drag submissions to change status · Champion: read-only board view of their homeworks</p>
+
+<div class="screens">
+
+  <!-- ① ADMIN KANBAN -->
+  <div class="screen-wrap">
+    <div class="screen-label">① Admin Kanban — drag to accept / decline submissions</div>
+    <div class="desktop" style="width:900px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">🔐 Admin</div>
+          <div class="nav-item">📋 과제</div>
+          <div class="nav-item active">🗂️ 칸반 보드</div>
+          <div class="nav-item">➕ 과제 생성</div>
+          <div class="nav-item">📊 진척도 비교</div>
+          <div class="nav-item">📅 기한 변경</div>
+          <div class="nav-item">📝 리포트</div>
+          <div class="sidebar-bottom"><div class="logout-btn">로그아웃</div></div>
+        </div>
+        <div class="main">
+          <div class="top-bar">
+            <div>
+              <div class="page-title">제출 칸반 보드</div>
+              <div class="page-sub">드래그로 제출 상태를 변경하세요</div>
+            </div>
+            <div class="filter-row">
+              <select class="hw-select">
+                <option>전체 과제</option>
+                <option selected># 02 Next.js 라우팅</option>
+                <option># 03 Supabase 연동</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="drag-tip">
+            ↕ 카드를 드래그하여 다른 열로 이동하면 제출 상태가 자동으로 업데이트됩니다
+          </div>
+
+          <div class="board">
+
+            <!-- 미제출 -->
+            <div class="column col-none">
+              <div class="col-header">
+                <span class="col-title">미제출</span>
+                <span class="col-count">2</span>
+              </div>
+              <div class="col-body">
+                <div class="card champ-card" style="cursor:default">
+                  <div class="card-hw"># 02 Next.js 라우팅</div>
+                  <div class="card-name">
+                    <div class="avatar" style="background:#b45309">정</div>
+                    정예진
+                  </div>
+                  <div class="card-meta"><span class="card-file">미제출</span></div>
+                </div>
+                <div class="card champ-card" style="cursor:default">
+                  <div class="card-hw"># 02 Next.js 라우팅</div>
+                  <div class="card-name">
+                    <div class="avatar" style="background:#065f46">오</div>
+                    오태양
+                  </div>
+                  <div class="card-meta"><span class="card-file">미제출</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 검토 중 -->
+            <div class="column col-pending">
+              <div class="col-header">
+                <span class="col-title">검토 중</span>
+                <span class="col-count">3</span>
+              </div>
+              <div class="col-body">
+                <div class="card">
+                  <div class="drag-handle"><div class="drag-dots"><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div></div></div>
+                  <div class="card-hw"># 02 Next.js 라우팅</div>
+                  <div class="card-name">
+                    <div class="avatar" style="background:#2563eb">박</div>
+                    박지영
+                  </div>
+                  <div class="card-meta">
+                    <span class="card-attempt">시도 #2</span>
+                    <span class="card-file">📄 routing-v2.zip</span>
+                  </div>
+                  <div class="card-meta" style="margin-top:4px;color:#666">05.25 제출</div>
+                </div>
+                <div class="card">
+                  <div class="drag-handle"><div class="drag-dots"><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div></div></div>
+                  <div class="card-hw"># 02 Next.js 라우팅</div>
+                  <div class="card-name">
+                    <div class="avatar" style="background:#0891b2">이</div>
+                    이수현
+                  </div>
+                  <div class="card-meta">
+                    <span class="card-attempt">시도 #1</span>
+                    <span class="card-file">📝 report.md</span>
+                  </div>
+                  <div class="card-meta" style="margin-top:4px;color:#666">05.24 제출</div>
+                </div>
+                <div class="card" style="border: 2px dashed #2563eb; background: rgba(37,99,235,0.06);">
+                  <div class="drag-handle"><div class="drag-dots"><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div><div class="drag-dot"></div></div></div>
+                  <div class="card-hw"># 02 Next.js 라우팅</div>
+                  <div class="card-name">
+                    <div class="avatar" style="background:#7c3aed">김</div>
+                    김민준
+                  </div>
+                  <div class="card-meta">
+                    <span class="card-attempt">시도 #1</span>
+                    <span class="card-file">📄 report.pdf</span>
+                  </div>
+                  <div style="font-size:10px;color:#2563eb;margin-top:5px">← 드래그 중...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 합격 (drop target highlighted) -->
+            <div class="column col-accepted">
+              <div class="col-header">
+                <span class="col-title">합격</span>
+                <span class="col-count">1</span>
+              </div>
+              <div class="col-body drop-target">
+                <div style="border: 2px dashed rgba(74,222,128,0.4); border-radius: 10px; padding: 12px; text-align: center; color: rgba(74,222,128,0.5); font-size: 12px; margin-bottom: 4px;">
+                  여기에 드롭하면 합격 처리됩니다 ✓
+                </div>
+                <div class="card">
+                  <div class="card-hw"># 01 React 기초</div>
+                  <div class="card-name">
+                    <div class="avatar" style="background:#7c3aed">김</div>
+                    김민준
+                  </div>
+                  <div class="card-meta">
+                    <span class="card-attempt">시도 #1</span>
+                    <span class="card-file">📝 react-basics.md</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 불합격 -->
+            <div class="column col-declined">
+              <div class="col-header">
+                <span class="col-title">불합격</span>
+                <span class="col-count">1</span>
+              </div>
+              <div class="col-body">
+                <div style="border: 2px dashed rgba(248,113,113,0.2); border-radius: 10px; padding: 12px; text-align: center; color: rgba(248,113,113,0.3); font-size: 12px; margin-bottom: 4px;">
+                  여기에 드롭하면 불합격 처리됩니다 ✕
+                </div>
+                <div class="card">
+                  <div class="card-hw"># 02 Next.js 라우팅</div>
+                  <div class="card-name">
+                    <div class="avatar" style="background:#2563eb">박</div>
+                    박지영
+                  </div>
+                  <div class="card-meta">
+                    <span class="card-attempt">시도 #1</span>
+                    <span class="card-file">📄 routing-v1.zip</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② CHAMPION KANBAN (read-only board view) -->
+  <div class="screen-wrap">
+    <div class="screen-label">② Champion View — Board toggle on homework list</div>
+    <div class="desktop" style="width:900px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">AX Homework</div>
+          <div class="nav-item active">📋 과제</div>
+          <div class="nav-item">📄 제정의서</div>
+          <div class="nav-item">📅 WBS</div>
+          <div class="nav-item">📊 진척도</div>
+          <div class="sidebar-bottom"><div class="logout-btn">로그아웃</div></div>
+        </div>
+        <div class="main">
+          <div class="top-bar">
+            <div>
+              <div class="page-title">내 과제</div>
+              <div class="page-sub">총 4개 · 1개 합격 · 1개 불합격 · 1개 검토 중</div>
+            </div>
+            <div class="view-toggle">
+              <button class="toggle-btn">☰ 목록</button>
+              <button class="toggle-btn active">⊞ 보드</button>
+            </div>
+          </div>
+
+          <div class="board">
+
+            <!-- 미제출 -->
+            <div class="column col-none">
+              <div class="col-header">
+                <span class="col-title">미제출</span>
+                <span class="col-count">1</span>
+              </div>
+              <div class="col-body">
+                <div class="card champ-card">
+                  <div class="hw-num"># 04</div>
+                  <div class="hw-title">최종 프로젝트</div>
+                  <div class="hw-due">마감 2026.06.17</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 검토 중 -->
+            <div class="column col-pending">
+              <div class="col-header">
+                <span class="col-title">검토 중</span>
+                <span class="col-count">1</span>
+              </div>
+              <div class="col-body">
+                <div class="card champ-card">
+                  <div class="hw-num"># 03</div>
+                  <div class="hw-title">Supabase 연동 실습</div>
+                  <div class="hw-due">마감 2026.06.03</div>
+                  <div class="card-meta" style="margin-top:6px">
+                    <span class="card-attempt">시도 #1</span>
+                    <span class="card-file">📄 supabase.md</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 합격 -->
+            <div class="column col-accepted">
+              <div class="col-header">
+                <span class="col-title">합격</span>
+                <span class="col-count">1</span>
+              </div>
+              <div class="col-body">
+                <div class="card champ-card">
+                  <div class="hw-num"># 01</div>
+                  <div class="hw-title">React 기초 실습</div>
+                  <div class="hw-due">마감 2026.05.20</div>
+                  <div class="card-meta" style="margin-top:6px">
+                    <span class="card-attempt">시도 #1</span>
+                    <span class="card-file">📝 react.md</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 불합격 -->
+            <div class="column col-declined">
+              <div class="col-header">
+                <span class="col-title">불합격</span>
+                <span class="col-count">1</span>
+              </div>
+              <div class="col-body">
+                <div class="card champ-card">
+                  <div class="hw-num"># 02</div>
+                  <div class="hw-title">Next.js 라우팅 과제</div>
+                  <div class="hw-due">마감 2026.05.27</div>
+                  <div class="card-meta" style="margin-top:6px">
+                    <span class="card-attempt">시도 #2</span>
+                    <span class="card-file">📄 routing-v2.zip</span>
+                  </div>
+                  <div style="margin-top:8px">
+                    <button style="background:#1e2d4a;color:#7dd3fc;border:1px solid #2d3a5e;border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer;font-weight:600">재제출 →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

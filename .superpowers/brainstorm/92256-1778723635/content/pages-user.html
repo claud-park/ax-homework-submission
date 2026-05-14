@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>User Pages — ax-homework-submission</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #141414;
+    color: #f5f5f5;
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+    padding: 32px 24px;
+  }
+  h2 { font-size: 20px; font-weight: 700; color: #f5f5f5; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 32px; }
+
+  .screens { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+
+  .screen-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .screen-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+  .phone {
+    width: 320px;
+    min-height: 580px;
+    background: #1a1a1a;
+    border-radius: 20px;
+    border: 1px solid #2a2a2a;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── TOP NAV ── */
+  .top-bar {
+    background: #1a1a1a;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid #252525;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .top-bar .logo { font-size: 16px; font-weight: 700; color: #f5f5f5; }
+  .top-bar .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #2563eb; display: flex; align-items: center;
+    justify-content: center; font-size: 12px; font-weight: 600; color: #fff;
+  }
+
+  /* ── CONTENT ── */
+  .content { padding: 20px; }
+
+  /* Login page */
+  .login-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 500px; padding: 32px 24px; text-align: center;
+  }
+  .login-logo {
+    width: 72px; height: 72px; border-radius: 18px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; margin-bottom: 24px;
+  }
+  .login-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .login-sub { font-size: 13px; color: #888; margin-bottom: 40px; line-height: 1.6; }
+  .btn-google {
+    width: 100%; padding: 14px 20px;
+    background: #fff; color: #111; border-radius: 12px;
+    font-size: 14px; font-weight: 600; border: none;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    cursor: pointer;
+  }
+  .google-icon { width: 18px; height: 18px; }
+
+  /* Section header */
+  .section-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .section-sub { font-size: 12px; color: #888; margin-bottom: 16px; }
+
+  /* Homework card */
+  .hw-card {
+    background: #222; border-radius: 14px; padding: 16px;
+    margin-bottom: 10px; border: 1px solid #2a2a2a;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .hw-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .hw-num { font-size: 10px; font-weight: 600; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; }
+  .hw-title { font-size: 14px; font-weight: 600; color: #f5f5f5; margin-top: 2px; }
+  .hw-due { font-size: 11px; color: #888; }
+  .badge {
+    font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+    white-space: nowrap;
+  }
+  .badge-pending { background: #2a2a2a; color: #aaa; }
+  .badge-accepted { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .badge-declined { background: rgba(239,68,68,0.15); color: #f87171; }
+  .badge-none { background: #1e1e1e; color: #555; }
+
+  /* Submission detail */
+  .back-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .back-btn { font-size: 12px; color: #2563eb; cursor: pointer; }
+  .attempt-card {
+    background: #222; border-radius: 14px; padding: 14px;
+    margin-bottom: 8px; border: 1px solid #2a2a2a;
+  }
+  .attempt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .attempt-label { font-size: 12px; font-weight: 600; color: #888; }
+  .file-chip {
+    background: #1a1a2e; border: 1px solid #2d3a5e; border-radius: 8px;
+    padding: 8px 12px; display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #7dd3fc; margin-bottom: 8px;
+  }
+  .comment-box {
+    background: #1e1e2e; border-radius: 10px; padding: 10px 12px;
+    font-size: 12px; color: #aaa; line-height: 1.6; border-left: 2px solid #2563eb;
+  }
+  .comment-label { font-size: 10px; color: #555; margin-bottom: 4px; }
+
+  /* Upload area */
+  .upload-area {
+    border: 2px dashed #2a2a2a; border-radius: 14px; padding: 28px 20px;
+    text-align: center; margin-bottom: 12px; cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-text { font-size: 13px; color: #aaa; }
+  .upload-hint { font-size: 11px; color: #555; margin-top: 4px; }
+  .btn-primary {
+    width: 100%; padding: 14px; background: #2563eb; color: #fff;
+    border-radius: 12px; font-size: 14px; font-weight: 600;
+    border: none; cursor: pointer; text-align: center;
+  }
+
+  .divider { height: 1px; background: #252525; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<h2>User Pages</h2>
+<p class="subtitle">FLO Design System · Pretendard · Dark mode · http://localhost:49216</p>
+
+<div class="screens">
+
+  <!-- ① LOGIN -->
+  <div class="screen-wrap">
+    <div class="screen-label">① Login</div>
+    <div class="phone">
+      <div class="login-wrap">
+        <div class="login-logo">📚</div>
+        <div class="login-title">AX Homework</div>
+        <div class="login-sub">과제를 제출하고<br>결과를 확인하세요</div>
+        <button class="btn-google">
+          <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Google로 계속하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② HOMEWORK LIST -->
+  <div class="screen-wrap">
+    <div class="screen-label">② Homework List</div>
+    <div class="phone">
+      <div class="top-bar">
+        <div class="logo">AX Homework</div>
+        <div class="avatar">YP</div>
+      </div>
+      <div class="content">
+        <div class="section-title">내 과제</div>
+        <div class="section-sub">총 4개 · 2개 완료</div>
+
+        <div class="hw-card">
+          <div class="hw-card-top">
+            <div>
+              <div class="hw-num"># 01</div>
+              <div class="hw-title">React 기초 실습</div>
+              <div class="hw-due">마감 2026.05.20</div>
+            </div>
+            <div class="badge badge-accepted">합격</div>
+          </div>
+        </div>
+
+        <div class="hw-card">
+          <div class="hw-card-top">
+            <div>
+              <div class="hw-num"># 02</div>
+              <div class="hw-title">Next.js 라우팅 과제</div>
+              <div class="hw-due">마감 2026.05.27</div>
+            </div>
+            <div class="badge badge-declined">불합격</div>
+          </div>
+        </div>
+
+        <div class="hw-card">
+          <div class="hw-card-top">
+            <div>
+              <div class="hw-num"># 03</div>
+              <div class="hw-title">Supabase 연동 실습</div>
+              <div class="hw-due">마감 2026.06.03</div>
+            </div>
+            <div class="badge badge-pending">검토 중</div>
+          </div>
+        </div>
+
+        <div class="hw-card">
+          <div class="hw-card-top">
+            <div>
+              <div class="hw-num"># 04</div>
+              <div class="hw-title">최종 프로젝트</div>
+              <div class="hw-due">마감 2026.06.17</div>
+            </div>
+            <div class="badge badge-none">미제출</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ HOMEWORK DETAIL -->
+  <div class="screen-wrap">
+    <div class="screen-label">③ Homework Detail + Resubmit</div>
+    <div class="phone">
+      <div class="top-bar">
+        <div class="back-btn">← 목록</div>
+        <div class="logo" style="font-size:14px"># 02 Next.js 라우팅</div>
+        <div style="width:48px"></div>
+      </div>
+      <div class="content">
+
+        <!-- Submission history -->
+        <div class="section-title" style="font-size:14px">제출 기록</div>
+        <div class="section-sub">마감 2026.05.27</div>
+
+        <div class="attempt-card">
+          <div class="attempt-header">
+            <div class="attempt-label">시도 #2 · 최신</div>
+            <div class="badge badge-declined">불합격</div>
+          </div>
+          <div class="file-chip">📄 nextjs-routing-v2.zip</div>
+          <div class="comment-label">어드민 코멘트</div>
+          <div class="comment-box">라우팅 구조는 좋으나 동적 경로 처리가 미흡합니다. params 처리 방식을 다시 검토해 주세요.</div>
+        </div>
+
+        <div class="attempt-card" style="opacity:0.6">
+          <div class="attempt-header">
+            <div class="attempt-label">시도 #1</div>
+            <div class="badge badge-declined">불합격</div>
+          </div>
+          <div class="file-chip">📄 nextjs-routing.zip</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Resubmit -->
+        <div class="section-title" style="font-size:14px;margin-bottom:12px">재제출</div>
+        <div class="upload-area">
+          <div class="upload-icon">☁️</div>
+          <div class="upload-text">파일을 드래그하거나 클릭하여 업로드</div>
+          <div class="upload-hint">.md, .zip 등 모든 형식 지원</div>
+        </div>
+        <button class="btn-primary">제출하기</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

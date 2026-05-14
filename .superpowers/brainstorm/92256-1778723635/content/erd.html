@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ERD — ax-homework-submission</title>
+<style>
+  body { background: #0f0f0f; color: #e5e5e5; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 32px; }
+  h2 { color: #f5f5f5; margin-bottom: 4px; }
+  .subtitle { color: #888; margin-bottom: 32px; font-size: 14px; }
+  svg { width: 100%; height: 620px; }
+  .table-box { fill: #1a1a1a; stroke-width: 2; rx: 8; }
+  .table-header { font-weight: bold; font-size: 14px; }
+  .field { font-size: 12px; font-family: monospace; }
+  .pk { fill: #f59e0b; }
+  .fk { fill: #f87171; }
+  .regular { fill: #94a3b8; }
+  .type { fill: #6b7280; }
+  .relation-line { stroke: #4b5563; stroke-width: 1.5; fill: none; stroke-dasharray: 4,3; }
+  .relation-label { font-size: 10px; fill: #6b7280; }
+</style>
+</head>
+<body>
+<h2>Entity Relationship Diagram</h2>
+<p class="subtitle">ax-homework-submission · Supabase PostgreSQL</p>
+
+<svg viewBox="0 0 900 580" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- USERS table -->
+  <g transform="translate(30, 60)">
+    <rect class="table-box" width="200" height="155" stroke="#4ade80"/>
+    <rect x="0" y="0" width="200" height="32" fill="#4ade80" rx="8"/>
+    <rect x="0" y="20" width="200" height="12" fill="#4ade80"/>
+    <text x="100" y="21" text-anchor="middle" class="table-header" fill="#0f0f0f">users</text>
+    <!-- fields -->
+    <text x="12" y="52" class="field pk">🔑 id</text><text x="130" y="52" class="field type">uuid PK</text>
+    <line x1="0" y1="60" x2="200" y2="60" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="78" class="field regular">email</text><text x="130" y="78" class="field type">text</text>
+    <line x1="0" y1="86" x2="200" y2="86" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="104" class="field regular">name</text><text x="130" y="104" class="field type">text</text>
+    <line x1="0" y1="112" x2="200" y2="112" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="130" class="field regular">avatar_url</text><text x="130" y="130" class="field type">text</text>
+    <line x1="0" y1="138" x2="200" y2="138" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="152" class="field regular">created_at</text><text x="130" y="152" class="field type">timestamptz</text>
+  </g>
+
+  <!-- HOMEWORKS table -->
+  <g transform="translate(620, 60)">
+    <rect class="table-box" width="220" height="177" stroke="#f59e0b"/>
+    <rect x="0" y="0" width="220" height="32" fill="#f59e0b" rx="8"/>
+    <rect x="0" y="20" width="220" height="12" fill="#f59e0b"/>
+    <text x="110" y="21" text-anchor="middle" class="table-header" fill="#0f0f0f">homeworks</text>
+    <text x="12" y="52" class="field pk">🔑 id</text><text x="150" y="52" class="field type">serial PK</text>
+    <line x1="0" y1="60" x2="220" y2="60" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="78" class="field regular">title</text><text x="150" y="78" class="field type">text</text>
+    <line x1="0" y1="86" x2="220" y2="86" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="104" class="field regular">description</text><text x="150" y="104" class="field type">text (HTML)</text>
+    <line x1="0" y1="112" x2="220" y2="112" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="130" class="field regular">due_date</text><text x="150" y="130" class="field type">date</text>
+    <line x1="0" y1="138" x2="220" y2="138" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="156" class="field regular">created_at</text><text x="150" y="156" class="field type">timestamptz</text>
+    <line x1="0" y1="164" x2="220" y2="164" stroke="#2a2a2a" stroke-width="1"/>
+  </g>
+
+  <!-- SUBMISSIONS table (center) -->
+  <g transform="translate(310, 190)">
+    <rect class="table-box" width="260" height="222" stroke="#7dd3fc"/>
+    <rect x="0" y="0" width="260" height="32" fill="#7dd3fc" rx="8"/>
+    <rect x="0" y="20" width="260" height="12" fill="#7dd3fc"/>
+    <text x="130" y="21" text-anchor="middle" class="table-header" fill="#0f0f0f">submissions</text>
+    <text x="12" y="52" class="field pk">🔑 id</text><text x="170" y="52" class="field type">uuid PK</text>
+    <line x1="0" y1="60" x2="260" y2="60" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="78" class="field fk">🔗 user_id</text><text x="170" y="78" class="field type">uuid FK</text>
+    <line x1="0" y1="86" x2="260" y2="86" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="104" class="field fk">🔗 homework_id</text><text x="170" y="104" class="field type">int FK</text>
+    <line x1="0" y1="112" x2="260" y2="112" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="130" class="field regular">file_path</text><text x="170" y="130" class="field type">text</text>
+    <line x1="0" y1="138" x2="260" y2="138" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="156" class="field regular">file_name</text><text x="170" y="156" class="field type">text</text>
+    <line x1="0" y1="164" x2="260" y2="164" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="182" class="field regular">status</text><text x="170" y="182" class="field type">enum</text>
+    <line x1="0" y1="190" x2="260" y2="190" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="208" class="field regular">attempt_number</text><text x="170" y="208" class="field type">int</text>
+    <line x1="0" y1="216" x2="260" y2="216" stroke="#2a2a2a" stroke-width="1"/>
+  </g>
+
+  <!-- COMMENTS table -->
+  <g transform="translate(340, 490)">
+    <rect class="table-box" width="220" height="130" stroke="#c084fc"/>
+    <rect x="0" y="0" width="220" height="32" fill="#c084fc" rx="8"/>
+    <rect x="0" y="20" width="220" height="12" fill="#c084fc"/>
+    <text x="110" y="21" text-anchor="middle" class="table-header" fill="#0f0f0f">comments</text>
+    <text x="12" y="52" class="field pk">🔑 id</text><text x="150" y="52" class="field type">uuid PK</text>
+    <line x1="0" y1="60" x2="220" y2="60" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="78" class="field fk">🔗 submission_id</text><text x="150" y="78" class="field type">uuid FK</text>
+    <line x1="0" y1="86" x2="220" y2="86" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="104" class="field regular">body</text><text x="150" y="104" class="field type">text</text>
+    <line x1="0" y1="112" x2="220" y2="112" stroke="#2a2a2a" stroke-width="1"/>
+    <text x="12" y="126" class="field regular">created_at</text><text x="150" y="126" class="field type">timestamptz</text>
+  </g>
+
+  <!-- RELATIONSHIP LINES -->
+
+  <!-- users → submissions (1:many) -->
+  <line x1="230" y1="137" x2="310" y2="268" class="relation-line"/>
+  <text x="240" y="210" class="relation-label">1</text>
+  <text x="288" y="262" class="relation-label">N</text>
+
+  <!-- homeworks → submissions (1:many) -->
+  <line x1="620" y1="148" x2="570" y2="268" class="relation-line"/>
+  <text x="608" y="210" class="relation-label">1</text>
+  <text x="574" y="262" class="relation-label">N</text>
+
+  <!-- submissions → comments (1:many) -->
+  <line x1="440" y1="412" x2="450" y2="490" class="relation-line"/>
+  <text x="430" y="453" class="relation-label">1</text>
+  <text x="440" y="486" class="relation-label">N</text>
+
+  <!-- Legend -->
+  <g transform="translate(30, 510)">
+    <rect x="0" y="0" width="240" height="60" fill="#1a1a1a" stroke="#333" rx="6"/>
+    <text x="12" y="18" font-size="11" fill="#888">Legend</text>
+    <text x="12" y="36" font-size="11" fill="#f59e0b">🔑 Primary Key</text>
+    <text x="12" y="52" font-size="11" fill="#f87171">🔗 Foreign Key</text>
+    <text x="130" y="36" font-size="11" fill="#4b5563">--- 1:N relationship</text>
+    <text x="130" y="52" font-size="11" fill="#6b7280">enum: pending|accepted|declined</text>
+  </g>
+
+  <!-- Storage note -->
+  <g transform="translate(620, 270)">
+    <rect x="0" y="0" width="220" height="80" fill="#1a1a2e" stroke="#4b5563" stroke-dasharray="4,3" rx="6"/>
+    <text x="110" y="20" text-anchor="middle" font-size="12" fill="#7dd3fc">Supabase Storage</text>
+    <text x="110" y="38" text-anchor="middle" font-size="11" fill="#6b7280">submissions/{user_id}/</text>
+    <text x="110" y="54" text-anchor="middle" font-size="11" fill="#6b7280">{homework_id}/{attempt_n}/</text>
+    <text x="110" y="70" text-anchor="middle" font-size="11" fill="#6b7280">{filename}</text>
+  </g>
+  <line x1="570" y1="301" x2="620" y2="310" class="relation-line"/>
+  <text x="588" y="305" font-size="10" fill="#6b7280">file_path</text>
+
+</svg>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<h2>Data Model</h2>
+<p class="subtitle">PostgreSQL schema — does this capture everything?</p>
+
+<div class="section">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px;font-family:monospace">
+
+    <div style="background:#111;border:1px solid #4ade80;padding:14px;border-radius:8px">
+      <div style="color:#4ade80;font-weight:bold;margin-bottom:8px;font-size:13px">users</div>
+      <div style="color:#aaa;line-height:1.9">
+        <span style="color:#f59e0b">id</span> uuid PK (= Supabase auth.user id)<br>
+        <span style="color:#7dd3fc">email</span> text NOT NULL<br>
+        <span style="color:#7dd3fc">name</span> text<br>
+        <span style="color:#7dd3fc">avatar_url</span> text<br>
+        <span style="color:#7dd3fc">created_at</span> timestamptz
+      </div>
+    </div>
+
+    <div style="background:#111;border:1px solid #f59e0b;padding:14px;border-radius:8px">
+      <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;font-size:13px">homeworks</div>
+      <div style="color:#aaa;line-height:1.9">
+        <span style="color:#f59e0b">id</span> serial PK → homework number (auto-increment)<br>
+        <span style="color:#7dd3fc">title</span> text NOT NULL<br>
+        <span style="color:#7dd3fc">description</span> text (HTML from WYSIWYG)<br>
+        <span style="color:#7dd3fc">due_date</span> date NOT NULL<br>
+        <span style="color:#7dd3fc">created_at</span> timestamptz
+      </div>
+    </div>
+
+    <div style="background:#111;border:1px solid #7dd3fc;padding:14px;border-radius:8px">
+      <div style="color:#7dd3fc;font-weight:bold;margin-bottom:8px;font-size:13px">submissions</div>
+      <div style="color:#aaa;line-height:1.9">
+        <span style="color:#f59e0b">id</span> uuid PK<br>
+        <span style="color:#f87171">user_id</span> uuid FK → users.id<br>
+        <span style="color:#f87171">homework_id</span> int FK → homeworks.id<br>
+        <span style="color:#7dd3fc">file_path</span> text (Supabase Storage path)<br>
+        <span style="color:#7dd3fc">file_name</span> text (original filename)<br>
+        <span style="color:#7dd3fc">status</span> enum: pending | accepted | declined<br>
+        <span style="color:#7dd3fc">attempt_number</span> int (1, 2, 3…)<br>
+        <span style="color:#7dd3fc">submitted_at</span> timestamptz
+      </div>
+    </div>
+
+    <div style="background:#111;border:1px solid #c084fc;padding:14px;border-radius:8px">
+      <div style="color:#c084fc;font-weight:bold;margin-bottom:8px;font-size:13px">comments</div>
+      <div style="color:#aaa;line-height:1.9">
+        <span style="color:#f59e0b">id</span> uuid PK<br>
+        <span style="color:#f87171">submission_id</span> uuid FK → submissions.id<br>
+        <span style="color:#7dd3fc">body</span> text NOT NULL<br>
+        <span style="color:#7dd3fc">created_at</span> timestamptz
+      </div>
+      <div style="color:#6b7280;font-size:11px;margin-top:8px">Admin-only write · visible to user on their page</div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:16px;background:#111;border:1px solid #333;padding:12px;border-radius:8px;font-size:12px;color:#aaa">
+    <span style="color:#f87171">FK</span> = foreign key &nbsp;·&nbsp;
+    <span style="color:#f59e0b">PK</span> = primary key &nbsp;·&nbsp;
+    <code style="color:#4ade80">attempt_number</code> is derived per (user_id, homework_id) pair — increments on each resubmit &nbsp;·&nbsp;
+    RLS: DENY ALL on all tables (service key only)
+  </div>
+</div>

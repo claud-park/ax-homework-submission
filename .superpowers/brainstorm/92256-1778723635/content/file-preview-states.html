@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>File Preview States</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #141414; color: #f5f5f5;
+    font-family: 'Pretendard', sans-serif; padding: 32px 24px;
+  }
+  h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 32px; }
+
+  .screens { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .screen-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .screen-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Shared panel shell */
+  .panel {
+    width: 420px; background: #1a1a1a;
+    border-radius: 16px; border: 1px solid #2a2a2a;
+    overflow: hidden;
+  }
+  .panel-header {
+    background: #141414; padding: 14px 18px;
+    border-bottom: 1px solid #222;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title { font-size: 13px; font-weight: 600; }
+  .panel-meta { font-size: 11px; color: #555; }
+  .panel-body { padding: 16px 18px; }
+
+  /* File info chip */
+  .file-chip {
+    display: flex; align-items: center; gap: 10px;
+    background: #111; border: 1px solid #2a2a2a;
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+  }
+  .file-icon { font-size: 22px; }
+  .file-info { flex: 1; }
+  .file-name { font-size: 13px; font-weight: 600; color: #f5f5f5; }
+  .file-size { font-size: 11px; color: #555; margin-top: 2px; }
+  .download-btn {
+    background: #1e2d4a; color: #7dd3fc; border: 1px solid #2d3a5e;
+    border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px;
+  }
+  .download-btn:hover { background: #253a5e; }
+
+  /* Markdown viewer */
+  .md-viewer {
+    background: #111; border: 1px solid #222; border-radius: 10px;
+    padding: 14px 16px; font-size: 12px; color: #ccc; line-height: 1.8;
+    height: 220px; overflow-y: auto;
+  }
+  .md-viewer h1 { font-size: 16px; font-weight: 700; color: #f5f5f5; margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 8px; }
+  .md-viewer h2 { font-size: 13px; font-weight: 600; color: #f0f0f0; margin: 12px 0 6px; }
+  .md-viewer p { margin-bottom: 8px; }
+  .md-viewer code { background: #1a1a2e; color: #7dd3fc; padding: 1px 5px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+  .md-viewer ul { padding-left: 16px; margin-bottom: 8px; }
+  .md-viewer li { margin-bottom: 3px; }
+  .viewer-label {
+    font-size: 10px; font-weight: 600; color: #555;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+  }
+
+  /* PDF viewer */
+  .pdf-viewer {
+    background: #111; border: 1px solid #222; border-radius: 10px;
+    height: 220px; overflow: hidden; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .pdf-toolbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: #1a1a1a; border-bottom: 1px solid #222;
+    padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; color: #888;
+  }
+  .pdf-page-nav { display: flex; align-items: center; gap: 8px; }
+  .pdf-btn { background: #222; border: 1px solid #333; border-radius: 5px; padding: 3px 8px; cursor: pointer; color: #ccc; font-size: 11px; }
+  .pdf-content {
+    margin-top: 32px; width: 100%; height: calc(100% - 32px);
+    background: #1e1e1e; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px;
+  }
+  .pdf-page-mock {
+    background: #f5f5f0; width: 120px; height: 155px;
+    border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    display: flex; flex-direction: column; padding: 10px; gap: 4px;
+  }
+  .pdf-line { background: #ccc; border-radius: 2px; height: 5px; width: 100%; }
+  .pdf-line.short { width: 60%; }
+  .pdf-line.medium { width: 80%; }
+
+  /* Unsupported file */
+  .unsupported {
+    background: #111; border: 1px solid #222; border-radius: 10px;
+    height: 220px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px; text-align: center;
+    padding: 20px;
+  }
+  .unsupported-icon { font-size: 36px; opacity: 0.5; }
+  .unsupported-text { font-size: 13px; color: #666; }
+  .unsupported-hint { font-size: 11px; color: #444; }
+  .big-download {
+    background: #1e2d4a; color: #7dd3fc; border: 1px solid #2d3a5e;
+    border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Review panel (shared right side) */
+  .full-layout { display: flex; gap: 12px; }
+  .preview-col { flex: 1; min-width: 0; }
+  .review-col { width: 160px; flex-shrink: 0; }
+  .review-label { font-size: 10px; font-weight: 600; color: #555; text-transform: uppercase; margin-bottom: 6px; }
+  textarea.comment-input {
+    width: 100%; background: #111; border: 1px solid #2a2a2a;
+    border-radius: 8px; padding: 8px 10px; color: #ccc;
+    font-size: 12px; font-family: inherit; resize: none; height: 80px; line-height: 1.5;
+  }
+  .action-buttons { display: flex; gap: 6px; margin-top: 8px; }
+  .btn-accept { flex:1; padding:9px; background:rgba(34,197,94,0.15); color:#4ade80; border:1px solid rgba(34,197,94,0.25); border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
+  .btn-decline { flex:1; padding:9px; background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.2); border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
+  .badge { font-size:10px; font-weight:600; padding:3px 7px; border-radius:6px; }
+  .badge-pending { background:rgba(234,179,8,0.12); color:#fbbf24; }
+  .attempt-chip { background:#222; border-radius:8px; padding:6px 10px; font-size:11px; color:#ccc; margin-bottom:4px; display:flex; justify-content:space-between; border:1px solid #2a2a2a; }
+  .attempt-chip.active { border-color:#2563eb; background:#1e2d4a; }
+</style>
+</head>
+<body>
+
+<h2>Submission Review — File Type States</h2>
+<p class="subtitle">How the preview panel adapts based on the submitted file · Always downloadable</p>
+
+<div class="screens">
+
+  <!-- ① MARKDOWN -->
+  <div class="screen-wrap">
+    <div class="screen-label">① .md file → Rendered inline</div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">박지영 · 시도 #2</div>
+          <div class="panel-meta">제출 2026.05.25 · Next.js 라우팅 과제</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="full-layout">
+          <div class="preview-col">
+            <div class="file-chip">
+              <div class="file-icon">📝</div>
+              <div class="file-info">
+                <div class="file-name">routing-report.md</div>
+                <div class="file-size">4.2 KB · Markdown</div>
+              </div>
+              <button class="download-btn">⬇ 다운로드</button>
+            </div>
+            <div class="viewer-label">미리보기</div>
+            <div class="md-viewer">
+              <h1>Next.js Routing Report</h1>
+              <h2>구현 내용</h2>
+              <p>이 과제에서는 <code>App Router</code> 기반의 동적 라우팅을 구현했습니다.</p>
+              <ul>
+                <li>페이지 라우팅 구조 설계</li>
+                <li><code>[id]</code> 동적 경로 처리</li>
+                <li>middleware 설정 및 인증 흐름</li>
+              </ul>
+              <h2>어려웠던 점</h2>
+              <p>params를 서버 컴포넌트에서 처리하는 방식이 낯설었습니다...</p>
+            </div>
+          </div>
+          <div class="review-col">
+            <div class="review-label" style="margin-bottom:6px">제출 이력</div>
+            <div class="attempt-chip active"><span>#2 · 05.25</span><div class="badge badge-pending">검토중</div></div>
+            <div class="attempt-chip"><span>#1 · 05.22</span></div>
+            <div style="height:12px"></div>
+            <div class="review-label">코멘트</div>
+            <textarea class="comment-input" placeholder="피드백 입력..."></textarea>
+            <div class="action-buttons">
+              <button class="btn-accept">✓</button>
+              <button class="btn-decline">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② PDF -->
+  <div class="screen-wrap">
+    <div class="screen-label">② .pdf file → Embedded viewer</div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">김민준 · 시도 #1</div>
+          <div class="panel-meta">제출 2026.05.24 · Next.js 라우팅 과제</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="full-layout">
+          <div class="preview-col">
+            <div class="file-chip">
+              <div class="file-icon">📄</div>
+              <div class="file-info">
+                <div class="file-name">report.pdf</div>
+                <div class="file-size">1.8 MB · PDF</div>
+              </div>
+              <button class="download-btn">⬇ 다운로드</button>
+            </div>
+            <div class="viewer-label">미리보기</div>
+            <div class="pdf-viewer">
+              <div class="pdf-toolbar">
+                <div class="pdf-page-nav">
+                  <button class="pdf-btn">‹</button>
+                  <span>1 / 4</span>
+                  <button class="pdf-btn">›</button>
+                </div>
+                <span>report.pdf</span>
+              </div>
+              <div class="pdf-content">
+                <div class="pdf-page-mock">
+                  <div class="pdf-line" style="height:8px;background:#555;margin-bottom:8px"></div>
+                  <div class="pdf-line"></div>
+                  <div class="pdf-line medium"></div>
+                  <div class="pdf-line short"></div>
+                  <div style="height:6px"></div>
+                  <div class="pdf-line"></div>
+                  <div class="pdf-line medium"></div>
+                  <div class="pdf-line"></div>
+                  <div class="pdf-line short"></div>
+                  <div style="height:6px"></div>
+                  <div class="pdf-line"></div>
+                  <div class="pdf-line medium"></div>
+                </div>
+                <div style="font-size:10px;color:#555">iframe embed · 브라우저 내 PDF 뷰어</div>
+              </div>
+            </div>
+          </div>
+          <div class="review-col">
+            <div class="review-label" style="margin-bottom:6px">제출 이력</div>
+            <div class="attempt-chip active"><span>#1 · 05.24</span><div class="badge badge-pending">검토중</div></div>
+            <div style="height:12px"></div>
+            <div class="review-label">코멘트</div>
+            <textarea class="comment-input" placeholder="피드백 입력..."></textarea>
+            <div class="action-buttons">
+              <button class="btn-accept">✓</button>
+              <button class="btn-decline">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ ZIP / OTHER -->
+  <div class="screen-wrap">
+    <div class="screen-label">③ .zip / other → Download only</div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">이수현 · 시도 #1</div>
+          <div class="panel-meta">제출 2026.05.26 · Next.js 라우팅 과제</div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="full-layout">
+          <div class="preview-col">
+            <div class="file-chip">
+              <div class="file-icon">🗜️</div>
+              <div class="file-info">
+                <div class="file-name">nextjs-project.zip</div>
+                <div class="file-size">3.4 MB · ZIP archive</div>
+              </div>
+              <button class="download-btn">⬇ 다운로드</button>
+            </div>
+            <div class="viewer-label">미리보기</div>
+            <div class="unsupported">
+              <div class="unsupported-icon">🗜️</div>
+              <div class="unsupported-text">.zip 파일은 미리보기를 지원하지 않습니다</div>
+              <div class="unsupported-hint">파일을 다운로드하여 확인하세요</div>
+              <button class="big-download">⬇ &nbsp;nextjs-project.zip 다운로드</button>
+            </div>
+          </div>
+          <div class="review-col">
+            <div class="review-label" style="margin-bottom:6px">제출 이력</div>
+            <div class="attempt-chip active"><span>#1 · 05.26</span><div class="badge badge-pending">검토중</div></div>
+            <div style="height:12px"></div>
+            <div class="review-label">코멘트</div>
+            <textarea class="comment-input" placeholder="피드백 입력..."></textarea>
+            <div class="action-buttons">
+              <button class="btn-accept">✓</button>
+              <button class="btn-decline">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

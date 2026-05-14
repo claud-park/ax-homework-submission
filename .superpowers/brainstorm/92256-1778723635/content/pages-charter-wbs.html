@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Charter + WBS Pages</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #141414; color: #f5f5f5; font-family: 'Pretendard', sans-serif; padding: 28px 24px; }
+  h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
+  .screens { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .screen-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .screen-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+  .desktop { background: #1a1a1a; border-radius: 16px; border: 1px solid #2a2a2a; overflow: hidden; }
+  .layout { display: flex; min-height: 560px; }
+  .sidebar { width: 170px; background: #141414; padding: 16px 14px; border-right: 1px solid #222; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px; }
+  .sidebar-logo { font-size: 13px; font-weight: 700; margin-bottom: 16px; color: #f5f5f5; }
+  .nav-item { font-size: 12px; padding: 7px 9px; border-radius: 7px; color: #888; display: flex; align-items: center; gap: 7px; }
+  .nav-item.active { background: #1e2d4a; color: #7dd3fc; font-weight: 600; }
+  .sidebar-bottom { margin-top: auto; }
+  .logout-btn { font-size: 12px; color: #555; padding: 7px 9px; border-radius: 7px; }
+  .main { flex: 1; padding: 20px; overflow: hidden; }
+  .page-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .page-sub { font-size: 12px; color: #888; margin-bottom: 16px; }
+
+  /* Export bar */
+  .export-bar { display: flex; gap: 8px; margin-bottom: 18px; justify-content: flex-end; }
+  .export-btn { background: #222; border: 1px solid #333; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #ccc; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .export-btn.pdf { border-color: #f87171; color: #f87171; background: rgba(239,68,68,0.08); }
+  .export-btn.docx { border-color: #7dd3fc; color: #7dd3fc; background: rgba(125,211,252,0.08); }
+
+  /* Charter sections */
+  .charter-grid { display: flex; flex-direction: column; gap: 12px; }
+  .charter-section { background: #111; border: 1px solid #2a2a2a; border-radius: 10px; overflow: hidden; }
+  .section-header { background: #1a1a1a; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #222; }
+  .section-title { font-size: 12px; font-weight: 600; color: #ccc; }
+  .section-required { font-size: 10px; color: #f59e0b; }
+  .section-body { padding: 10px 14px; font-size: 12px; color: #aaa; line-height: 1.7; min-height: 50px; }
+  .section-body.empty { color: #444; font-style: italic; }
+  .wysiwyg-mini { border-top: 1px solid #222; padding: 6px 10px; background: #141414; display: flex; gap: 10px; }
+  .tb { font-size: 11px; color: #555; cursor: pointer; font-weight: 700; }
+
+  /* WBS table */
+  .wbs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .add-btn { background: #1e2d4a; color: #7dd3fc; border: 1px solid #2d3a5e; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  table.wbs { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.wbs th { color: #555; font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid #222; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  table.wbs td { padding: 8px 8px; border-bottom: 1px solid #1a1a1a; color: #ccc; vertical-align: middle; }
+  table.wbs tr:hover td { background: #1e1e1e; }
+  .week-badge { background: #1e2d4a; color: #7dd3fc; padding: 2px 7px; border-radius: 5px; font-size: 10px; font-weight: 600; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .dot-done { background: #4ade80; }
+  .dot-progress { background: #fbbf24; }
+  .dot-delayed { background: #f87171; }
+  .dot-none { background: #444; }
+  .action-icon { font-size: 13px; cursor: pointer; opacity: 0.6; }
+  .action-icon:hover { opacity: 1; }
+  .delay-icon { color: #f87171; font-size: 13px; }
+  .upload-mini { background: #1a2e1a; color: #4ade80; border: 1px solid #166534; border-radius: 6px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer; }
+  .progress-mini { background: #2a2000; color: #fbbf24; border: 1px solid #854d0e; border-radius: 6px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer; }
+  .req-btn { background: #2e1a00; color: #fb923c; border: 1px solid #7c2d12; border-radius: 6px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+<h2>Charter + WBS Pages</h2>
+<p class="subtitle">Champion (user) self-serve project management · FLO Design System</p>
+
+<div class="screens">
+
+  <!-- ① CHARTER PAGE -->
+  <div class="screen-wrap">
+    <div class="screen-label">① 제정의서 (Project Charter)</div>
+    <div class="desktop" style="width:520px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">AX Homework</div>
+          <div class="nav-item">📋 과제</div>
+          <div class="nav-item active">📄 제정의서</div>
+          <div class="nav-item">📅 WBS</div>
+          <div class="nav-item">📊 진척도</div>
+          <div class="sidebar-bottom"><div class="logout-btn">로그아웃</div></div>
+        </div>
+        <div class="main">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+            <div>
+              <div class="page-title">제정의서</div>
+              <div class="page-sub">프로젝트 헌장 · 자동 저장됨</div>
+            </div>
+            <div class="export-bar" style="margin-bottom:0">
+              <button class="export-btn docx">📄 DOCX</button>
+              <button class="export-btn pdf">📕 PDF</button>
+            </div>
+          </div>
+
+          <div class="charter-grid">
+            <div class="charter-section">
+              <div class="section-header">
+                <div class="section-title">프로젝트명</div>
+                <div class="section-required">필수</div>
+              </div>
+              <div class="section-body">AX 물류 자동화 개선 프로젝트</div>
+            </div>
+
+            <div class="charter-section">
+              <div class="section-header">
+                <div class="section-title">문제 정의 (AS-IS)</div>
+                <div class="section-required">필수</div>
+              </div>
+              <div class="section-body">현재 물류 센터의 입출고 프로세스는 수작업 의존도가 높아 오류 발생률이 12%에 달하며 처리 시간이 평균 4.2시간 소요됩니다.</div>
+              <div class="wysiwyg-mini">
+                <span class="tb">B</span><span class="tb">I</span><span class="tb">U</span><span class="tb" style="font-weight:400">H2</span><span class="tb" style="font-weight:400">•</span>
+              </div>
+            </div>
+
+            <div class="charter-section">
+              <div class="section-header">
+                <div class="section-title">목표 (TO-BE)</div>
+                <div class="section-required">필수</div>
+              </div>
+              <div class="section-body">AI 기반 자동 분류 시스템 도입으로 오류율 3% 이하 감소, 처리 시간 2시간으로 단축.</div>
+              <div class="wysiwyg-mini">
+                <span class="tb">B</span><span class="tb">I</span><span class="tb">U</span><span class="tb" style="font-weight:400">H2</span><span class="tb" style="font-weight:400">•</span>
+              </div>
+            </div>
+
+            <div class="charter-section">
+              <div class="section-header">
+                <div class="section-title">범위 (Scope)</div>
+                <div class="section-required">필수</div>
+              </div>
+              <div class="section-body">
+                <span style="color:#4ade80">✓ In:</span> 입출고 자동화, 재고 관리 시스템<br>
+                <span style="color:#f87171">✗ Out:</span> 배송 라우팅, 외부 파트너 시스템
+              </div>
+              <div class="wysiwyg-mini">
+                <span class="tb">B</span><span class="tb">I</span><span class="tb">U</span><span class="tb" style="font-weight:400">H2</span><span class="tb" style="font-weight:400">•</span>
+              </div>
+            </div>
+
+            <div class="charter-section">
+              <div class="section-header"><div class="section-title">기대 효과</div></div>
+              <div class="section-body empty">내용을 입력하세요...</div>
+            </div>
+
+            <div class="charter-section">
+              <div class="section-header"><div class="section-title">리스크</div></div>
+              <div class="section-body empty">내용을 입력하세요...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② WBS PAGE -->
+  <div class="screen-wrap">
+    <div class="screen-label">② 주차별 WBS (Milestone Creator)</div>
+    <div class="desktop" style="width:620px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">AX Homework</div>
+          <div class="nav-item">📋 과제</div>
+          <div class="nav-item">📄 제정의서</div>
+          <div class="nav-item active">📅 WBS</div>
+          <div class="nav-item">📊 진척도</div>
+          <div class="sidebar-bottom"><div class="logout-btn">로그아웃</div></div>
+        </div>
+        <div class="main">
+          <div class="wbs-header">
+            <div>
+              <div class="page-title">주차별 WBS</div>
+              <div class="page-sub">내 마일스톤 계획 · 5개 등록됨</div>
+            </div>
+            <button class="add-btn">+ 마일스톤 추가</button>
+          </div>
+
+          <table class="wbs">
+            <thead>
+              <tr>
+                <th>주차</th>
+                <th>마일스톤</th>
+                <th>기간</th>
+                <th>상태</th>
+                <th>액션</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="week-badge">1주차</div></td>
+                <td style="font-weight:600;color:#f5f5f5">AS-IS 현황 분석</td>
+                <td style="color:#888">05.01 – 05.07</td>
+                <td><span class="status-dot dot-done"></span><span style="color:#4ade80">완료</span></td>
+                <td style="display:flex;gap:6px;align-items:center">
+                  <span class="action-icon">📎</span>
+                  <span class="action-icon">✏️</span>
+                </td>
+              </tr>
+              <tr>
+                <td><div class="week-badge">2주차</div></td>
+                <td style="font-weight:600;color:#f5f5f5">솔루션 설계</td>
+                <td style="color:#888">05.08 – 05.14</td>
+                <td><span class="status-dot dot-done"></span><span style="color:#4ade80">완료</span></td>
+                <td style="display:flex;gap:6px;align-items:center">
+                  <span class="action-icon">📎</span>
+                  <span class="action-icon">✏️</span>
+                </td>
+              </tr>
+              <tr>
+                <td><div class="week-badge">3주차</div></td>
+                <td style="font-weight:600;color:#f5f5f5">파일럿 개발 (계속)</td>
+                <td style="color:#888">05.15 – 05.21</td>
+                <td><span class="status-dot dot-progress"></span><span style="color:#fbbf24">진행 중</span></td>
+                <td style="display:flex;gap:6px;align-items:center">
+                  <button class="upload-mini">📤 산출물 업로드</button>
+                  <span class="action-icon">✏️</span>
+                </td>
+              </tr>
+              <tr>
+                <td><div class="week-badge">4주차</div></td>
+                <td style="font-weight:600;color:#f5f5f5">파일럿 테스트</td>
+                <td style="color:#888">05.22 – 05.28</td>
+                <td><span class="status-dot dot-delayed"></span><span style="color:#f87171">지연 </span><span class="delay-icon">⚠️</span></td>
+                <td style="display:flex;gap:6px;align-items:center">
+                  <button class="upload-mini">📤 업로드</button>
+                  <button class="progress-mini">▶ 진행 중</button>
+                  <button class="req-btn">📅 기한 변경</button>
+                </td>
+              </tr>
+              <tr>
+                <td><div class="week-badge">5주차</div></td>
+                <td style="font-weight:600;color:#555">성과 발표</td>
+                <td style="color:#555">05.29 – 06.04</td>
+                <td><span class="status-dot dot-none"></span><span style="color:#555">미시작</span></td>
+                <td style="display:flex;gap:6px;align-items:center">
+                  <span class="action-icon" style="color:#444">✏️</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Deadline change request modal hint -->
+          <div style="margin-top:16px;background:#2e1a00;border:1px solid #7c2d12;border-radius:10px;padding:12px 14px;font-size:12px;color:#fb923c">
+            <div style="font-weight:600;margin-bottom:4px">📅 기한 변경 요청 안내</div>
+            <div style="color:#aaa;font-size:11px">"기한 변경" 버튼 클릭 시 AX Office에 요청이 전송됩니다. 승인 후 마감일이 자동 업데이트됩니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Pages — ax-homework-submission</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #141414;
+    color: #f5f5f5;
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+    padding: 32px 24px;
+  }
+  h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 32px; }
+
+  .screens { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .screen-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .screen-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+  .desktop {
+    width: 520px;
+    background: #1a1a1a;
+    border-radius: 16px;
+    border: 1px solid #2a2a2a;
+    overflow: hidden;
+  }
+
+  /* sidebar layout */
+  .layout { display: flex; min-height: 520px; }
+  .sidebar {
+    width: 180px; background: #141414; padding: 20px 16px;
+    border-right: 1px solid #222; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .sidebar-logo { font-size: 14px; font-weight: 700; color: #f5f5f5; margin-bottom: 20px; }
+  .sidebar-label { font-size: 10px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 6px; }
+  .nav-item {
+    font-size: 13px; padding: 8px 10px; border-radius: 8px;
+    cursor: pointer; color: #888; display: flex; align-items: center; gap: 8px;
+  }
+  .nav-item.active { background: #1e2d4a; color: #7dd3fc; font-weight: 600; }
+  .nav-item:hover:not(.active) { background: #222; color: #ccc; }
+  .sidebar-bottom { margin-top: auto; }
+  .logout-btn {
+    font-size: 12px; color: #555; padding: 8px 10px;
+    cursor: pointer; border-radius: 8px;
+  }
+  .logout-btn:hover { color: #f87171; background: rgba(239,68,68,0.08); }
+
+  .main { flex: 1; padding: 20px; overflow: hidden; }
+  .page-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { font-size: 12px; color: #888; margin-bottom: 16px; }
+
+  /* Table */
+  .table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .table th { color: #555; font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid #222; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+  .table td { padding: 10px 8px; border-bottom: 1px solid #1e1e1e; color: #ccc; vertical-align: middle; }
+  .table tr:last-child td { border-bottom: none; }
+  .table tr:hover td { background: #1e1e1e; }
+
+  .badge { font-size: 10px; font-weight: 600; padding: 3px 7px; border-radius: 6px; white-space: nowrap; }
+  .badge-accepted { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .badge-declined { background: rgba(239,68,68,0.15); color: #f87171; }
+  .badge-pending { background: rgba(234,179,8,0.12); color: #fbbf24; }
+  .badge-none { background: #1e1e1e; color: #555; }
+
+  .progress-bar { background: #222; border-radius: 4px; height: 6px; width: 80px; }
+  .progress-fill { background: #2563eb; border-radius: 4px; height: 6px; }
+
+  /* Submission review panel */
+  .review-layout { display: flex; gap: 12px; }
+  .file-panel { flex: 1; }
+  .review-panel { width: 190px; flex-shrink: 0; }
+
+  .md-viewer {
+    background: #111; border-radius: 10px; padding: 12px;
+    font-size: 12px; color: #ccc; line-height: 1.7; height: 200px;
+    overflow: hidden; border: 1px solid #222;
+  }
+  .md-viewer h3 { color: #f5f5f5; font-size: 13px; margin-bottom: 6px; }
+  .md-viewer p { margin-bottom: 8px; }
+  .md-viewer code { background: #1a1a2e; color: #7dd3fc; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+  .review-section { margin-bottom: 14px; }
+  .review-label { font-size: 10px; font-weight: 600; color: #555; text-transform: uppercase; margin-bottom: 6px; }
+  .attempt-chip {
+    background: #222; border-radius: 8px; padding: 6px 10px;
+    font-size: 12px; color: #ccc; margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+    border: 1px solid #2a2a2a;
+  }
+  .attempt-chip.active { border-color: #2563eb; background: #1e2d4a; }
+
+  textarea.comment-input {
+    width: 100%; background: #111; border: 1px solid #2a2a2a;
+    border-radius: 8px; padding: 8px 10px; color: #ccc;
+    font-size: 12px; font-family: inherit; resize: none; height: 70px;
+    line-height: 1.5;
+  }
+  .action-buttons { display: flex; gap: 6px; margin-top: 6px; }
+  .btn-accept {
+    flex: 1; padding: 9px; background: rgba(34,197,94,0.15);
+    color: #4ade80; border: 1px solid rgba(34,197,94,0.25);
+    border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .btn-decline {
+    flex: 1; padding: 9px; background: rgba(239,68,68,0.1);
+    color: #f87171; border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+
+  /* Create homework */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 5px; display: block; }
+  .form-input {
+    width: 100%; background: #111; border: 1px solid #2a2a2a;
+    border-radius: 8px; padding: 9px 12px; color: #f5f5f5;
+    font-size: 13px; font-family: inherit;
+  }
+  .wysiwyg-toolbar {
+    background: #111; border: 1px solid #2a2a2a; border-bottom: none;
+    border-radius: 8px 8px 0 0; padding: 6px 10px;
+    display: flex; gap: 10px;
+  }
+  .toolbar-btn { font-size: 12px; color: #888; cursor: pointer; font-weight: 700; }
+  .wysiwyg-body {
+    background: #111; border: 1px solid #2a2a2a;
+    border-radius: 0 0 8px 8px; padding: 10px 12px;
+    min-height: 80px; font-size: 13px; color: #ccc;
+  }
+  .btn-primary {
+    width: 100%; padding: 11px; background: #2563eb; color: #fff;
+    border-radius: 10px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;
+  }
+
+  /* Admin login */
+  .login-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 400px; padding: 32px;
+  }
+  .login-icon { font-size: 36px; margin-bottom: 16px; }
+  .login-title { font-size: 18px; font-weight: 700; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+
+<h2>Admin Pages</h2>
+<p class="subtitle">FLO Design System · Desktop layout · Dark mode · http://localhost:49216</p>
+
+<div class="screens">
+
+  <!-- ① ADMIN LOGIN -->
+  <div class="screen-wrap">
+    <div class="screen-label">① Admin Login</div>
+    <div class="desktop" style="width:340px">
+      <div class="login-wrap">
+        <div class="login-icon">🔐</div>
+        <div class="login-title">Admin</div>
+        <div class="form-group" style="width:100%">
+          <label class="form-label">이메일</label>
+          <input class="form-input" placeholder="admin@dreamus.io" style="width:100%"/>
+        </div>
+        <div class="form-group" style="width:100%">
+          <label class="form-label">비밀번호</label>
+          <input class="form-input" type="password" placeholder="••••••••" style="width:100%"/>
+        </div>
+        <button class="btn-primary" style="margin-top:8px">로그인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② ADMIN DASHBOARD -->
+  <div class="screen-wrap">
+    <div class="screen-label">② Dashboard — Homework List</div>
+    <div class="desktop">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">🔐 Admin</div>
+          <div class="nav-item active">📋 과제 관리</div>
+          <div class="nav-item">➕ 과제 생성</div>
+          <div class="sidebar-bottom">
+            <div class="logout-btn">로그아웃</div>
+          </div>
+        </div>
+        <div class="main">
+          <div class="page-title">과제 목록</div>
+          <div class="page-sub">총 4개 과제</div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>과제명</th>
+                <th>마감일</th>
+                <th>제출현황</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color:#555">01</td>
+                <td style="color:#f5f5f5;font-weight:600">React 기초 실습</td>
+                <td>05.20</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+                    <span style="font-size:11px;color:#aaa">5/5</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="color:#555">02</td>
+                <td style="color:#f5f5f5;font-weight:600">Next.js 라우팅 과제</td>
+                <td>05.27</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div>
+                    <span style="font-size:11px;color:#aaa">3/5</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="color:#555">03</td>
+                <td style="color:#f5f5f5;font-weight:600">Supabase 연동 실습</td>
+                <td>06.03</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="progress-bar"><div class="progress-fill" style="width:20%"></div></div>
+                    <span style="font-size:11px;color:#aaa">1/5</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style="color:#555">04</td>
+                <td style="color:#f5f5f5;font-weight:600">최종 프로젝트</td>
+                <td>06.17</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                    <span style="font-size:11px;color:#555">0/5</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ SUBMISSION REVIEW -->
+  <div class="screen-wrap">
+    <div class="screen-label">③ Submission Review (Markdown viewer + comment + accept/decline)</div>
+    <div class="desktop" style="width:560px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">🔐 Admin</div>
+          <div class="nav-item active">📋 과제 관리</div>
+          <div class="nav-item">➕ 과제 생성</div>
+          <div class="sidebar-bottom">
+            <div class="logout-btn">로그아웃</div>
+          </div>
+        </div>
+        <div class="main">
+          <div style="font-size:11px;color:#555;margin-bottom:8px">과제 02 › 박지영</div>
+          <div class="page-title" style="font-size:14px">Next.js 라우팅 과제</div>
+          <div class="page-sub">제출 2회 · 최신: 2026.05.25</div>
+          <div class="review-layout">
+            <div class="file-panel">
+              <!-- Attempt selector -->
+              <div class="review-label">제출 이력</div>
+              <div class="attempt-chip active">
+                <span>시도 #2 · 2026.05.25</span>
+                <div class="badge badge-declined">불합격</div>
+              </div>
+              <div class="attempt-chip">
+                <span>시도 #1 · 2026.05.22</span>
+                <div class="badge badge-declined">불합격</div>
+              </div>
+              <!-- MD viewer -->
+              <div class="review-label" style="margin-top:12px">파일 미리보기 (Markdown)</div>
+              <div class="md-viewer">
+                <h3># Next.js Routing Report</h3>
+                <p>This report covers dynamic routing implementation using <code>App Router</code>.</p>
+                <p>## 구현 내용</p>
+                <p>- 페이지 라우팅 구조 설계<br>- <code>[id]</code> 동적 경로 처리<br>- middleware 설정</p>
+              </div>
+            </div>
+            <div class="review-panel">
+              <div class="review-section">
+                <div class="review-label">코멘트 작성</div>
+                <textarea class="comment-input" placeholder="피드백을 입력하세요...">동적 경로 처리 방식 재검토 필요</textarea>
+              </div>
+              <div class="review-section">
+                <div class="review-label">결과</div>
+                <div class="action-buttons">
+                  <button class="btn-accept">✓ 합격</button>
+                  <button class="btn-decline">✕ 불합격</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ CREATE HOMEWORK -->
+  <div class="screen-wrap">
+    <div class="screen-label">④ Create Homework</div>
+    <div class="desktop" style="width:420px">
+      <div class="layout">
+        <div class="sidebar">
+          <div class="sidebar-logo">🔐 Admin</div>
+          <div class="nav-item">📋 과제 관리</div>
+          <div class="nav-item active">➕ 과제 생성</div>
+          <div class="sidebar-bottom">
+            <div class="logout-btn">로그아웃</div>
+          </div>
+        </div>
+        <div class="main">
+          <div class="page-title">새 과제 만들기</div>
+          <div class="page-sub" style="margin-bottom:16px">과제 번호는 자동 부여됩니다</div>
+          <div class="form-group">
+            <label class="form-label">제목 *</label>
+            <input class="form-input" placeholder="과제 제목을 입력하세요"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">설명 (선택)</label>
+            <div class="wysiwyg-toolbar">
+              <span class="toolbar-btn">B</span>
+              <span class="toolbar-btn">I</span>
+              <span class="toolbar-btn">U</span>
+              <span class="toolbar-btn" style="font-weight:400">H1</span>
+              <span class="toolbar-btn" style="font-weight:400">•—</span>
+            </div>
+            <div class="wysiwyg-body" contenteditable="true" style="outline:none">과제 설명을 입력하세요...</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">마감일 *</label>
+            <input class="form-input" type="date"/>
+          </div>
+          <button class="btn-primary">과제 생성</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

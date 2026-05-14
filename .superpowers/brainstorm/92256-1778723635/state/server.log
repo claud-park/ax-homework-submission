@@ -1,0 +1,14 @@
+{"type":"server-started","port":49216,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:49216","screen_dir":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content","state_dir":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/state"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/approaches.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/architecture.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/data-model.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/erd.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/pages-user.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/pages-admin.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/file-preview-states.html"}
+{"type":"screen-updated","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/pages-user.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/erd-v2.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/pages-charter-wbs.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/pages-gantt-progress.html"}
+{"type":"screen-added","file":"/Users/claud_01/Documents/flo/AX/ax-homework-submission/.superpowers/brainstorm/92256-1778723635/content/kanban.html"}
+{"type":"server-stopped","reason":"idle timeout"}

@@ -1,0 +1,72 @@
+<h2>Architecture Approaches</h2>
+<p class="subtitle">Three ways to structure the auth and data layer — pick what feels right</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Full Supabase ⭐ Recommended</h3>
+      <p><strong>Users:</strong> Google OAuth via Supabase Auth<br>
+      <strong>Admin:</strong> Email/password user in Supabase Auth with <code>is_admin</code> flag<br>
+      <strong>Files:</strong> Supabase Storage<br>
+      <strong>Data access:</strong> Row Level Security (RLS) policies on all tables</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Single unified auth system</li>
+          <li>Built-in session management everywhere</li>
+          <li>RLS enforces access at DB level — hard to bypass</li>
+          <li>No custom server code needed</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>RLS policies require careful setup</li>
+          <li>Admin user must be provisioned once in Supabase dashboard</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Supabase DB/Storage + Custom Admin Auth</h3>
+      <p><strong>Users:</strong> Google OAuth via Supabase Auth<br>
+      <strong>Admin:</strong> Credentials stored in <code>.env</code>, validated via Next.js API route, session stored in a cookie<br>
+      <strong>Files:</strong> Supabase Storage<br>
+      <strong>Data access:</strong> No RLS — API routes enforce authorization explicitly</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Admin auth is simple and explicit</li>
+          <li>Easier to reason about — no RLS complexity</li>
+          <li>No Supabase dashboard provisioning needed</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Needs Next.js API routes (server code in a CSR app)</li>
+          <li>No RLS means authorization relies entirely on API layer</li>
+          <li>Two separate auth systems to maintain</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Supabase + Separate Admin App</h3>
+      <p><strong>Users:</strong> Google OAuth via Supabase Auth<br>
+      <strong>Admin:</strong> Completely separate Next.js route group or subdomain with its own auth<br>
+      <strong>Files:</strong> Supabase Storage<br>
+      <strong>Data access:</strong> Supabase service key used only in admin routes</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Clear separation between user and admin surfaces</li>
+          <li>Admin uses service key — full DB access without RLS</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>More complex project structure</li>
+          <li>Service key exposure risk if not handled carefully</li>
+          <li>Overkill for a single admin</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
