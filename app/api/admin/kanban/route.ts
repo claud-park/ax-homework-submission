@@ -8,11 +8,14 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const homeworkId = searchParams.get('homework_id')
+  if (homeworkId !== null && isNaN(parseInt(homeworkId, 10))) {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 })
+  }
 
   const supabase = createServiceClient()
 
   let query = supabase.from('submissions').select('*, users(*)').order('submitted_at', { ascending: false })
-  if (homeworkId) query = query.eq('homework_id', parseInt(homeworkId))
+  if (homeworkId) query = query.eq('homework_id', parseInt(homeworkId, 10))
 
   const { data: submissions, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

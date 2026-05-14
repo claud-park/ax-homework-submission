@@ -80,21 +80,19 @@ export default function AdminKanbanPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
+  }
+
   const fetchKanban = useCallback(() => {
     const url = selectedHw ? `/api/admin/kanban?homework_id=${selectedHw}` : '/api/admin/kanban'
-    apiFetch<KanbanData>(url).then(setData)
+    apiFetch<KanbanData>(url).then(setData).catch(() => showToast('데이터 로드 실패'))
   }, [selectedHw])
 
   useEffect(() => {
     apiFetch<Homework[]>('/api/admin/homeworks').then(setHomeworks)
   }, [])
-
-  useEffect(() => { fetchKanban() }, [fetchKanban])
-
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
-  }
 
   function onDragStart(event: DragStartEvent) {
     const card = data.pending.find(c => c.id === event.active.id) ?? null
