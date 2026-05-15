@@ -5,15 +5,22 @@ import { createServiceClient } from '@/lib/supabase/server'
 export async function GET(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const isAdmin = !!user.user_metadata?.is_admin
   const homeworkId = req.nextUrl.searchParams.get('homework_id')
+  const targetUserId = req.nextUrl.searchParams.get('user_id')
+  const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
+
   const supabase = createServiceClient()
   let query = supabase
     .from('milestones')
     .select('*, milestone_deliverables(*)')
-    .eq('user_id', user.id)
+    .eq('user_id', effectiveUserId)
     .order('display_order')
   if (homeworkId) {
-    query = query.eq('homework_id', Number(homeworkId))
+    const hwId = parseInt(homeworkId, 10)
+    if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
+    query = query.eq('homework_id', hwId)
   } else {
     query = query.order('week_number')
   }
