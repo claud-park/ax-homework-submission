@@ -7,14 +7,14 @@ async function getCharterAndVerifyAccess(
   charterId: string,
   userId: string,
   isAdmin: boolean
-) {
+): Promise<{ id: string; user_id: string } | null | 'forbidden'> {
   const { data: charter } = await supabase
     .from('charter_submissions')
     .select('id, user_id')
     .eq('id', charterId)
     .single()
   if (!charter) return null
-  if (!isAdmin && charter.user_id !== userId) return null
+  if (!isAdmin && charter.user_id !== userId) return 'forbidden'
   return charter
 }
 
@@ -24,7 +24,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const isAdmin = !!user.user_metadata?.is_admin
   const supabase = createServiceClient()
   const charter = await getCharterAndVerifyAccess(supabase, params.id, user.id, isAdmin)
-  if (!charter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (charter === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (charter === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { data, error } = await supabase
     .from('charter_comments')
     .select('*')
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const isAdmin = !!user.user_metadata?.is_admin
   const supabase = createServiceClient()
   const charter = await getCharterAndVerifyAccess(supabase, params.id, user.id, isAdmin)
-  if (!charter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (charter === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (charter === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { body } = await req.json()
   if (!body?.trim()) return NextResponse.json({ error: 'Body required' }, { status: 400 })
   const { data, error } = await supabase
