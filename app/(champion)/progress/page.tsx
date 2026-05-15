@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone } from '@/lib/types'
+import 'gantt-task-react/dist/index.css'
 
 const STATUS_COLOR: Record<string, string> = {
   not_started: '#444',
@@ -76,7 +77,7 @@ export default function ProgressPage() {
       </div>
 
       {GanttComponent && tasks.length > 0 ? (
-        <div className="rounded-xl border overflow-auto" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
+        <div className="rounded-xl border overflow-auto" style={{ borderColor: 'var(--border-subtle)', background: '#ffffff', colorScheme: 'light' }}>
           {GanttComponent && (
             <GanttComponent
               tasks={tasks}
