@@ -6,6 +6,18 @@ import type { Submission, Comment, CharterSubmission, CharterComment, Milestone 
 import ReactMarkdown from 'react-markdown'
 import DOMPurify from 'dompurify'
 
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return '방금'
+  if (minutes < 60) return `${minutes}분 전`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}시간 전`
+  return `${Math.floor(hours / 24)}일 전`
+}
+
 // ─── shared constants ────────────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<string, string> = { pending: '검토 중', accepted: '합격', declined: '불합격' }
@@ -73,7 +85,7 @@ function AdminCommentItem({ comment, onEdit }: { comment: Comment; onEdit: (c: C
         )}
       </div>
       <p className="text-xs mt-1 ml-[52px]" style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>
-        {new Date(comment.created_at).toLocaleString('ko-KR')}
+        {relativeTime(comment.created_at)}
         {comment.updated_at !== comment.created_at && ' · 편집됨'}
       </p>
     </div>
@@ -277,7 +289,7 @@ function CharterThreadComment({
             <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
               style={{ color: badge.color, background: badge.bg, fontSize: '10px' }}>{badge.label}</span>
             <span className="text-xs" style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>
-              {new Date(comment.created_at).toLocaleString('ko-KR')}
+              {relativeTime(comment.created_at)}
               {comment.updated_at !== comment.created_at && ' · 편집됨'}
             </span>
           </div>
@@ -540,7 +552,7 @@ function MilestonesAdminTab({ homeworkId, userId }: { homeworkId: number; userId
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left" style={{ borderColor: 'var(--border-subtle)' }}>
-            <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤</th>
+            <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤명</th>
             <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</th>
             <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>상태</th>
             <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>산출물</th>
