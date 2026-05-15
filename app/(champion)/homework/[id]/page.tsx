@@ -304,6 +304,7 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
         </div>
       ) : (
         <>
+          {milestones.length > 0 && (
           <table className="w-full text-sm mb-4">
             <thead>
               <tr className="border-b text-left" style={{ borderColor: 'var(--border-subtle)' }}>
@@ -333,6 +334,7 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
               ))}
             </tbody>
           </table>
+          )}
           {!showForm && (
             <button onClick={() => setShowForm(true)}
               className="text-sm font-semibold"
