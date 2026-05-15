@@ -13,6 +13,20 @@ export async function GET(req: NextRequest) {
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 
   const supabase = createServiceClient()
+
+  // Admin with homework_id but no user_id → list all users' charters for that homework
+  if (isAdmin && !targetUserId && homeworkId) {
+    const hwId = parseInt(homeworkId, 10)
+    if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
+    const { data, error } = await supabase
+      .from('charter_submissions')
+      .select('*, users(*)')
+      .eq('homework_id', hwId)
+      .order('submitted_at', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  }
+
   let query = supabase
     .from('charter_submissions')
     .select('*')
