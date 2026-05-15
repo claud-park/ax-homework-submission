@@ -313,11 +313,12 @@ function ChampionCommentThread({ comment, currentUserId, onReply, onEdit }: {
   )
 }
 
-function CharterCommentSection({ charterId }: { charterId: string }) {
+function CharterCommentPanel({ charterId }: { charterId: string }) {
   const [comments, setComments] = useState<CharterComment[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [newBody, setNewBody] = useState('')
   const [posting, setPosting] = useState(false)
+  const [filter, setFilter] = useState<'all' | 'unresolved'>('all')
 
   useEffect(() => {
     import('@/lib/supabase/client').then(({ createSupabaseBrowserClient }) => {
@@ -371,25 +372,64 @@ function CharterCommentSection({ charterId }: { charterId: string }) {
     setComments(prev => updateInTree(prev, updated))
   }
 
+  const unresolvedCount = comments.filter(c => !c.is_resolved).length
+  const filtered = filter === 'unresolved' ? comments.filter(c => !c.is_resolved) : comments
+
   return (
-    <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-      <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>피드백</p>
-      {comments.length === 0 && (
-        <p className="text-sm mb-3" style={{ color: 'var(--text-disabled)' }}>아직 피드백이 없습니다.</p>
-      )}
-      {comments.map(c => (
-        <ChampionCommentThread key={c.id} comment={c} currentUserId={currentUserId}
-          onReply={handleReply} onEdit={handleEdit} />
-      ))}
-      <div className="mt-3">
+    <div className="flex flex-col h-full">
+      {/* Panel header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0"
+        style={{ borderColor: 'var(--border-subtle)' }}>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>피드백</span>
+          {unresolvedCount > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+              style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', fontSize: '10px' }}>
+              {unresolvedCount}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-1.5">
+          <button onClick={() => setFilter('all')}
+            className="text-xs px-2.5 py-1 rounded-md font-semibold"
+            style={filter === 'all'
+              ? { background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }
+              : { background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+            전체
+          </button>
+          <button onClick={() => setFilter('unresolved')}
+            className="text-xs px-2.5 py-1 rounded-md font-semibold"
+            style={filter === 'unresolved'
+              ? { background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }
+              : { background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+            미해결 {unresolvedCount > 0 ? unresolvedCount : ''}
+          </button>
+        </div>
+      </div>
+
+      {/* Comment list */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {filtered.length === 0 && (
+          <p className="text-xs text-center mt-8" style={{ color: 'var(--text-disabled)' }}>
+            {filter === 'unresolved' ? '미해결 피드백이 없습니다.' : '아직 피드백이 없습니다.'}
+          </p>
+        )}
+        {filtered.map(c => (
+          <ChampionCommentThread key={c.id} comment={c} currentUserId={currentUserId}
+            onReply={handleReply} onEdit={handleEdit} />
+        ))}
+      </div>
+
+      {/* New comment input */}
+      <div className="p-3 border-t shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
         <textarea value={newBody} onChange={e => setNewBody(e.target.value)}
           placeholder="새 코멘트 작성..."
           rows={2}
-          className="w-full text-sm rounded-lg p-3 resize-none mb-2"
+          className="w-full text-xs rounded-lg p-2 resize-none mb-2"
           style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
         <div className="flex justify-end">
           <button onClick={handlePost} disabled={posting || !newBody.trim()}
-            className="text-sm px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50"
             style={{ background: 'var(--blue-600)', color: '#fff' }}>
             {posting ? '작성 중...' : '작성'}
           </button>
@@ -430,15 +470,25 @@ function CharterTab({ homeworkId }: { homeworkId: number }) {
   }
 
   const existing = charter === 'new' ? undefined : charter
+
+  // No id yet (writing for first time): editor only, no panel
+  if (!existing) {
+    return (
+      <div className="p-6">
+        <CharterEditor key="new" homeworkId={homeworkId} charter={undefined} onSaved={saved => setCharter(saved)} />
+      </div>
+    )
+  }
+
+  // Existing charter: split layout — editor left, feedback panel right
   return (
-    <div className="p-6">
-      <CharterEditor
-        key={existing?.id ?? 'new'}
-        homeworkId={homeworkId}
-        charter={existing}
-        onSaved={saved => setCharter(saved)}
-      />
-      {existing && <CharterCommentSection charterId={existing.id} />}
+    <div className="flex" style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}>
+      <div className="flex-1 overflow-y-auto p-6 border-r" style={{ borderColor: 'var(--border-subtle)' }}>
+        <CharterEditor key={existing.id} homeworkId={homeworkId} charter={existing} onSaved={saved => setCharter(saved)} />
+      </div>
+      <div className="flex flex-col" style={{ width: '320px', minWidth: '280px' }}>
+        <CharterCommentPanel charterId={existing.id} />
+      </div>
     </div>
   )
 }

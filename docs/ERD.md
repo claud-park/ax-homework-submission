@@ -100,9 +100,9 @@ Threaded feedback on a charter submission. Max depth 2 (top-level + replies).
 | 🔗 parent_id | uuid FK | → charter_comments.id (null = top-level comment) |
 | body | text NOT NULL | plain text |
 | author_role | text | `admin` \| `user` (check constraint) |
-| 🔗 author_id | uuid FK | → users.id (nullable) |
+| 🔗 author_id | uuid FK | → auth.users(id) nullable; set by both admin and champion |
 | is_resolved | boolean | true = admin marked as resolved; top-level only |
-| 🔗 resolved_by | uuid FK | → users.id nullable |
+| 🔗 resolved_by | uuid FK | → auth.users(id) nullable |
 | resolved_at | timestamptz | when resolved |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
@@ -180,7 +180,7 @@ users             1 ──< N  charter_submissions
 homeworks         1 ──< 1  charter_submissions (per user, via partial unique index)
 charter_submissions 1 ──< N  charter_comments (via charter_submission_id)
 charter_comments   1 ──< N  charter_comments (replies, via parent_id, max depth 2)
-users             1 ──< N  charter_comments (via author_id)
+auth.users        1 ──< N  charter_comments (via author_id; admin OR champion)
 users             1 ──< N  milestones
 homeworks         1 ──< N  milestones (per user; one 과제 has one or more milestones)
 milestones        1 ──< N  milestone_deliverables
