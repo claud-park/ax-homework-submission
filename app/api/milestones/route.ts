@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   let query = supabase
     .from('milestones')
-    .select('*, milestone_deliverables(*)')
+    .select('*, milestone_deliverables(*), homeworks(id, title)')
     .eq('user_id', effectiveUserId)
     .order('display_order')
   if (homeworkId) {

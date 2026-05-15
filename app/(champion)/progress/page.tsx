@@ -3,18 +3,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone } from '@/lib/types'
 
+type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
+
 const STATUS_COLOR: Record<string, string> = {
   not_started: '#f1f5f9',
-  in_progress: '#bfdbfe',
-  completed: '#bbf7d0',
-  delayed:    '#fecaca',
+  in_progress:  '#bfdbfe',
+  completed:    '#bbf7d0',
+  delayed:      '#fecaca',
 }
 const STATUS_LABEL: Record<string, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
 }
 const DAY_KO = ['일', '월', '화', '수', '목', '금', '토']
 
-// Parse "YYYY-MM-DD" as local date to avoid UTC offset issues
 function parseLocal(s: string): Date {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, m - 1, d)
@@ -41,18 +42,18 @@ function inRange(day: Date, startStr: string, endStr: string) {
   return t >= parseLocal(startStr).getTime() && t <= parseLocal(endStr).getTime()
 }
 
-const BORDER = '1px solid #e2e8f0'
+const BORDER   = '1px solid #e2e8f0'
 const HEADER_BG = '#f8fafc'
+const GROUP_BG  = '#f1f5f9'
 const LEFT_W = 240
 const COL_W  = 44
-// Heights of the 3 header rows — used for sticky top offsets
 const H0 = 28, H1 = 24, H2 = 24
 
 export default function ProgressPage() {
-  const [milestones, setMilestones] = useState<Milestone[]>([])
+  const [milestones, setMilestones] = useState<MilestoneWithHomework[]>([])
 
   useEffect(() => {
-    apiFetch<Milestone[]>('/api/milestones').then(setMilestones)
+    apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones)
   }, [])
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
@@ -61,6 +62,23 @@ export default function ProgressPage() {
   const tasks   = useMemo(() => milestones.filter(m => m.start_date && m.due_date), [milestones])
   const delayed = useMemo(() => milestones.filter(m => m.status === 'delayed'),      [milestones])
 
+  // Group tasks by homework, sorted: homework groups (asc id), then standalone (null) last
+  const groups = useMemo(() => {
+    const map = new Map<string, { hwId: number | null; hwTitle: string | null; milestones: MilestoneWithHomework[] }>()
+    for (const m of tasks) {
+      const key = m.homework_id !== null ? String(m.homework_id) : '__none__'
+      if (!map.has(key)) map.set(key, { hwId: m.homework_id, hwTitle: m.homeworks?.title ?? null, milestones: [] })
+      map.get(key)!.milestones.push(m)
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        if (a === '__none__') return 1
+        if (b === '__none__') return -1
+        return Number(a) - Number(b)
+      })
+      .map(([, g]) => g)
+  }, [tasks])
+
   const { days, monthGroups } = useMemo(() => {
     if (!tasks.length) return { days: [] as Date[], monthGroups: [] as { label: string; count: number }[] }
     const minMs = Math.min(...tasks.map(m => parseLocal(m.start_date).getTime()))
@@ -68,14 +86,14 @@ export default function ProgressPage() {
     const s = new Date(minMs); s.setDate(s.getDate() - 5)
     const e = new Date(maxMs); e.setDate(e.getDate() + 5)
     const allDays = getWeekdays(s, e)
-    const groups: { label: string; count: number }[] = []
+    const grps: { label: string; count: number }[] = []
     for (const d of allDays) {
       const label = `${d.getMonth() + 1}월`
-      const last = groups[groups.length - 1]
+      const last = grps[grps.length - 1]
       if (last?.label === label) last.count++
-      else groups.push({ label, count: 1 })
+      else grps.push({ label, count: 1 })
     }
-    return { days: allDays, monthGroups: groups }
+    return { days: allDays, monthGroups: grps }
   }, [tasks])
 
   return (
@@ -142,7 +160,7 @@ export default function ProgressPage() {
                 ))}
               </tr>
 
-              {/* Row 1: Day names (월/화/수/목/금) */}
+              {/* Row 1: Day names */}
               <tr style={{ height: `${H1}px` }}>
                 {days.map((d, i) => (
                   <th key={i} style={{
@@ -174,34 +192,62 @@ export default function ProgressPage() {
             </thead>
 
             <tbody>
-              {tasks.map(m => (
-                <tr key={m.id} style={{ height: '40px' }}>
-                  {/* Fixed task name column */}
-                  <td style={{
-                    position: 'sticky', left: 0, zIndex: 10,
-                    background: '#fff',
-                    borderRight: BORDER, borderBottom: BORDER,
-                    paddingLeft: '12px', paddingRight: '8px',
-                    fontSize: '12px', color: '#0f172a',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>
-                    {m.title}
-                  </td>
+              {groups.map(({ hwId, hwTitle, milestones: gms }) => {
+                const groupLabel = hwId !== null
+                  ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? `  ${hwTitle}` : ''}`
+                  : '독립 WBS'
 
-                  {/* Date cells */}
-                  {days.map((day, i) => {
-                    const active = inRange(day, m.start_date, m.due_date)
-                    return (
-                      <td key={i} style={{
-                        background: active ? STATUS_COLOR[m.status] : '#fff',
-                        borderRight: BORDER,
+                return (
+                  <>
+                    {/* Group header row */}
+                    <tr key={`grp-${hwId ?? 'none'}`} style={{ height: '28px' }}>
+                      <td style={{
+                        position: 'sticky', left: 0, zIndex: 10,
+                        background: GROUP_BG,
+                        borderRight: BORDER, borderBottom: BORDER,
+                        paddingLeft: '12px', paddingRight: '8px',
+                        fontSize: '11px', fontWeight: 700, color: '#475569',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        letterSpacing: '0.02em',
+                      }}>
+                        {groupLabel}
+                      </td>
+                      <td colSpan={days.length} style={{
+                        background: GROUP_BG,
                         borderBottom: BORDER,
                         padding: 0,
                       }} />
-                    )
-                  })}
-                </tr>
-              ))}
+                    </tr>
+
+                    {/* Milestone rows */}
+                    {gms.map(m => (
+                      <tr key={m.id} style={{ height: '40px' }}>
+                        <td style={{
+                          position: 'sticky', left: 0, zIndex: 10,
+                          background: '#fff',
+                          borderRight: BORDER, borderBottom: BORDER,
+                          paddingLeft: '20px', paddingRight: '8px',
+                          fontSize: '12px', color: '#0f172a',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {m.title}
+                        </td>
+                        {days.map((day, i) => {
+                          const active = inRange(day, m.start_date, m.due_date)
+                          return (
+                            <td key={i} style={{
+                              background: active ? STATUS_COLOR[m.status] : '#fff',
+                              borderRight: BORDER,
+                              borderBottom: BORDER,
+                              padding: 0,
+                            }} />
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </>
+                )
+              })}
             </tbody>
           </table>
         </div>
