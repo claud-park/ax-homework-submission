@@ -1,8 +1,10 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch, apiUpload } from '@/lib/api-client'
 import type { Milestone, DeadlineChangeRequest } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
+
+type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
 const STATUS_LABEL: Record<string, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
@@ -19,7 +21,7 @@ const REQ_COLOR: Record<string, string> = {
 interface NewMilestone { week_number: string; title: string; start_date: string; due_date: string }
 
 export default function MilestonesPage() {
-  const [milestones, setMilestones] = useState<Milestone[]>([])
+  const [milestones, setMilestones] = useState<MilestoneWithHomework[]>([])
   const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<NewMilestone>({ week_number: '1', title: '', start_date: '', due_date: '' })
@@ -32,9 +34,26 @@ export default function MilestonesPage() {
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
   useEffect(() => {
-    apiFetch<Milestone[]>('/api/milestones').then(setMilestones)
+    apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones)
     apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests)
   }, [])
+
+  // Group by homework, sorted by homework id asc, standalone ('독립 WBS') last
+  const groups = useMemo(() => {
+    const map = new Map<string, { hwId: number | null; hwTitle: string | null; items: MilestoneWithHomework[] }>()
+    for (const m of milestones) {
+      const key = m.homework_id !== null ? String(m.homework_id) : '__none__'
+      if (!map.has(key)) map.set(key, { hwId: m.homework_id, hwTitle: m.homeworks?.title ?? null, items: [] })
+      map.get(key)!.items.push(m)
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        if (a === '__none__') return 1
+        if (b === '__none__') return -1
+        return Number(a) - Number(b)
+      })
+      .map(([key, g]) => ({ key, ...g }))
+  }, [milestones])
 
   function showSuccess(msg: string) {
     setSuccess(msg)
@@ -46,7 +65,7 @@ export default function MilestonesPage() {
     e.preventDefault()
     setError(null)
     try {
-      const created = await apiFetch<Milestone>('/api/milestones', {
+      const created = await apiFetch<MilestoneWithHomework>('/api/milestones', {
         method: 'POST',
         body: JSON.stringify({ ...form, week_number: parseInt(form.week_number) }),
       })
@@ -64,7 +83,7 @@ export default function MilestonesPage() {
       const body = new FormData()
       body.append('file', file)
       await apiUpload(`/api/milestones/${id}/deliverables`, body)
-      const updated = await apiFetch<Milestone[]>('/api/milestones')
+      const updated = await apiFetch<MilestoneWithHomework[]>('/api/milestones')
       setMilestones(updated)
     } catch {
       setError('파일 업로드에 실패했습니다.')
@@ -83,7 +102,7 @@ export default function MilestonesPage() {
   async function handleMarkProgress(id: string) {
     setError(null)
     try {
-      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+      const updated = await apiFetch<MilestoneWithHomework>(`/api/milestones/${id}`, {
         method: 'PATCH', body: JSON.stringify({ is_manual_progress: true }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
@@ -168,115 +187,140 @@ export default function MilestonesPage() {
         </div>
       )}
 
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
-        <table className="w-full text-xs border-collapse">
-          <thead>
-            <tr style={{ background: 'var(--surface-secondary)' }}>
-              {['주차', '마일스톤', '기간', '상태', ''].map(h => (
-                <th key={h} className="text-left px-3 py-2 font-semibold uppercase tracking-wide" style={{ color: 'var(--text-disabled)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {milestones.map(m => {
-              const milestoneReqs = requests.filter(r => r.milestone_id === m.id)
-              return (
-                <tr key={m.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td className="px-3 py-3">
-                    <span className="px-2 py-0.5 rounded font-bold" style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' }}>{m.week_number}주차</span>
-                  </td>
-                  <td className="px-3 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-1.5">
-                      <span style={{ color: 'var(--text-secondary)' }}>{m.start_date} – {m.due_date}</span>
-                      {(m.status === 'delayed' || m.status === 'in_progress') && (
-                        <button
-                          onClick={() => {
-                            const existing = milestoneReqs[0]
-                            setDeadlineModal({ id: m.id, due_date: m.due_date, existingReqId: existing?.id })
-                            setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
-                          }}
-                          className="text-xs self-start underline"
-                          style={{ color: 'var(--text-disabled)' }}
-                        >
-                          {milestoneReqs.length > 0 ? '기한 변경 요청 수정' : '기한 변경 요청'}
-                        </button>
-                      )}
-                      {(() => {
-                        const pending = milestoneReqs.find(r => r.status === 'pending')
-                        const resolved = milestoneReqs.find(r => r.status === 'approved' || r.status === 'rejected')
-                        const toShow = [pending, resolved].filter(Boolean) as typeof milestoneReqs
-                        if (toShow.length === 0) return null
+      {milestones.length === 0 ? (
+        <p className="p-6 text-center text-sm" style={{ color: 'var(--text-disabled)' }}>
+          아직 마일스톤이 없습니다. 추가해보세요.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {groups.map(({ key, hwId, hwTitle, items }) => {
+            const sectionLabel = hwId !== null
+              ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? `  ${hwTitle}` : ''}`
+              : '독립 WBS'
+
+            return (
+              <div key={key}>
+                {/* Section header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wide shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                    {sectionLabel}
+                  </span>
+                  <div className="flex-1" style={{ height: '1px', background: 'var(--border-subtle)' }} />
+                  <span className="text-xs shrink-0" style={{ color: 'var(--text-disabled)' }}>{items.length}개</span>
+                </div>
+
+                {/* Milestone table */}
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr style={{ background: 'var(--surface-secondary)' }}>
+                        {['주차', '마일스톤', '기간', '상태', ''].map(h => (
+                          <th key={h} className="text-left px-3 py-2 font-semibold uppercase tracking-wide" style={{ color: 'var(--text-disabled)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map(m => {
+                        const milestoneReqs = requests.filter(r => r.milestone_id === m.id)
                         return (
-                          <div className="flex flex-col gap-1">
-                            {toShow.map(r => (
-                              <div key={r.id} className="flex items-center gap-1.5">
-                                <span className="text-xs font-semibold" style={{ color: REQ_COLOR[r.status] }}>
-                                  {REQ_LABEL[r.status]}
-                                </span>
-                                <span style={{ color: 'var(--text-disabled)' }}>→ {r.requested_due_date}</span>
+                          <tr key={m.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                            <td className="px-3 py-3">
+                              <span className="px-2 py-0.5 rounded font-bold" style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' }}>{m.week_number}주차</span>
+                            </td>
+                            <td className="px-3 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-col gap-1.5">
+                                <span style={{ color: 'var(--text-secondary)' }}>{m.start_date} – {m.due_date}</span>
+                                {(m.status === 'delayed' || m.status === 'in_progress') && (
+                                  <button
+                                    onClick={() => {
+                                      const existing = milestoneReqs[0]
+                                      setDeadlineModal({ id: m.id, due_date: m.due_date, existingReqId: existing?.id })
+                                      setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
+                                    }}
+                                    className="text-xs self-start underline"
+                                    style={{ color: 'var(--text-disabled)' }}
+                                  >
+                                    {milestoneReqs.length > 0 ? '기한 변경 요청 수정' : '기한 변경 요청'}
+                                  </button>
+                                )}
+                                {(() => {
+                                  const pending = milestoneReqs.find(r => r.status === 'pending')
+                                  const resolved = milestoneReqs.find(r => r.status === 'approved' || r.status === 'rejected')
+                                  const toShow = [pending, resolved].filter(Boolean) as typeof milestoneReqs
+                                  if (toShow.length === 0) return null
+                                  return (
+                                    <div className="flex flex-col gap-1">
+                                      {toShow.map(r => (
+                                        <div key={r.id} className="flex items-center gap-1.5">
+                                          <span className="text-xs font-semibold" style={{ color: REQ_COLOR[r.status] }}>
+                                            {REQ_LABEL[r.status]}
+                                          </span>
+                                          <span style={{ color: 'var(--text-disabled)' }}>→ {r.requested_due_date}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
+                                })()}
                               </div>
-                            ))}
-                          </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-col gap-1.5">
+                                <span style={{ color: STATUS_COLOR[m.status] }}>
+                                  {STATUS_LABEL[m.status]}{m.status === 'delayed' ? ' ⚠️' : ''}
+                                </span>
+                                {(m.status === 'not_started' || m.status === 'delayed') && (
+                                  <button onClick={() => handleMarkProgress(m.id)} className="px-2 py-1 rounded font-semibold self-start" style={{ color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}>
+                                    ▶ 과제 시작
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex flex-col gap-2 items-start">
+                                {(() => {
+                                  const lastDeliverable = m.deliverables?.slice().sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0]
+                                  return lastDeliverable ? (
+                                    <button onClick={() => handleDownload(m.id)} className="text-xs underline text-left" style={{ color: 'var(--blue-600)' }}>
+                                      ⬇ {lastDeliverable.file_name}
+                                    </button>
+                                  ) : null
+                                })()}
+                                {m.status === 'completed' ? (
+                                  <>
+                                    <button
+                                      onClick={() => setConfirmResubmitId(m.id)}
+                                      className="text-xs underline"
+                                      style={{ color: 'var(--text-disabled)' }}
+                                    >
+                                      과제 재제출
+                                    </button>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      ref={el => { if (el) resubmitInputRefs.current.set(m.id, el) }}
+                                      onChange={e => { if (e.target.files?.[0]) { handleUpload(m.id, e.target.files[0]); e.target.value = '' } }}
+                                    />
+                                  </>
+                                ) : (
+                                  <label className="cursor-pointer px-2 py-1 rounded font-semibold" style={{ background: 'rgba(74,222,128,0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
+                                    📤 과제 업로드
+                                    <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) handleUpload(m.id, e.target.files[0]) }} />
+                                  </label>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
                         )
-                      })()}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-1.5">
-                      <span style={{ color: STATUS_COLOR[m.status] }}>
-                        {STATUS_LABEL[m.status]}{m.status === 'delayed' ? ' ⚠️' : ''}
-                      </span>
-                      {(m.status === 'not_started' || m.status === 'delayed') && (
-                        <button onClick={() => handleMarkProgress(m.id)} className="px-2 py-1 rounded font-semibold self-start" style={{  color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}>
-                          ▶ 과제 시작
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-2 items-start">
-                      {(() => {
-                        const lastDeliverable = m.deliverables?.slice().sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0]
-                        return lastDeliverable ? (
-                          <button onClick={() => handleDownload(m.id)} className="text-xs underline text-left" style={{ color: 'var(--blue-600)' }}>
-                            ⬇ {lastDeliverable.file_name}
-                          </button>
-                        ) : null
-                      })()}
-                      {m.status === 'completed' ? (
-                        <>
-                          <button
-                            onClick={() => setConfirmResubmitId(m.id)}
-                            className="text-xs underline"
-                            style={{ color: 'var(--text-disabled)' }}
-                          >
-                            과제 재제출
-                          </button>
-                          <input
-                            type="file"
-                            className="hidden"
-                            ref={el => { if (el) resubmitInputRefs.current.set(m.id, el) }}
-                            onChange={e => { if (e.target.files?.[0]) { handleUpload(m.id, e.target.files[0]); e.target.value = '' } }}
-                          />
-                        </>
-                      ) : (
-                        <label className="cursor-pointer px-2 py-1 rounded font-semibold" style={{ background: 'rgba(74,222,128,0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
-                          📤 과제 업로드
-                          <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) handleUpload(m.id, e.target.files[0]) }} />
-                        </label>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        {milestones.length === 0 && (
-          <p className="p-6 text-center text-sm" style={{ color: 'var(--text-disabled)' }}>아직 마일스톤이 없습니다. 추가해보세요.</p>
-        )}
-      </div>
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Re-submission confirmation dialog */}
       {confirmResubmitId && (
