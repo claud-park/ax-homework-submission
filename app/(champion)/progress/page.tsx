@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone } from '@/lib/types'
 import 'gantt-task-react/dist/index.css'
@@ -17,10 +17,21 @@ const STATUS_LABEL: Record<string, string> = {
 export default function ProgressPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [GanttComponent, setGanttComponent] = useState<React.ComponentType<any> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
 
   useEffect(() => {
     apiFetch<Milestone[]>('/api/milestones').then(setMilestones)
     import('gantt-task-react').then(m => setGanttComponent(() => m.Gantt as React.ComponentType<any>))
+  }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    setContainerWidth(el.clientWidth)
+    const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [])
 
   const delayed = milestones.filter(m => m.status === 'delayed')
@@ -50,6 +61,16 @@ export default function ProgressPage() {
       }
     }), [milestones])
 
+  const columnWidth = useMemo(() => {
+    if (!containerWidth || tasks.length === 0) return 60
+    const weekMs = 7 * 24 * 60 * 60 * 1000
+    const minMs = Math.min(...tasks.map(t => t.start.getTime()))
+    const maxMs = Math.max(...tasks.map(t => t.end.getTime()))
+    // gantt-task-react pads ~2 extra weeks on each side in Week view
+    const numWeeks = Math.ceil((maxMs - minMs) / weekMs) + 4
+    return Math.max(40, Math.floor(containerWidth / numWeeks))
+  }, [containerWidth, tasks])
+
   return (
     <div>
       <div className="mb-6">
@@ -77,15 +98,14 @@ export default function ProgressPage() {
       </div>
 
       {GanttComponent && tasks.length > 0 ? (
-        <div className="rounded-xl border overflow-auto" style={{ borderColor: 'var(--border-subtle)', background: '#ffffff', colorScheme: 'light' }}>
-          {GanttComponent && (
+        <div ref={containerRef} className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)', background: '#ffffff', colorScheme: 'light' }}>
+          {GanttComponent && containerWidth > 0 && (
             <GanttComponent
               tasks={tasks}
               viewMode="Week"
               locale="ko"
               listCellWidth=""
-              columnWidth={60}
-              ganttHeight={300}
+              columnWidth={columnWidth}
               todayColor="rgba(37,99,235,0.15)"
             />
           )}
