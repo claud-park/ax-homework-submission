@@ -44,6 +44,7 @@ export interface Comment {
 export interface CharterSubmission {
   id: string
   user_id: string
+  homework_id: number | null
   project_name: string | null
   content: ProjectCharter['content']
   submitted_at: string
@@ -69,6 +70,7 @@ export interface ProjectCharter {
 export interface Milestone {
   id: string
   user_id: string
+  homework_id: number | null
   week_number: number
   title: string
   description: string | null

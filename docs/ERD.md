@@ -1,6 +1,6 @@
 # Entity Relationship Diagram — v2
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-05-14
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-05-15
 
 ---
 
@@ -70,10 +70,13 @@ Each champion's submitted/saved 과제정의서 versions. Mutable — champion c
 |---|---|---|
 | 🔑 id | uuid PK | |
 | 🔗 user_id | uuid FK | → users.id |
+| 🔗 homework_id | int FK | → homeworks.id (nullable; one per user+homework) |
 | project_name | text | |
 | content | jsonb | same shape as project_charters.content |
 | submitted_at | timestamptz | original submission time |
 | updated_at | timestamptz | last resubmit time |
+
+Unique constraint: `(user_id, homework_id) WHERE homework_id IS NOT NULL` — one 과제정의서 per homework per champion.
 
 `content` jsonb shape:
 ```json
@@ -94,7 +97,8 @@ Champion-created weekly WBS items (self-serve).
 |---|---|---|
 | 🔑 id | uuid PK | |
 | 🔗 user_id | uuid FK | → users.id |
-| week_number | int | 1-based week index |
+| 🔗 homework_id | int FK | → homeworks.id (nullable; links milestone to a specific 과제) |
+| week_number | int | 1-based week index; defaults to homework_id when created from homework context |
 | title | text NOT NULL | |
 | description | text | optional |
 | start_date | date NOT NULL | |
@@ -156,7 +160,9 @@ users             1 ──< N  comments (via author_id, nullable)
 
 users             1 ──< 1  project_charters
 users             1 ──< N  charter_submissions
+homeworks         1 ──< 1  charter_submissions (per user, via partial unique index)
 users             1 ──< N  milestones
+homeworks         1 ──< N  milestones (per user; one 과제 has one or more milestones)
 milestones        1 ──< N  milestone_deliverables
 milestones        1 ──< N  deadline_change_requests
 ```
