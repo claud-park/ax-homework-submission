@@ -90,6 +90,23 @@ Unique constraint: `(user_id, homework_id) WHERE homework_id IS NOT NULL` — on
 }
 ```
 
+### `charter_comments`
+Threaded feedback on a charter submission. Max depth 2 (top-level + replies).
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 charter_submission_id | uuid FK | → charter_submissions.id ON DELETE CASCADE |
+| 🔗 parent_id | uuid FK | → charter_comments.id (null = top-level comment) |
+| body | text NOT NULL | plain text |
+| author_role | text | `admin` \| `user` (check constraint) |
+| 🔗 author_id | uuid FK | → users.id (nullable) |
+| is_resolved | boolean | true = admin marked as resolved; top-level only |
+| 🔗 resolved_by | uuid FK | → users.id nullable |
+| resolved_at | timestamptz | when resolved |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
 ### `milestones`
 Champion-created weekly WBS items (self-serve).
 
@@ -161,6 +178,9 @@ users             1 ──< N  comments (via author_id, nullable)
 users             1 ──< 1  project_charters
 users             1 ──< N  charter_submissions
 homeworks         1 ──< 1  charter_submissions (per user, via partial unique index)
+charter_submissions 1 ──< N  charter_comments (via charter_submission_id)
+charter_comments   1 ──< N  charter_comments (replies, via parent_id, max depth 2)
+users             1 ──< N  charter_comments (via author_id)
 users             1 ──< N  milestones
 homeworks         1 ──< N  milestones (per user; one 과제 has one or more milestones)
 milestones        1 ──< N  milestone_deliverables
