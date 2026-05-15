@@ -120,3 +120,18 @@ export interface KanbanData {
   declined: (Submission & { user: User })[]
   not_submitted: User[]
 }
+
+export interface CharterComment {
+  id: string
+  charter_submission_id: string
+  parent_id: string | null
+  body: string
+  author_role: 'admin' | 'user'
+  author_id: string | null
+  is_resolved: boolean
+  resolved_by: string | null
+  resolved_at: string | null
+  created_at: string
+  updated_at: string
+  replies?: CharterComment[]
+}
