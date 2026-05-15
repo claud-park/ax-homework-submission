@@ -97,9 +97,9 @@ export default function ProgressPage() {
         ))}
       </div>
 
-      {GanttComponent && tasks.length > 0 ? (
-        <div ref={containerRef} className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)', background: '#ffffff', colorScheme: 'light' }}>
-          {GanttComponent && containerWidth > 0 && (
+      <div ref={containerRef}>
+        {GanttComponent && tasks.length > 0 ? (
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)', background: '#ffffff', colorScheme: 'light' }}>
             <GanttComponent
               tasks={tasks}
               viewMode="Week"
@@ -108,13 +108,13 @@ export default function ProgressPage() {
               columnWidth={columnWidth}
               todayColor="rgba(37,99,235,0.15)"
             />
-          )}
-        </div>
-      ) : (
-        <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>
-          {milestones.length === 0 ? 'WBS에서 마일스톤을 추가하면 여기에 표시됩니다.' : '차트를 불러오는 중...'}
-        </p>
-      )}
+          </div>
+        ) : (
+          <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>
+            {milestones.length === 0 ? 'WBS에서 마일스톤을 추가하면 여기에 표시됩니다.' : '차트를 불러오는 중...'}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
