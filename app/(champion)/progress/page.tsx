@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone } from '@/lib/types'
 
@@ -55,6 +55,8 @@ export default function ProgressPage() {
   useEffect(() => {
     apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones)
   }, [])
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
   const todayStr = today.toISOString().split('T')[0]
@@ -193,23 +195,44 @@ export default function ProgressPage() {
 
             <tbody>
               {groups.map(({ hwId, hwTitle, milestones: gms }) => {
+                const key = hwId !== null ? String(hwId) : '__none__'
+                const collapsed = collapsedGroups.has(key)
                 const groupLabel = hwId !== null
                   ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? `  ${hwTitle}` : ''}`
                   : '독립 WBS'
 
                 return (
-                  <>
-                    {/* Group header row */}
-                    <tr key={`grp-${hwId ?? 'none'}`} style={{ height: '28px' }}>
+                  <Fragment key={key}>
+                    {/* Group header row — clickable to toggle */}
+                    <tr
+                      style={{ height: '28px', cursor: 'pointer' }}
+                      onClick={() => setCollapsedGroups(prev => {
+                        const next = new Set(prev)
+                        if (next.has(key)) next.delete(key)
+                        else next.add(key)
+                        return next
+                      })}
+                    >
                       <td style={{
                         position: 'sticky', left: 0, zIndex: 10,
                         background: GROUP_BG,
                         borderRight: BORDER, borderBottom: BORDER,
-                        paddingLeft: '12px', paddingRight: '8px',
+                        paddingLeft: '10px', paddingRight: '8px',
                         fontSize: '11px', fontWeight: 700, color: '#475569',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         letterSpacing: '0.02em',
+                        userSelect: 'none',
                       }}>
+                        <span style={{
+                          display: 'inline-block',
+                          marginRight: '6px',
+                          fontSize: '9px',
+                          color: '#94a3b8',
+                          transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.15s ease',
+                        }}>
+                          ▼
+                        </span>
                         {groupLabel}
                       </td>
                       <td colSpan={days.length} style={{
@@ -219,8 +242,8 @@ export default function ProgressPage() {
                       }} />
                     </tr>
 
-                    {/* Milestone rows */}
-                    {gms.map(m => (
+                    {/* Milestone rows — hidden when collapsed */}
+                    {!collapsed && gms.map(m => (
                       <tr key={m.id} style={{ height: '40px' }}>
                         <td style={{
                           position: 'sticky', left: 0, zIndex: 10,
@@ -245,7 +268,7 @@ export default function ProgressPage() {
                         })}
                       </tr>
                     ))}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>
