@@ -11,13 +11,19 @@ export async function PATCH(
   const { body } = await req.json()
   if (!body?.trim()) return NextResponse.json({ error: 'Body required' }, { status: 400 })
   const supabase = createServiceClient()
+  const { data: existing } = await supabase
+    .from('charter_comments')
+    .select('id, author_id')
+    .eq('id', params.commentId)
+    .single()
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (existing.author_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { data, error } = await supabase
     .from('charter_comments')
     .update({ body: body.trim(), updated_at: new Date().toISOString() })
     .eq('id', params.commentId)
-    .eq('author_id', user.id)
     .select()
     .single()
-  if (error || !data) return NextResponse.json({ error: 'Not found or not yours' }, { status: 404 })
+  if (error || !data) return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   return NextResponse.json(data)
 }
