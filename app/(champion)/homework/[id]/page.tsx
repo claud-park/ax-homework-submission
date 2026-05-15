@@ -422,7 +422,7 @@ export default function HomeworkDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [newComments, setNewComments] = useState<Record<string, string>>({})
   const [submittingComment, setSubmittingComment] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('submission')
+  const [activeTab, setActiveTab] = useState<Tab>('charter')
 
   useEffect(() => {
     apiFetch<Homework>(`/api/homeworks/${id}`).then(setHomework)
@@ -492,9 +492,9 @@ export default function HomeworkDetailPage() {
   }
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'submission', label: '과제 제출' },
     { key: 'charter', label: '과제정의서' },
     { key: 'milestones', label: '마일스톤 (WBS)' },
+    { key: 'submission', label: '과제 제출' },
   ]
 
   return (
