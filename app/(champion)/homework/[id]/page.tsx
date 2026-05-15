@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api-client'
 import type { Homework, Submission, Comment, CharterSubmission, Milestone, ProjectCharter } from '@/lib/types'
 import DOMPurify from 'dompurify'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
+import DatePicker from '@/components/DatePicker'
 
 // ─── shared constants ────────────────────────────────────────────────────────
 
@@ -359,17 +360,23 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="text-xs mb-1 block" style={{ color: 'var(--text-secondary)' }}>시작일 *</label>
-                <input type="date" value={form.start_date}
-                  onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
-                  className="w-full text-sm p-2 rounded-lg border"
-                  style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }} />
+                <DatePicker
+                  value={form.start_date}
+                  onChange={v => setForm(f => ({ ...f, start_date: v }))}
+                  required
+                  placeholder="날짜 선택"
+                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }}
+                />
               </div>
               <div className="flex-1">
                 <label className="text-xs mb-1 block" style={{ color: 'var(--text-secondary)' }}>마감일 *</label>
-                <input type="date" value={form.due_date}
-                  onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))}
-                  className="w-full text-sm p-2 rounded-lg border"
-                  style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }} />
+                <DatePicker
+                  value={form.due_date}
+                  onChange={v => setForm(f => ({ ...f, due_date: v }))}
+                  required
+                  placeholder="날짜 선택"
+                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }}
+                />
               </div>
             </div>
             <textarea
