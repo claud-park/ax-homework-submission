@@ -5,7 +5,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
-import type { Homework, Submission, Comment, CharterSubmission, Milestone, ProjectCharter } from '@/lib/types'
+import type { Homework, Submission, Comment, CharterSubmission, Milestone, ProjectCharter, CharterComment } from '@/lib/types'
 import DOMPurify from 'dompurify'
 
 // ─── shared constants ────────────────────────────────────────────────────────
@@ -201,6 +201,204 @@ function CharterEditor({ homeworkId, charter, onSaved }: {
   )
 }
 
+function ChampionCommentThread({ comment, currentUserId, onReply, onEdit }: {
+  comment: CharterComment
+  currentUserId: string | null
+  onReply: (parentId: string, body: string) => Promise<void>
+  onEdit: (commentId: string, body: string) => Promise<void>
+}) {
+  const [replyOpen, setReplyOpen] = useState(false)
+  const [replyBody, setReplyBody] = useState('')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editBody, setEditBody] = useState(comment.body)
+  const [saving, setSaving] = useState(false)
+
+  const isOwn = comment.author_id === currentUserId
+  const isAdminComment = comment.author_role === 'admin'
+  const badge = isAdminComment
+    ? { label: '관리자', color: 'var(--blue-600)', bg: 'rgba(37,99,235,0.08)' }
+    : { label: '챔피언', color: 'var(--success)', bg: 'rgba(22,163,74,0.08)' }
+  const dimmed = comment.parent_id === null && comment.is_resolved
+
+  async function submitReply() {
+    if (!replyBody.trim()) return
+    setSaving(true)
+    try { await onReply(comment.id, replyBody.trim()); setReplyBody(''); setReplyOpen(false) } finally { setSaving(false) }
+  }
+
+  async function submitEdit() {
+    if (!editBody.trim() || editBody.trim() === comment.body) { setEditOpen(false); return }
+    setSaving(true)
+    try { await onEdit(comment.id, editBody.trim()); setEditOpen(false) } finally { setSaving(false) }
+  }
+
+  return (
+    <div style={{ opacity: dimmed ? 0.5 : 1, marginBottom: '8px' }}>
+      <div className="rounded-xl border p-3"
+        style={{
+          background: 'var(--surface-primary)',
+          borderColor: dimmed ? 'var(--border-subtle)' : comment.parent_id === null ? 'var(--blue-600)' : 'var(--border-subtle)',
+          borderLeftWidth: comment.parent_id === null ? '3px' : '1px',
+        }}>
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
+              style={{ color: badge.color, background: badge.bg, fontSize: '10px' }}>{badge.label}</span>
+            <span style={{ color: 'var(--text-disabled)', fontSize: '10px' }}>
+              {new Date(comment.created_at).toLocaleString('ko-KR')}
+              {comment.updated_at !== comment.created_at && ' · 편집됨'}
+            </span>
+          </div>
+          {comment.parent_id === null && comment.is_resolved && (
+            <span className="text-xs font-semibold" style={{ color: 'var(--success)' }}>✓ 해결됨</span>
+          )}
+        </div>
+
+        {editOpen ? (
+          <div>
+            <textarea value={editBody} onChange={e => setEditBody(e.target.value)} rows={2}
+              className="w-full text-xs rounded-lg p-2 resize-none mb-1"
+              style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
+            <div className="flex gap-2">
+              <button onClick={() => { setEditOpen(false); setEditBody(comment.body) }}
+                className="text-xs px-2 py-1 rounded"
+                style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
+              <button onClick={submitEdit} disabled={saving}
+                className="text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+                style={{ background: 'var(--blue-600)', color: '#fff' }}>저장</button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm" style={{ color: dimmed ? 'var(--text-disabled)' : 'var(--text-primary)', textDecoration: dimmed ? 'line-through' : 'none' }}>
+            {comment.body}
+          </p>
+        )}
+
+        {!editOpen && !dimmed && (
+          <div className="flex gap-3 mt-2">
+            {isOwn && <button onClick={() => setEditOpen(true)} className="text-xs" style={{ color: 'var(--text-disabled)' }}>편집</button>}
+            {comment.parent_id === null && !replyOpen && (
+              <button onClick={() => setReplyOpen(true)} className="text-xs" style={{ color: 'var(--text-disabled)' }}>↩ 답글</button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {comment.replies && comment.replies.length > 0 && (
+        <div className="ml-4 border-l pl-3 mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
+          {comment.replies.map(r => (
+            <ChampionCommentThread key={r.id} comment={r} currentUserId={currentUserId}
+              onReply={onReply} onEdit={onEdit} />
+          ))}
+        </div>
+      )}
+
+      {replyOpen && (
+        <div className="ml-4 border-l pl-3 mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
+          <textarea value={replyBody} onChange={e => setReplyBody(e.target.value)} rows={2}
+            placeholder="답글 작성..."
+            className="w-full text-xs rounded-lg p-2 resize-none mb-1"
+            style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
+          <div className="flex gap-2">
+            <button onClick={() => { setReplyOpen(false); setReplyBody('') }}
+              className="text-xs px-2 py-1 rounded"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
+            <button onClick={submitReply} disabled={saving || !replyBody.trim()}
+              className="text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+              style={{ background: 'var(--blue-600)', color: '#fff' }}>답글 작성</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CharterCommentSection({ charterId }: { charterId: string }) {
+  const [comments, setComments] = useState<CharterComment[]>([])
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [newBody, setNewBody] = useState('')
+  const [posting, setPosting] = useState(false)
+
+  useEffect(() => {
+    import('@/lib/supabase/client').then(({ createSupabaseBrowserClient }) => {
+      createSupabaseBrowserClient().auth.getSession().then(({ data: { session } }) => {
+        setCurrentUserId(session?.user?.id ?? null)
+      })
+    })
+    apiFetch<CharterComment[]>(`/api/charter/submissions/${charterId}/comments`).then(flat => {
+      const map = new Map<string, CharterComment>()
+      flat.forEach(c => map.set(c.id, { ...c, replies: [] }))
+      const roots: CharterComment[] = []
+      map.forEach(c => {
+        if (c.parent_id) map.get(c.parent_id)?.replies?.push(c)
+        else roots.push(c)
+      })
+      setComments(roots)
+    })
+  }, [charterId])
+
+  function updateInTree(list: CharterComment[], updated: CharterComment): CharterComment[] {
+    return list.map(c => {
+      if (c.id === updated.id) return { ...updated, replies: c.replies }
+      return { ...c, replies: c.replies ? updateInTree(c.replies, updated) : [] }
+    })
+  }
+
+  async function handlePost() {
+    if (!newBody.trim()) return
+    setPosting(true)
+    try {
+      const created = await apiFetch<CharterComment>(`/api/charter/submissions/${charterId}/comments`, {
+        method: 'POST', body: JSON.stringify({ body: newBody.trim() }),
+      })
+      setComments(prev => [...prev, { ...created, replies: [] }])
+      setNewBody('')
+    } finally { setPosting(false) }
+  }
+
+  async function handleReply(parentId: string, body: string) {
+    const created = await apiFetch<CharterComment>(
+      `/api/charter/submissions/${charterId}/comments/${parentId}/replies`,
+      { method: 'POST', body: JSON.stringify({ body }) }
+    )
+    setComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: [...(c.replies ?? []), created] } : c))
+  }
+
+  async function handleEdit(commentId: string, body: string) {
+    const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}`, {
+      method: 'PATCH', body: JSON.stringify({ body }),
+    })
+    setComments(prev => updateInTree(prev, updated))
+  }
+
+  return (
+    <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+      <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>피드백</p>
+      {comments.length === 0 && (
+        <p className="text-sm mb-3" style={{ color: 'var(--text-disabled)' }}>아직 피드백이 없습니다.</p>
+      )}
+      {comments.map(c => (
+        <ChampionCommentThread key={c.id} comment={c} currentUserId={currentUserId}
+          onReply={handleReply} onEdit={handleEdit} />
+      ))}
+      <div className="mt-3">
+        <textarea value={newBody} onChange={e => setNewBody(e.target.value)}
+          placeholder="새 코멘트 작성..."
+          rows={2}
+          className="w-full text-sm rounded-lg p-3 resize-none mb-2"
+          style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
+        <div className="flex justify-end">
+          <button onClick={handlePost} disabled={posting || !newBody.trim()}
+            className="text-sm px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            style={{ background: 'var(--blue-600)', color: '#fff' }}>
+            {posting ? '작성 중...' : '작성'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CharterTab({ homeworkId }: { homeworkId: number }) {
   const [loading, setLoading] = useState(true)
   const [charter, setCharter] = useState<CharterSubmission | null | 'new'>(null)
@@ -240,6 +438,7 @@ function CharterTab({ homeworkId }: { homeworkId: number }) {
         charter={existing}
         onSaved={saved => setCharter(saved)}
       />
+      {existing && <CharterCommentSection charterId={existing.id} />}
     </div>
   )
 }
