@@ -47,6 +47,7 @@ export interface CharterSubmission {
   project_name: string | null
   content: ProjectCharter['content']
   submitted_at: string
+  updated_at: string
 }
 
 export interface ProjectCharter {

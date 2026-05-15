@@ -5,9 +5,11 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
 import type { ProjectCharter, CharterSubmission } from '@/lib/types'
-import DOMPurify from 'dompurify'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
+type CharterContent = ProjectCharter['content']
+type SidePanel = null | 'new' | CharterSubmission
+
 const SECTIONS: { key: SectionKey; label: string; required?: boolean }[] = [
   { key: 'problem_definition', label: '문제 정의 (AS-IS)', required: true },
   { key: 'goal', label: '목표 (TO-BE)', required: true },
@@ -17,6 +19,8 @@ const SECTIONS: { key: SectionKey; label: string; required?: boolean }[] = [
   { key: 'risks', label: '리스크' },
 ]
 
+function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
+
 function SectionEditor({ label, required, content, onBlur }: {
   label: string; required?: boolean; content: string; onBlur: (html: string) => void
 }) {
@@ -25,7 +29,6 @@ function SectionEditor({ label, required, content, onBlur }: {
     content,
     onBlur: ({ editor }) => onBlur(editor.getHTML()),
   })
-
   return (
     <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
       <div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
@@ -39,239 +42,254 @@ function SectionEditor({ label, required, content, onBlur }: {
   )
 }
 
-function SectionViewer({ label, html }: { label: string; html: string }) {
-  return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
-      <div className="px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-        <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-      </div>
-      <div
-        className="p-3 text-sm prose max-w-none"
-        style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html || '<p style="color:var(--text-disabled)">—</p>') }}
-      />
-    </div>
-  )
-}
-
-type CharterContent = ProjectCharter['content']
-type RightPanel = 'editor' | { submission: CharterSubmission }
-
-export default function CharterPage() {
-  const [projectName, setProjectName] = useState('')
-  const [content, setContent] = useState<CharterContent>({})
+// Keyed by submission id or 'new' — remounts when switching between items
+function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
+  mode: 'new' | 'edit'
+  submission?: CharterSubmission
+  onClose: () => void
+  onCreated: (sub: CharterSubmission) => void
+  onUpdated: (sub: CharterSubmission) => void
+}) {
+  const [projectName, setProjectName] = useState(submission?.project_name ?? '')
   const [saving, setSaving] = useState(false)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [submissions, setSubmissions] = useState<CharterSubmission[]>([])
-  const [rightPanel, setRightPanel] = useState<RightPanel>('editor')
-  const saveTimeout = useRef<ReturnType<typeof setTimeout>>()
-  const contentRef = useRef<CharterContent>({})
-
-  useEffect(() => {
-    apiFetch<ProjectCharter | null>('/api/charter').then(c => {
-      if (c) {
-        setProjectName(c.project_name ?? '')
-        const charterContent = c.content ?? {}
-        setContent(charterContent)
-        contentRef.current = charterContent
-      }
-    })
-    apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions)
-  }, [])
-
-  async function save(newContent: CharterContent, name: string) {
-    setSaving(true)
-    try {
-      await apiFetch('/api/charter', { method: 'PUT', body: JSON.stringify({ project_name: name, content: newContent }) })
-      setLastSaved(new Date())
-    } catch { /* silent */ } finally {
-      setSaving(false)
-    }
-  }
+  const contentRef = useRef<CharterContent>(submission?.content ?? {})
 
   function handleSectionBlur(key: SectionKey, html: string) {
-    const updated: CharterContent = { ...content, [key]: html }
-    setContent(updated)
-    contentRef.current = updated
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => save(updated, projectName), 800)
+    contentRef.current = { ...contentRef.current, [key]: html }
   }
 
-  function handleNameBlur() {
-    clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => save(contentRef.current, projectName), 800)
-  }
-
-  async function handleSubmit() {
-    setSubmitting(true)
+  async function handleSave() {
+    setSaving(true)
     try {
-      const newSub = await apiFetch<CharterSubmission>('/api/charter/submissions', {
-        method: 'POST',
-        body: JSON.stringify({ project_name: projectName, content: contentRef.current }),
-      })
-      setSubmissions(prev => [newSub, ...prev])
-      setRightPanel({ submission: newSub })
+      if (mode === 'new') {
+        const newSub = await apiFetch<CharterSubmission>('/api/charter/submissions', {
+          method: 'POST',
+          body: JSON.stringify({ project_name: projectName, content: contentRef.current }),
+        })
+        onCreated(newSub)
+      } else {
+        const updated = await apiFetch<CharterSubmission>(`/api/charter/submissions/${submission!.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ project_name: projectName, content: contentRef.current }),
+        })
+        onUpdated(updated)
+      }
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
-  }
-
-  function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
-
-  async function exportPdf() {
-    const { default: jsPDF } = await import('jspdf')
-    const { default: html2canvas } = await import('html2canvas')
-    const el = document.getElementById('charter-content')!
-    const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 })
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const imgData = canvas.toDataURL('image/png')
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const imgHeight = (canvas.height * pageWidth) / canvas.width
-    pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, imgHeight)
-    pdf.save(`과제정의서_${projectName || 'charter'}.pdf`)
   }
 
   async function exportDocx() {
     const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
     const { saveAs } = await import('file-saver')
-    const src = rightPanel === 'editor' ? content : (rightPanel as { submission: CharterSubmission }).submission.content
-    const name = rightPanel === 'editor' ? projectName : (rightPanel as { submission: CharterSubmission }).submission.project_name ?? '과제정의서'
+    const src = contentRef.current
     const sections = SECTIONS.map(s => [
       new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
       new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? ''), break: 1 })] }),
     ]).flat()
     const doc = new Document({
-      sections: [{ children: [new Paragraph({ text: name, heading: HeadingLevel.HEADING_1 }), ...sections] }],
+      sections: [{ children: [new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }), ...sections] }],
     })
     const blob = await Packer.toBlob(doc)
-    saveAs(blob, `과제정의서_${name}.docx`)
+    saveAs(blob, `과제정의서_${projectName || 'charter'}.docx`)
   }
 
-  const isEditor = rightPanel === 'editor'
-  const viewingSub = !isEditor ? (rightPanel as { submission: CharterSubmission }).submission : null
+  return (
+    <div className="flex flex-col h-full border-l" style={{ borderColor: 'var(--border-subtle)' }}>
+      {/* Panel header */}
+      <div className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
+        <button
+          onClick={onClose}
+          className="text-xs px-2 py-1 rounded"
+          style={{ color: 'var(--text-secondary)', background: 'var(--surface-secondary)' }}
+        >
+          ✕
+        </button>
+        <input
+          value={projectName}
+          onChange={e => setProjectName(e.target.value)}
+          placeholder="프로젝트명을 입력하세요"
+          className="flex-1 text-sm font-semibold bg-transparent outline-none"
+          style={{ color: 'var(--text-primary)' }}
+        />
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            onClick={exportDocx}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
+          >
+            📄 DOCX
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+            style={{ background: 'var(--blue-600)', color: '#fff' }}
+          >
+            {saving ? '저장 중...' : mode === 'new' ? '제출하기' : '재제출하기'}
+          </button>
+        </div>
+      </div>
+
+      {/* Section editors */}
+      <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex flex-col gap-3 max-w-2xl">
+          {mode === 'edit' && submission && (
+            <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>
+              마지막 수정: {new Date(submission.updated_at).toLocaleString('ko-KR')}
+            </p>
+          )}
+          {SECTIONS.map(s => (
+            <SectionEditor
+              key={s.key}
+              label={s.label}
+              required={s.required}
+              content={(submission?.content ?? {})[s.key] ?? ''}
+              onBlur={html => handleSectionBlur(s.key, html)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SubmissionCard({ sub, compressed, active, onClick }: {
+  sub: CharterSubmission; compressed: boolean; active: boolean; onClick: () => void
+}) {
+  const date = new Date(sub.updated_at ?? sub.submitted_at).toLocaleDateString('ko-KR')
+
+  if (compressed) {
+    return (
+      <button
+        onClick={onClick}
+        className="w-full text-left px-3 py-2.5 border-b"
+        style={{
+          borderColor: 'var(--border-subtle)',
+          background: active ? 'rgba(37,99,235,0.08)' : 'transparent',
+        }}
+      >
+        <p className="text-xs font-semibold truncate" style={{ color: active ? 'var(--blue-600)' : 'var(--text-primary)' }}>
+          {sub.project_name || '(제목 없음)'}
+        </p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-disabled)' }}>{date}</p>
+      </button>
+    )
+  }
 
   return (
-    <div className="flex gap-0" style={{ height: 'calc(100vh - 40px)', minHeight: 0 }}>
+    <button
+      onClick={onClick}
+      className="text-left p-4 rounded-xl border transition-colors"
+      style={{
+        borderColor: active ? 'var(--blue-600)' : 'var(--border-subtle)',
+        background: active ? 'rgba(37,99,235,0.06)' : 'var(--surface-primary)',
+      }}
+    >
+      <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+        {sub.project_name || '(제목 없음)'}
+      </p>
+      <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>{date}</p>
+    </button>
+  )
+}
 
-      {/* Left panel — submission list */}
-      <div className="flex flex-col border-r flex-shrink-0" style={{ width: '220px', borderColor: 'var(--border-subtle)', background: 'var(--background)' }}>
-        <div className="px-3 py-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-subtle)' }}>
-          <span className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>제출 이력</span>
+export default function CharterPage() {
+  const [submissions, setSubmissions] = useState<CharterSubmission[]>([])
+  const [sidePanel, setSidePanel] = useState<SidePanel>(null)
+
+  useEffect(() => {
+    apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions)
+  }, [])
+
+  const panelKey = sidePanel === null ? '' : sidePanel === 'new' ? 'new' : sidePanel.id
+  const activeId = sidePanel !== null && sidePanel !== 'new' ? sidePanel.id : null
+
+  function handleCreated(newSub: CharterSubmission) {
+    setSubmissions(prev => [newSub, ...prev])
+    setSidePanel(newSub)
+  }
+
+  function handleUpdated(updated: CharterSubmission) {
+    setSubmissions(prev => prev.map(s => s.id === updated.id ? updated : s))
+    setSidePanel(updated)
+  }
+
+  return (
+    <div className="flex" style={{ height: 'calc(100vh - 40px)', minHeight: 0 }}>
+
+      {/* Submission list — full-width when no panel, 272px when panel open */}
+      <div
+        className="flex flex-col flex-shrink-0 overflow-hidden"
+        style={{
+          width: sidePanel !== null ? '272px' : '100%',
+          borderRight: sidePanel !== null ? `1px solid var(--border-subtle)` : 'none',
+          transition: 'width 0.2s ease',
+        }}
+      >
+        {/* List header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
+          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</span>
           <button
-            onClick={() => setRightPanel('editor')}
-            className="text-xs px-2 py-1 rounded font-semibold"
-            style={{ background: isEditor ? 'rgba(37,99,235,0.15)' : 'var(--surface-secondary)', color: isEditor ? 'var(--blue-600)' : 'var(--text-secondary)' }}
+            onClick={() => setSidePanel('new')}
+            className="text-xs px-2.5 py-1 rounded-lg font-semibold"
+            style={{
+              background: sidePanel === 'new' ? 'rgba(37,99,235,0.15)' : 'var(--surface-secondary)',
+              color: sidePanel === 'new' ? 'var(--blue-600)' : 'var(--text-secondary)',
+            }}
           >
             + 새 작성
           </button>
         </div>
-        <div className="overflow-y-auto flex-1">
-          {submissions.length === 0 && (
-            <p className="text-xs p-3" style={{ color: 'var(--text-disabled)' }}>제출 이력이 없습니다.</p>
-          )}
-          {submissions.map(sub => {
-            const isActive = viewingSub?.id === sub.id
-            return (
-              <button
+
+        {/* List body */}
+        <div className="flex-1 overflow-y-auto">
+          {submissions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-2" style={{ color: 'var(--text-disabled)' }}>
+              <p className="text-sm">아직 제출한 과제정의서가 없습니다.</p>
+              <p className="text-xs">+ 새 작성으로 시작하세요.</p>
+            </div>
+          ) : sidePanel !== null ? (
+            // Compressed list
+            submissions.map(sub => (
+              <SubmissionCard
                 key={sub.id}
-                onClick={() => setRightPanel({ submission: sub })}
-                className="w-full text-left px-3 py-2.5 border-b"
-                style={{
-                  borderColor: 'var(--border-subtle)',
-                  background: isActive ? 'rgba(37,99,235,0.08)' : 'transparent',
-                }}
-              >
-                <p className="text-xs font-semibold truncate" style={{ color: isActive ? 'var(--blue-600)' : 'var(--text-primary)' }}>
-                  {sub.project_name || '(제목 없음)'}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-disabled)' }}>
-                  {new Date(sub.submitted_at).toLocaleDateString('ko-KR')}
-                </p>
-              </button>
-            )
-          })}
+                sub={sub}
+                compressed
+                active={activeId === sub.id}
+                onClick={() => setSidePanel(sub)}
+              />
+            ))
+          ) : (
+            // Full-width card grid
+            <div className="p-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+              {submissions.map(sub => (
+                <SubmissionCard
+                  key={sub.id}
+                  sub={sub}
+                  compressed={false}
+                  active={false}
+                  onClick={() => setSidePanel(sub)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Right panel — editor or viewer */}
-      <div className="flex-1 overflow-y-auto">
-        {isEditor ? (
-          <div className="p-6 max-w-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</h1>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  {saving ? '저장 중...' : lastSaved ? `마지막 저장: ${lastSaved.toLocaleTimeString('ko-KR')}` : '자동 저장'}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={exportDocx} className="px-3 py-2 rounded-lg text-xs font-semibold" style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}>
-                  📄 DOCX
-                </button>
-                <button onClick={exportPdf} className="px-3 py-2 rounded-lg text-xs font-semibold" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }}>
-                  📕 PDF
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="px-3 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"
-                  style={{ background: 'var(--blue-600)', color: '#fff' }}
-                >
-                  {submitting ? '제출 중...' : '제출하기'}
-                </button>
-              </div>
-            </div>
-
-            <div id="charter-content" className="flex flex-col gap-3">
-              <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
-                <div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>프로젝트명</span>
-                  <span className="text-xs" style={{ color: 'var(--amber)' }}>필수</span>
-                </div>
-                <input
-                  value={projectName}
-                  onChange={e => setProjectName(e.target.value)}
-                  onBlur={handleNameBlur}
-                  placeholder="프로젝트명을 입력하세요"
-                  className="w-full p-3 text-sm"
-                  style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)', outline: 'none', border: 'none' }}
-                />
-              </div>
-              {SECTIONS.map(s => (
-                <SectionEditor
-                  key={s.key}
-                  label={s.label}
-                  required={s.required}
-                  content={content[s.key] ?? ''}
-                  onBlur={html => handleSectionBlur(s.key, html)}
-                />
-              ))}
-            </div>
-          </div>
-        ) : viewingSub ? (
-          <div className="p-6 max-w-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {viewingSub.project_name || '(제목 없음)'}
-                </h1>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  제출일: {new Date(viewingSub.submitted_at).toLocaleString('ko-KR')}
-                </p>
-              </div>
-              <button onClick={exportDocx} className="px-3 py-2 rounded-lg text-xs font-semibold" style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}>
-                📄 DOCX
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              {SECTIONS.map(s => (
-                <SectionViewer key={s.key} label={s.label} html={viewingSub.content[s.key] ?? ''} />
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </div>
+      {/* Side panel — editor */}
+      {sidePanel !== null && (
+        <div className="flex-1 overflow-hidden" style={{ minWidth: 0 }}>
+          <CharterPanel
+            key={panelKey}
+            mode={sidePanel === 'new' ? 'new' : 'edit'}
+            submission={sidePanel !== 'new' ? sidePanel : undefined}
+            onClose={() => setSidePanel(null)}
+            onCreated={handleCreated}
+            onUpdated={handleUpdated}
+          />
+        </div>
+      )}
     </div>
   )
 }

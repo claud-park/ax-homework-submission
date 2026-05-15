@@ -52,7 +52,7 @@
 ## NEW Tables (Project Management Layer)
 
 ### `project_charters`
-One per champion. Stores the 제정의서 (project charter) document.
+One per champion. Auto-save scratch pad (legacy — UI now uses `charter_submissions` directly).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -62,6 +62,18 @@ One per champion. Stores the 제정의서 (project charter) document.
 | content | jsonb | structured sections: problem, goal, scope, outcomes, risks |
 | updated_at | timestamptz | |
 | created_at | timestamptz | |
+
+### `charter_submissions`
+Each champion's submitted/saved 과제정의서 versions. Mutable — champion can edit and resubmit any entry.
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 user_id | uuid FK | → users.id |
+| project_name | text | |
+| content | jsonb | same shape as project_charters.content |
+| submitted_at | timestamptz | original submission time |
+| updated_at | timestamptz | last resubmit time |
 
 `content` jsonb shape:
 ```json
@@ -143,6 +155,7 @@ submissions       1 ──< N  comments
 users             1 ──< N  comments (via author_id, nullable)
 
 users             1 ──< 1  project_charters
+users             1 ──< N  charter_submissions
 users             1 ──< N  milestones
 milestones        1 ──< N  milestone_deliverables
 milestones        1 ──< N  deadline_change_requests
