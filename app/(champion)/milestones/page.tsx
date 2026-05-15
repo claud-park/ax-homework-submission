@@ -139,6 +139,9 @@ export default function MilestonesPage() {
 
   const inputStyle = { background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
 
+  // Fixed column widths shared across all section tables so columns line up
+  const COL_WIDTHS = ['72px', '22%', '30%', '20%', '20%']
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -211,7 +214,8 @@ export default function MilestonesPage() {
 
                 {/* Milestone table */}
                 <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
-                  <table className="w-full text-xs border-collapse">
+                  <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
+                    <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
                     <thead>
                       <tr style={{ background: 'var(--surface-secondary)' }}>
                         {['주차', '마일스톤', '기간', '상태', ''].map(h => (
