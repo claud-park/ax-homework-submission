@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
 import type { ProjectCharter, CharterSubmission } from '@/lib/types'
+import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
 type CharterContent = ProjectCharter['content']
@@ -277,17 +278,24 @@ export default function CharterPage() {
         </div>
       </div>
 
-      {/* Side panel — editor */}
+      {/* Side panel — editor + comment panel */}
       {sidePanel !== null && (
-        <div className="flex-1 overflow-hidden" style={{ minWidth: 0 }}>
-          <CharterPanel
-            key={panelKey}
-            mode={sidePanel === 'new' ? 'new' : 'edit'}
-            submission={sidePanel !== 'new' ? sidePanel : undefined}
-            onClose={() => setSidePanel(null)}
-            onCreated={handleCreated}
-            onUpdated={handleUpdated}
-          />
+        <div className="flex flex-1 overflow-hidden" style={{ minWidth: 0 }}>
+          <div className="flex-1 overflow-hidden">
+            <CharterPanel
+              key={panelKey}
+              mode={sidePanel === 'new' ? 'new' : 'edit'}
+              submission={sidePanel !== 'new' ? sidePanel : undefined}
+              onClose={() => setSidePanel(null)}
+              onCreated={handleCreated}
+              onUpdated={handleUpdated}
+            />
+          </div>
+          {sidePanel !== 'new' && (
+            <div className="flex flex-col border-l" style={{ width: '300px', minWidth: '280px', borderColor: 'var(--border-subtle)' }}>
+              <CharterCommentPanel key={sidePanel.id} charterId={sidePanel.id} />
+            </div>
+          )}
         </div>
       )}
     </div>
