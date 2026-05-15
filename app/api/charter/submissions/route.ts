@@ -18,7 +18,11 @@ export async function GET(req: NextRequest) {
     .select('*')
     .eq('user_id', effectiveUserId)
     .order('submitted_at', { ascending: false })
-  if (homeworkId) query = query.eq('homework_id', Number(homeworkId))
+  if (homeworkId) {
+    const hwId = parseInt(homeworkId, 10)
+    if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
+    query = query.eq('homework_id', hwId)
+  }
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
