@@ -524,8 +524,28 @@ export default function HomeworkDetailPage() {
               <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
                 {latest?.status === 'declined' ? '재제출' : '제출하기'}
               </p>
-              <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)}
-                className="text-sm mb-3 block" style={{ color: 'var(--text-secondary)' }} />
+
+              {/* Custom file picker */}
+              <label
+                className="flex items-center gap-3 w-full rounded-lg border cursor-pointer mb-3 overflow-hidden"
+                style={{ borderColor: file ? 'var(--blue-600)' : 'var(--border-subtle)', background: 'var(--surface-secondary)' }}
+              >
+                <span
+                  className="shrink-0 px-3 py-2 text-xs font-semibold border-r"
+                  style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
+                >
+                  파일 선택
+                </span>
+                <span className="text-sm truncate" style={{ color: file ? 'var(--text-primary)' : 'var(--text-disabled)' }}>
+                  {file ? file.name : '파일을 선택하세요'}
+                </span>
+                <input
+                  type="file"
+                  className="sr-only"
+                  onChange={e => setFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+
               {error && <p className="text-xs mb-2" style={{ color: 'var(--error)' }}>{error}</p>}
               <button type="submit" disabled={!file || uploading}
                 className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
