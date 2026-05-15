@@ -21,6 +21,15 @@ export async function POST(
   if (!isAdmin && charter.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Verify parent is top-level (no reply-to-reply)
+  let body: string | undefined
+  try {
+    const json = await req.json()
+    body = json.body
+  } catch {
+    return NextResponse.json({ error: 'Body required' }, { status: 400 })
+  }
+  if (!body?.trim()) return NextResponse.json({ error: 'Body required' }, { status: 400 })
+
   const { data: parent } = await supabase
     .from('charter_comments')
     .select('id, parent_id')
@@ -29,9 +38,6 @@ export async function POST(
     .single()
   if (!parent) return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
   if (parent.parent_id !== null) return NextResponse.json({ error: 'Cannot reply to a reply' }, { status: 400 })
-
-  const { body } = await req.json()
-  if (!body?.trim()) return NextResponse.json({ error: 'Body required' }, { status: 400 })
 
   const { data, error } = await supabase
     .from('charter_comments')

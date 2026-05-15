@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string; commentId: string } }
+  { params }: { params: { commentId: string } }
 ) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,7 +16,6 @@ export async function PATCH(
     .update({ body: body.trim(), updated_at: new Date().toISOString() })
     .eq('id', params.commentId)
     .eq('author_id', user.id)
-    .eq('charter_submission_id', params.id)
     .select()
     .single()
   if (error || !data) return NextResponse.json({ error: 'Not found or not yours' }, { status: 404 })
