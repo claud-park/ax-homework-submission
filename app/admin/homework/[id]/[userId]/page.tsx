@@ -328,9 +328,9 @@ function CharterThreadComment({
           </p>
         )}
 
-        {!editOpen && !dimmed && (
+        {!editOpen && !dimmed && (authorIsAdmin || isTopLevel) && (
           <div className="flex gap-3 mt-2">
-            <button onClick={() => setEditOpen(true)} className="text-xs" style={{ color: 'var(--text-disabled)' }}>편집</button>
+            {authorIsAdmin && <button onClick={() => setEditOpen(true)} className="text-xs" style={{ color: 'var(--text-disabled)' }}>편집</button>}
             {isTopLevel && !replyOpen && (
               <button onClick={() => setReplyOpen(true)} className="text-xs" style={{ color: 'var(--text-disabled)' }}>↩ 답글</button>
             )}
