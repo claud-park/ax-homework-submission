@@ -135,3 +135,31 @@ export interface CharterComment {
   updated_at: string
   replies?: CharterComment[]
 }
+
+export interface KanbanCard {
+  userId: string
+  homeworkId: number
+  homeworkTitle: string
+  user: User
+  latestSubmission: {
+    id: string
+    status: SubmissionStatus
+    attemptNumber: number
+    fileName: string
+    submittedAt: string
+  } | null
+  milestoneTotal: number
+  milestoneCompleted: number
+  hasCharter: boolean
+  pendingDeadlineRequests: number
+}
+
+export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
+
+export interface KanbanDataV2 {
+  not_started: KanbanCard[]
+  in_progress: KanbanCard[]
+  reviewing: KanbanCard[]
+  accepted: KanbanCard[]
+  declined: KanbanCard[]
+}
