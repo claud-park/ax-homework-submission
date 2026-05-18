@@ -22,15 +22,17 @@ export async function GET(req: NextRequest) {
 
   // 2. Homeworks
   let hwQuery = supabase.from('homeworks').select('id, title')
-  if (homeworkId) hwQuery = hwQuery.eq('id', homeworkId)
+  if (homeworkId !== null) hwQuery = hwQuery.eq('id', homeworkId)
   const { data: homeworks, error: hwErr } = await hwQuery
   if (hwErr) return NextResponse.json({ error: hwErr.message }, { status: 500 })
 
   // 3. Latest submission per (user_id, homework_id)
-  const { data: allSubmissions, error: subErr } = await supabase
+  let subQuery = supabase
     .from('submissions')
     .select('id, user_id, homework_id, file_name, status, attempt_number, submitted_at')
     .order('submitted_at', { ascending: false })
+  if (homeworkId !== null) subQuery = subQuery.eq('homework_id', homeworkId)
+  const { data: allSubmissions, error: subErr } = await subQuery
   if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 })
 
   const latestSubMap = new Map<string, NonNullable<typeof allSubmissions>[number]>()
@@ -40,9 +42,9 @@ export async function GET(req: NextRequest) {
   }
 
   // 4. Milestone counts per (user_id, homework_id)
-  const { data: milestones, error: msErr } = await supabase
-    .from('milestones')
-    .select('user_id, homework_id, status')
+  let msQuery = supabase.from('milestones').select('user_id, homework_id, status')
+  if (homeworkId !== null) msQuery = msQuery.eq('homework_id', homeworkId)
+  const { data: milestones, error: msErr } = await msQuery
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
 
   const milestoneMap = new Map<string, { total: number; completed: number }>()
@@ -56,9 +58,9 @@ export async function GET(req: NextRequest) {
   }
 
   // 5. Charter existence per (user_id, homework_id)
-  const { data: charters, error: charterErr } = await supabase
-    .from('charter_submissions')
-    .select('user_id, homework_id')
+  let charterQuery = supabase.from('charter_submissions').select('user_id, homework_id')
+  if (homeworkId !== null) charterQuery = charterQuery.eq('homework_id', homeworkId)
+  const { data: charters, error: charterErr } = await charterQuery
   if (charterErr) return NextResponse.json({ error: charterErr.message }, { status: 500 })
 
   const charterSet = new Set<string>()
@@ -75,8 +77,8 @@ export async function GET(req: NextRequest) {
 
   const deadlineMap = new Map<string, number>()
   for (const req of deadlineReqs ?? []) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hwId = (req.milestones as any)?.homework_id
+    const milestoneJoin = req.milestones as { homework_id: number | null } | { homework_id: number | null }[] | null
+    const hwId = Array.isArray(milestoneJoin) ? milestoneJoin[0]?.homework_id : milestoneJoin?.homework_id
     if (!hwId) continue
     const key = `${req.user_id}_${hwId}`
     deadlineMap.set(key, (deadlineMap.get(key) ?? 0) + 1)
