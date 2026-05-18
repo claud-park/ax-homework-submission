@@ -112,6 +112,7 @@ export async function notifyNewComment(params: {
   <div style="border-bottom:2px solid #6366f1;padding-bottom:12px;margin-bottom:20px">
     <h2 style="margin:0;font-size:18px">💬 ${kind}</h2>
   </div>
+  <p style="margin:0 0 16px 0;font-size:14px;color:#0f172a">안녕하세요, ${escapeHtml(params.recipientName)}님.</p>
   <table style="width:100%;font-size:14px;border-collapse:collapse">
     <tr><td style="padding:8px 0;color:#64748b;width:100px">작성자</td><td style="padding:8px 0;font-weight:600">${escapeHtml(params.authorName)} (${authorRoleLabel})</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">위치</td><td style="padding:8px 0">${escapeHtml(params.contextTitle)}</td></tr>
