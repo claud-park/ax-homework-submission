@@ -18,6 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { FullPageSpinner } from '@/components/ui/spinner'
 
 // ─── shared constants ────────────────────────────────────────────────────────
 
@@ -227,7 +228,7 @@ function CharterTab({ homeworkId }: { homeworkId: number }) {
   }, [homeworkId])
 
   if (loading) {
-    return <p className="text-sm p-6" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>
+    return <FullPageSpinner />
   }
 
   if (charter === null) {
@@ -355,7 +356,7 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
     }
   }
 
-  if (loading) return <p className="text-sm p-6" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>
+  if (loading) return <FullPageSpinner />
 
   return (
     <div className="p-6 max-w-2xl">

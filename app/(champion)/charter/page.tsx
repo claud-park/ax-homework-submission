@@ -17,6 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Spinner } from '@/components/ui/spinner'
+import { EmptyState } from '@/components/ui/empty-state'
+import { FileText } from 'lucide-react'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
 
@@ -193,6 +196,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
   const [projectName, setProjectName] = useState(submission?.project_name ?? '')
   const [homeworkId, setHomeworkId] = useState<number | ''>(submission?.homework_id ?? '')
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const contentRef = useRef<CharterContent>(submission?.content ?? {})
   const dirtyRef = useRef<boolean>(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
@@ -239,19 +243,24 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
     }
   }
 
-  async function exportDocx() {
-    const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
-    const { saveAs } = await import('file-saver')
-    const src = contentRef.current
-    const sections = SECTIONS.map(s => [
-      new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? ''), break: 1 })] }),
-    ]).flat()
-    const doc = new Document({
-      sections: [{ children: [new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }), ...sections] }],
-    })
-    const blob = await Packer.toBlob(doc)
-    saveAs(blob, `과제정의서_${projectName || 'charter'}.docx`)
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
+      const { saveAs } = await import('file-saver')
+      const src = contentRef.current
+      const sections = SECTIONS.map(s => [
+        new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
+        new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? ''), break: 1 })] }),
+      ]).flat()
+      const doc = new Document({
+        sections: [{ children: [new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }), ...sections] }],
+      })
+      const blob = await Packer.toBlob(doc)
+      saveAs(blob, `과제정의서_${projectName || 'charter'}.docx`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -289,11 +298,16 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <button
-            onClick={exportDocx}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
             style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
           >
-            📄 DOCX
+            {exporting ? (
+              <><Spinner size="sm" className="inline" /> 내보내는 중...</>
+            ) : (
+              '📄 DOCX'
+            )}
           </button>
           <button
             onClick={handleSave}
@@ -456,10 +470,11 @@ export default function CharterPage() {
         {/* List body */}
         <div className="flex-1 overflow-y-auto">
           {submissions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2" style={{ color: 'var(--text-disabled)' }}>
-              <p className="text-sm">아직 제출한 과제정의서가 없습니다.</p>
-              <p className="text-xs">+ 과제정의서를 추가해주세요.</p>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="과제정의서가 없습니다"
+              description="과제정의서를 추가해주세요."
+            />
           ) : sidePanel !== null ? (
             // Compressed list — grouped by homework
             <div>

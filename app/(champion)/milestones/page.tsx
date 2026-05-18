@@ -13,6 +13,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ListTodo } from 'lucide-react'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -249,9 +251,11 @@ export default function MilestonesPage() {
       )}
 
       {milestones.length === 0 ? (
-        <p className="p-6 text-center text-sm" style={{ color: 'var(--text-disabled)' }}>
-          아직 마일스톤이 없습니다. 추가해보세요.
-        </p>
+        <EmptyState
+          icon={ListTodo}
+          title="마일스톤이 없습니다"
+          description="아래에서 첫 마일스톤을 추가해보세요."
+        />
       ) : (
         <div className="flex flex-col gap-6">
           {groups.map(({ key, hwId, hwTitle, items }) => {

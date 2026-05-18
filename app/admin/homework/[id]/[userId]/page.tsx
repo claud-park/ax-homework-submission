@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api-client'
 import type { Submission, Comment, CharterSubmission, CharterComment, Milestone } from '@/lib/types'
 import ReactMarkdown from 'react-markdown'
 import DOMPurify from 'dompurify'
+import { FullPageSpinner, Spinner } from '@/components/ui/spinner'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -257,7 +258,7 @@ function FilePanelContent({ submission, fileUrl }: { submission: Submission; fil
 
   if (!fileUrl) return (
     <div className="flex items-center justify-center h-32">
-      <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>파일 URL 로딩 중...</p>
+      <Spinner size="md" />
     </div>
   )
 
@@ -508,7 +509,7 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
   const unresolvedCount = comments.filter(c => !c.is_resolved).length
   const filtered = filter === 'unresolved' ? comments.filter(c => !c.is_resolved) : comments
 
-  if (charter === 'loading') return <p className="text-sm p-4" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>
+  if (charter === 'loading') return <FullPageSpinner />
 
   if (charter === null) return (
     <div className="p-6 text-center">
@@ -607,7 +608,7 @@ function MilestonesAdminTab({ homeworkId, userId }: { homeworkId: number; userId
       .catch((e: Error) => { toast.error('마일스톤 로드 실패: ' + e.message); setLoading(false) })
   }, [homeworkId, userId])
 
-  if (loading) return <p className="text-sm p-4" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>
+  if (loading) return <FullPageSpinner />
 
   if (milestones.length === 0) return (
     <div className="p-6 text-center">

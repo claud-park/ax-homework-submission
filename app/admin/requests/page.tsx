@@ -8,6 +8,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Inbox } from 'lucide-react'
 
 const STATUS_COLOR: Record<string, string> = {
   pending: 'var(--amber)', approved: 'var(--success)', rejected: 'var(--error)',
@@ -121,7 +123,7 @@ export default function AdminRequestsPage() {
             )}
           </div>
         ))}
-        {displayed.length === 0 && <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>기한 변경 요청이 없습니다.</p>}
+        {displayed.length === 0 && <EmptyState icon={Inbox} title="대기 중인 요청이 없습니다" />}
       </div>
     </div>
   )

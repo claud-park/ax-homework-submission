@@ -4,6 +4,9 @@ import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { Submission, User, CharterSubmission } from '@/lib/types'
+import { FullPageSpinner } from '@/components/ui/spinner'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Users } from 'lucide-react'
 
 const STATUS_LABEL: Record<string, string> = { pending: '검토 중', accepted: '합격', declined: '불합격' }
 const STATUS_COLOR: Record<string, string> = {
@@ -61,7 +64,7 @@ export default function AdminHomeworkSubmissionsPage() {
       .catch((err: Error) => { toast.error('제출 현황 로드 실패: ' + err.message); setError(err.message); setLoading(false) })
   }, [id])
 
-  if (loading) return <p className="text-sm p-4" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>
+  if (loading) return <FullPageSpinner />
   if (error) return <p className="text-sm p-4" style={{ color: 'var(--error)' }}>오류: {error}</p>
 
   return (
@@ -72,7 +75,7 @@ export default function AdminHomeworkSubmissionsPage() {
       </div>
       <div className="flex flex-col gap-3">
         {rows.length === 0 && (
-          <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>제출한 사용자가 없습니다.</p>
+          <EmptyState icon={Users} title="제출한 사용자가 없습니다" />
         )}
         {rows.map(row => (
           <a
