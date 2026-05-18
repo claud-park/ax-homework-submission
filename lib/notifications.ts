@@ -86,3 +86,45 @@ export async function notifyDeadlineChangeRequest(params: {
     console.error('[email] notifyDeadlineChangeRequest failed:', e)
   }
 }
+
+export async function notifyNewComment(params: {
+  recipientEmail: string
+  recipientName: string
+  authorName: string
+  authorRole: 'admin' | 'user'
+  contextTitle: string
+  body: string
+  isReply: boolean
+  link: string
+}): Promise<void> {
+  if (!params.recipientEmail) {
+    console.warn('[email] skipped notifyNewComment: no recipient email', {
+      recipientName: params.recipientName,
+      authorName: params.authorName,
+    })
+    return
+  }
+  const authorRoleLabel = params.authorRole === 'admin' ? '어드민' : '챔피언'
+  const kind = params.isReply ? '새 답글' : '새 코멘트'
+  const subject = `[${kind}] ${params.authorName} (${authorRoleLabel}) - ${params.contextTitle}`
+  const html = `
+<div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
+  <div style="border-bottom:2px solid #6366f1;padding-bottom:12px;margin-bottom:20px">
+    <h2 style="margin:0;font-size:18px">💬 ${kind}</h2>
+  </div>
+  <table style="width:100%;font-size:14px;border-collapse:collapse">
+    <tr><td style="padding:8px 0;color:#64748b;width:100px">작성자</td><td style="padding:8px 0;font-weight:600">${escapeHtml(params.authorName)} (${authorRoleLabel})</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">위치</td><td style="padding:8px 0">${escapeHtml(params.contextTitle)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b;vertical-align:top">내용</td><td style="padding:8px 0;white-space:pre-wrap">${escapeHtml(params.body)}</td></tr>
+  </table>
+  <div style="margin-top:24px">
+    <a href="${escapeHtml(params.link)}" style="display:inline-block;background:#6366f1;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">이동해서 확인</a>
+  </div>
+</div>
+`.trim()
+  try {
+    await sendEmail({ to: params.recipientEmail, subject, html })
+  } catch (e) {
+    console.error('[email] notifyNewComment failed:', e)
+  }
+}
