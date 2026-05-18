@@ -3,10 +3,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 const NAV = [
-  { label: '📋 과제', href: '/' },
-  { label: '📄 과제정의서', href: '/charter' },
-  { label: '📅 WBS', href: '/milestones' },
-  { label: '📊 진척도', href: '/progress' },
+  { emoji: '📋', label: '과제', href: '/' },
+  { emoji: '📄', label: '과제정의서', href: '/charter' },
+  { emoji: '📅', label: 'WBS', href: '/milestones' },
+  { emoji: '📊', label: '진척도', href: '/progress' },
 ]
 
 export default function ChampionLayout({ children }: { children: React.ReactNode }) {
@@ -35,7 +35,7 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
                 color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
               }}
             >
-              {item.label}
+              <span aria-hidden="true">{item.emoji}</span> {item.label}
             </a>
           )
         })}

@@ -41,7 +41,7 @@ const STATUS_LABEL: Record<string, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
 }
 const STATUS_COLOR: Record<string, string> = {
-  not_started: '#94a3b8', in_progress: '#f59e0b', completed: '#22c55e', delayed: '#f87171',
+  not_started: 'var(--text-disabled)', in_progress: 'var(--amber)', completed: 'var(--success)', delayed: 'var(--error)',
 }
 const STATUS_BG: Record<string, string> = {
   not_started: 'rgba(148,163,184,0.12)',
@@ -88,11 +88,11 @@ function DueDateBadge({ m }: { m: Milestone }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '6px' }}>
-      <p style={{ fontSize: '10px', margin: 0, color: overdue ? '#f87171' : 'var(--text-disabled)', fontWeight: overdue ? 700 : 400 }}>
+      <p style={{ fontSize: '10px', margin: 0, color: overdue ? 'var(--error)' : 'var(--text-disabled)', fontWeight: overdue ? 700 : 400 }}>
         마감 {m.due_date}
       </p>
       {m.status !== 'completed' && (
-        <p style={{ fontSize: '11px', fontWeight: 700, margin: 0, color: overdue ? '#f87171' : urgent ? '#f59e0b' : 'var(--text-disabled)' }}>
+        <p style={{ fontSize: '11px', fontWeight: 700, margin: 0, color: overdue ? 'var(--error)' : urgent ? 'var(--amber)' : 'var(--text-disabled)' }}>
           {overdue ? `D+${Math.abs(days)} 경과` : days === 0 ? 'D-day' : `D-${days}`}
         </p>
       )}
@@ -134,7 +134,7 @@ function MilestoneCard({ m }: { m: MilestoneWithUser }) {
 function OverdueBadge({ count }: { count: number }) {
   if (count === 0) return null
   return (
-    <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: 'rgba(248,113,113,0.15)', color: '#f87171' }}>
+    <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', background: 'rgba(248,113,113,0.15)', color: 'var(--error)' }}>
       ⚠️ {count}건 지연
     </span>
   )
@@ -334,7 +334,7 @@ function HomeworkGroup({
     <div style={{ marginBottom: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.03em' }}>{label}</span>
-        {overdueCount > 0 && <span style={{ fontSize: '10px', fontWeight: 600, color: '#f87171' }}>⚠️ {overdueCount}건 지연</span>}
+        {overdueCount > 0 && <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--error)' }}>⚠️ {overdueCount}건 지연</span>}
         <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

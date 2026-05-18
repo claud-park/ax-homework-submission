@@ -5,13 +5,16 @@ import type { Homework, Submission, SubmissionStatus } from '@/lib/types'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Inbox } from 'lucide-react'
+import { Inbox, Clock, CheckCircle2, XCircle, FileX, type LucideIcon } from 'lucide-react'
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '검토 중', accepted: '합격', declined: '불합격',
 }
 const STATUS_COLOR: Record<string, string> = {
   pending: 'var(--amber)', accepted: 'var(--success)', declined: 'var(--error)',
+}
+const STATUS_ICON: Record<string, LucideIcon> = {
+  pending: Clock, accepted: CheckCircle2, declined: XCircle,
 }
 const BOARD_COLS: { key: SubmissionStatus | 'none'; label: string }[] = [
   { key: 'none', label: '미제출' },
@@ -99,12 +102,19 @@ export default function HomeworkListPage() {
                     <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{hw.title}</span>
                     <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>마감: {hw.due_date}</p>
                   </div>
-                  {sub ? (
-                    <span className="text-xs font-semibold px-2 py-1 rounded-md" style={{ color: STATUS_COLOR[sub.status], background: `${STATUS_COLOR[sub.status]}20` }}>
-                      {STATUS_LABEL[sub.status]}
+                  {sub ? (() => {
+                    const Icon = STATUS_ICON[sub.status]
+                    return (
+                      <span className="text-xs font-semibold px-2 py-1 rounded-md" style={{ color: STATUS_COLOR[sub.status], background: `${STATUS_COLOR[sub.status]}20`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {Icon && <Icon className="h-3 w-3" aria-hidden="true" />}
+                        {STATUS_LABEL[sub.status]}
+                      </span>
+                    )
+                  })() : (
+                    <span className="text-xs font-semibold px-2 py-1 rounded-md" style={{ color: 'var(--text-disabled)', background: 'rgba(85,85,85,0.2)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <FileX className="h-3 w-3" aria-hidden="true" />
+                      미제출
                     </span>
-                  ) : (
-                    <span className="text-xs font-semibold px-2 py-1 rounded-md" style={{ color: 'var(--text-disabled)', background: 'rgba(85,85,85,0.2)' }}>미제출</span>
                   )}
                 </a>
               )
