@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
     const milestoneJoin = req.milestones as { homework_id: number | null } | { homework_id: number | null }[] | null
     const hwId = Array.isArray(milestoneJoin) ? milestoneJoin[0]?.homework_id : milestoneJoin?.homework_id
     if (!hwId) continue
+    if (homeworkId !== null && hwId !== homeworkId) continue
     const key = `${req.user_id}_${hwId}`
     deadlineMap.set(key, (deadlineMap.get(key) ?? 0) + 1)
   }

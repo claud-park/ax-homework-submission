@@ -8,12 +8,12 @@ import { useDraggable } from '@dnd-kit/core'
 import { apiFetch } from '@/lib/api-client'
 import type { Homework, KanbanCard, KanbanColumn, KanbanDataV2 } from '@/lib/types'
 
-const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: string; cardBg: string }[] = [
-  { key: 'not_started', label: '미시작',  color: 'var(--text-disabled)', cardBorder: 'var(--border-subtle)',    cardBg: 'var(--surface-secondary)' },
-  { key: 'in_progress', label: '진행 중', color: 'var(--amber)',          cardBorder: 'rgba(217,119,6,0.3)',    cardBg: 'rgba(217,119,6,0.04)'     },
-  { key: 'reviewing',   label: '검토 중', color: 'var(--blue-600)',       cardBorder: 'rgba(37,99,235,0.3)',    cardBg: 'rgba(37,99,235,0.04)'     },
-  { key: 'accepted',    label: '합격',    color: 'var(--success)',         cardBorder: 'rgba(22,163,74,0.3)',    cardBg: 'rgba(22,163,74,0.04)'     },
-  { key: 'declined',    label: '불합격',  color: 'var(--error)',           cardBorder: 'rgba(220,38,38,0.3)',    cardBg: 'rgba(220,38,38,0.04)'     },
+const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: string; cardBg: string; avatarBg: string }[] = [
+  { key: 'not_started', label: '미시작',  color: 'var(--text-disabled)', cardBorder: 'var(--border-subtle)',    cardBg: 'var(--surface-secondary)', avatarBg: 'var(--surface-secondary)' },
+  { key: 'in_progress', label: '진행 중', color: 'var(--amber)',          cardBorder: 'rgba(217,119,6,0.3)',    cardBg: 'rgba(217,119,6,0.04)',     avatarBg: 'rgba(217,119,6,0.12)'      },
+  { key: 'reviewing',   label: '검토 중', color: 'var(--blue-600)',       cardBorder: 'rgba(37,99,235,0.3)',    cardBg: 'rgba(37,99,235,0.04)',     avatarBg: 'rgba(37,99,235,0.12)'      },
+  { key: 'accepted',    label: '합격',    color: 'var(--success)',         cardBorder: 'rgba(22,163,74,0.3)',    cardBg: 'rgba(22,163,74,0.04)',     avatarBg: 'rgba(22,163,74,0.12)'      },
+  { key: 'declined',    label: '불합격',  color: 'var(--error)',           cardBorder: 'rgba(220,38,38,0.3)',    cardBg: 'rgba(220,38,38,0.04)',     avatarBg: 'rgba(220,38,38,0.12)'      },
 ]
 
 const DROPPABLE_COLS: KanbanColumn[] = ['accepted', 'declined']
@@ -59,10 +59,11 @@ function KanbanCardView({
       <div className="flex items-center gap-2 mb-2">
         <div
           aria-label={card.user.name}
+          role="img"
           className="flex-shrink-0 flex items-center justify-center rounded-full font-bold"
           style={{
             width: 28, height: 28,
-            background: col.cardBg,
+            background: col.avatarBg,
             color: col.color,
             fontSize: 12,
             border: `1px solid ${col.cardBorder}`,
@@ -204,10 +205,7 @@ export default function AdminKanbanPage() {
 
   const fetchKanban = useCallback(() => {
     const url = selectedHw ? `/api/admin/kanban?homework_id=${selectedHw}` : '/api/admin/kanban'
-    apiFetch<KanbanDataV2>(url).then(setData).catch(() => {
-      setToast('데이터 로드 실패')
-      setTimeout(() => setToast(null), 3000)
-    })
+    apiFetch<KanbanDataV2>(url).then(setData).catch(() => showToast('데이터 로드 실패'))
   }, [selectedHw])
 
   useEffect(() => {

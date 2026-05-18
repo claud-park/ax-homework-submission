@@ -114,12 +114,6 @@ export interface HomeworkWithCount extends Homework {
   user_count: number
 }
 
-export interface KanbanData {
-  pending: (Submission & { user: User })[]
-  accepted: (Submission & { user: User })[]
-  declined: (Submission & { user: User })[]
-  not_submitted: User[]
-}
 
 export interface CharterComment {
   id: string
