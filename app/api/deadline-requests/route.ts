@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { notifyDeadlineChangeRequest } from '@/lib/notifications'
 
 export async function GET(req: NextRequest) {
   const user = await verifyJWT(req)
@@ -31,5 +32,23 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
+  void (async () => {
+    try {
+      const [{ data: milestone }, { data: userRow }] = await Promise.all([
+        supabase.from('milestones').select('*').eq('id', milestone_id).single(),
+        supabase.from('users').select('*').eq('id', user.id).single(),
+      ])
+      if (milestone && userRow) {
+        await notifyDeadlineChangeRequest({ user: userRow, milestone, request: data })
+      } else {
+        console.warn('[email] skipped notifyDeadlineChangeRequest: milestone or user lookup returned null', { milestone_id, userId: user.id })
+      }
+    } catch (e) {
+      console.error('[email] outer catch:', e)
+    }
+  })()
+
   return NextResponse.json(data, { status: 201 })
 }
