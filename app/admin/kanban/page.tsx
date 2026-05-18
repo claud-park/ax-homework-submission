@@ -7,6 +7,7 @@ import {
 import { useDraggable } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
+import { SubmissionDetailPanel } from '@/components/SubmissionDetailPanel'
 import type { Homework, KanbanCard, KanbanColumn, KanbanDataV2, SubmissionStatus } from '@/lib/types'
 
 const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: string; cardBg: string; avatarBg: string }[] = [
@@ -39,12 +40,16 @@ function KanbanCardView({
   card,
   col,
   draggable,
+  clickable,
   showHomework,
+  onClick,
 }: {
   card: KanbanCard
   col: typeof COLS[0]
   draggable: boolean
+  clickable: boolean
   showHomework: boolean
+  onClick?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: cardDragId(card),
@@ -56,16 +61,27 @@ function KanbanCardView({
     ? Math.round((card.milestoneCompleted / card.milestoneTotal) * 100)
     : 0
 
+  const cursor = draggable ? 'grab' : clickable ? 'pointer' : 'default'
+
   return (
     <div
       ref={setNodeRef}
       {...(draggable ? { ...attributes, ...listeners } : {})}
-      className="rounded-xl border text-xs p-3"
+      onClick={clickable ? onClick : undefined}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick?.()
+        }
+      } : undefined}
+      className="rounded-xl border text-xs p-3 transition-shadow hover:shadow-md"
       style={{
         background: col.cardBg,
         borderColor: col.cardBorder,
         opacity: isDragging ? 0.4 : 1,
-        cursor: draggable ? 'grab' : 'default',
+        cursor,
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       }}
     >
@@ -144,18 +160,23 @@ function KanbanCardView({
   )
 }
 
+const CLICKABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
+
 function DroppableCol({
   col,
   cards,
   showHomework,
   isDropTarget,
+  onCardClick,
 }: {
   col: typeof COLS[0]
   cards: KanbanCard[]
   showHomework: boolean
   isDropTarget: boolean
+  onCardClick: (card: KanbanCard) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.key, disabled: !isDropTarget })
+  const isClickable = CLICKABLE_COLS.includes(col.key)
 
   return (
     <div
@@ -186,7 +207,9 @@ function DroppableCol({
             card={card}
             col={col}
             draggable={DRAGGABLE_COLS.includes(col.key)}
+            clickable={isClickable}
             showHomework={showHomework}
+            onClick={() => onCardClick(card)}
           />
         ))}
       </div>
@@ -207,6 +230,7 @@ export default function AdminKanbanPage() {
   const [selectedHw, setSelectedHw] = useState<string>('')
   const [data, setData] = useState<KanbanDataV2>(EMPTY_DATA)
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null)
+  const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -309,6 +333,7 @@ export default function AdminKanbanPage() {
               cards={data[col.key]}
               showHomework={showHomework}
               isDropTarget={DROPPABLE_COLS.includes(col.key)}
+              onCardClick={setSelectedCard}
             />
           ))}
         </div>
@@ -318,11 +343,19 @@ export default function AdminKanbanPage() {
               card={activeCard}
               col={COLS.find(c => c.key === colForStatus(activeCard.latestSubmission!.status))!}
               draggable={false}
+              clickable={false}
               showHomework={showHomework}
             />
           )}
         </DragOverlay>
       </DndContext>
+
+      <SubmissionDetailPanel
+        card={selectedCard}
+        open={selectedCard !== null}
+        onOpenChange={(open) => { if (!open) setSelectedCard(null) }}
+        onStatusChanged={fetchKanban}
+      />
     </div>
   )
 }
