@@ -37,12 +37,12 @@ export async function notifyNewSubmission(params: {
   <table style="width:100%;font-size:14px;border-collapse:collapse">
     <tr><td style="padding:8px 0;color:#64748b;width:100px">챔피언</td><td style="padding:8px 0;font-weight:600">${escapeHtml(user.name)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">과제</td><td style="padding:8px 0">#${hwNo} ${escapeHtml(homework.title)}</td></tr>
-    <tr><td style="padding:8px 0;color:#64748b">시도 횟수</td><td style="padding:8px 0">${submission.attempt_number}회</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">시도 횟수</td><td style="padding:8px 0">${String(submission.attempt_number)}회</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">파일명</td><td style="padding:8px 0">${escapeHtml(submission.file_name)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">제출 시각</td><td style="padding:8px 0">${escapeHtml(submission.submitted_at)}</td></tr>
   </table>
   <div style="margin-top:24px">
-    <a href="${link}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">칸반에서 검토</a>
+    <a href="${escapeHtml(link)}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">칸반에서 검토</a>
   </div>
 </div>
 `.trim()
@@ -76,7 +76,7 @@ export async function notifyDeadlineChangeRequest(params: {
     <tr><td style="padding:8px 0;color:#64748b;vertical-align:top">사유</td><td style="padding:8px 0;white-space:pre-wrap">${escapeHtml(request.reason)}</td></tr>
   </table>
   <div style="margin-top:24px">
-    <a href="${link}" style="display:inline-block;background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">요청 검토</a>
+    <a href="${escapeHtml(link)}" style="display:inline-block;background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">요청 검토</a>
   </div>
 </div>
 `.trim()
