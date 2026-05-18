@@ -28,7 +28,7 @@ export async function notifyNewSubmission(params: {
   const { user, homework, submission } = params
   const hwNo = String(homework.id).padStart(2, '0')
   const subject = `[과제 제출] ${user.name} - #${hwNo} ${homework.title}`
-  const link = `${appBaseUrl()}/admin/kanban?homework_id=${homework.id}`
+  const link = `${appBaseUrl()}/admin/kanban?homework_id=${encodeURIComponent(homework.id)}`
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
   <div style="border-bottom:2px solid #2563eb;padding-bottom:12px;margin-bottom:20px">
