@@ -58,6 +58,7 @@ function KanbanCardView({
     >
       <div className="flex items-center gap-2 mb-2">
         <div
+          aria-label={card.user.name}
           className="flex-shrink-0 flex items-center justify-center rounded-full font-bold"
           style={{
             width: 28, height: 28,
@@ -203,7 +204,10 @@ export default function AdminKanbanPage() {
 
   const fetchKanban = useCallback(() => {
     const url = selectedHw ? `/api/admin/kanban?homework_id=${selectedHw}` : '/api/admin/kanban'
-    apiFetch<KanbanDataV2>(url).then(setData).catch(() => showToast('데이터 로드 실패'))
+    apiFetch<KanbanDataV2>(url).then(setData).catch(() => {
+      setToast('데이터 로드 실패')
+      setTimeout(() => setToast(null), 3000)
+    })
   }, [selectedHw])
 
   useEffect(() => {
@@ -227,16 +231,17 @@ export default function AdminKanbanPage() {
 
     const card = data.reviewing.find(c => cardDragId(c) === dragId)
     if (!card?.latestSubmission) return
+    const submission = card.latestSubmission
 
     const newStatus = targetCol === 'accepted' ? 'accepted' : 'declined'
-    const submissionId = card.latestSubmission.id
+    const submissionId = submission.id
 
     setData(prev => ({
       ...prev,
       reviewing: prev.reviewing.filter(c => cardDragId(c) !== dragId),
       [targetCol]: [
         ...prev[targetCol],
-        { ...card, latestSubmission: { ...card.latestSubmission!, status: newStatus } },
+        { ...card, latestSubmission: { ...submission, status: newStatus } },
       ],
     }))
 
