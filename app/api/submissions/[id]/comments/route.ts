@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { notifyNewComment } from '@/lib/notifications'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await verifyJWT(req)
@@ -23,5 +24,38 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
+  void (async () => {
+    try {
+      const recipientEmail = process.env.ADMIN_NOTIFICATION_EMAIL
+      if (!recipientEmail) return
+      const [{ data: userRow }, { data: subRow }] = await Promise.all([
+        supabase.from('users').select('name').eq('id', user.id).single(),
+        supabase.from('submissions').select('homework_id, homeworks(title)').eq('id', params.id).single(),
+      ])
+      if (!userRow || !subRow) {
+        console.warn('[email] skipped notifyNewComment: lookup returned null', { userId: user.id, submissionId: params.id })
+        return
+      }
+      const hw = subRow.homeworks as { title: string } | { title: string }[] | null
+      const hwTitle = Array.isArray(hw) ? hw[0]?.title : hw?.title
+      const contextTitle = `#${String(subRow.homework_id).padStart(2, '0')} ${hwTitle ?? ''}`
+      const link = `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/admin/homework/${subRow.homework_id}`
+      await notifyNewComment({
+        recipientEmail,
+        recipientName: '관리자',
+        authorName: userRow.name,
+        authorRole: 'user',
+        contextTitle,
+        body: commentBody.trim(),
+        isReply: false,
+        link,
+      })
+    } catch (e) {
+      console.error('[email] outer catch:', e)
+    }
+  })()
+
   return NextResponse.json(data, { status: 201 })
 }
