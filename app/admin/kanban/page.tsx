@@ -6,7 +6,7 @@ import {
 } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
 import { apiFetch } from '@/lib/api-client'
-import type { Homework, KanbanCard, KanbanColumn, KanbanDataV2 } from '@/lib/types'
+import type { Homework, KanbanCard, KanbanColumn, KanbanDataV2, SubmissionStatus } from '@/lib/types'
 
 const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: string; cardBg: string; avatarBg: string }[] = [
   { key: 'not_started', label: '미시작',  color: 'var(--text-disabled)', cardBorder: 'var(--border-subtle)',    cardBg: 'var(--surface-secondary)', avatarBg: 'var(--surface-secondary)' },
@@ -16,10 +16,22 @@ const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: strin
   { key: 'declined',    label: '불합격',  color: 'var(--error)',           cardBorder: 'rgba(220,38,38,0.3)',    cardBg: 'rgba(220,38,38,0.04)',     avatarBg: 'rgba(220,38,38,0.12)'      },
 ]
 
-const DROPPABLE_COLS: KanbanColumn[] = ['accepted', 'declined']
+const DRAGGABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
+const DROPPABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
 
 function cardDragId(card: KanbanCard) {
   return `${card.userId}_${card.homeworkId}`
+}
+
+function colForStatus(status: SubmissionStatus): KanbanColumn {
+  return status === 'pending' ? 'reviewing' : status
+}
+
+function statusForCol(col: KanbanColumn): SubmissionStatus | null {
+  if (col === 'reviewing') return 'pending'
+  if (col === 'accepted') return 'accepted'
+  if (col === 'declined') return 'declined'
+  return null
 }
 
 function KanbanCardView({
@@ -172,7 +184,7 @@ function DroppableCol({
             key={cardDragId(card)}
             card={card}
             col={col}
-            draggable={col.key === 'reviewing'}
+            draggable={DRAGGABLE_COLS.includes(col.key)}
             showHomework={showHomework}
           />
         ))}
@@ -214,9 +226,17 @@ export default function AdminKanbanPage() {
 
   useEffect(() => { fetchKanban() }, [fetchKanban])
 
+  function findCardWithSource(dragId: string): { card: KanbanCard; sourceCol: KanbanColumn } | null {
+    for (const colKey of DRAGGABLE_COLS) {
+      const card = data[colKey].find(c => cardDragId(c) === dragId)
+      if (card) return { card, sourceCol: colKey }
+    }
+    return null
+  }
+
   function onDragStart(event: DragStartEvent) {
-    const card = data.reviewing.find(c => cardDragId(c) === event.active.id) ?? null
-    setActiveCard(card)
+    const found = findCardWithSource(event.active.id as string)
+    setActiveCard(found?.card ?? null)
   }
 
   async function onDragEnd(event: DragEndEvent) {
@@ -225,18 +245,21 @@ export default function AdminKanbanPage() {
     if (!over || !active) return
     const dragId = active.id as string
     const targetCol = over.id as KanbanColumn
-    if (!DROPPABLE_COLS.includes(targetCol)) return
+    const newStatus = statusForCol(targetCol)
+    if (!newStatus) return
 
-    const card = data.reviewing.find(c => cardDragId(c) === dragId)
-    if (!card?.latestSubmission) return
-    const submission = card.latestSubmission
+    const found = findCardWithSource(dragId)
+    if (!found) return
+    const submission = found.card.latestSubmission
+    if (!submission) return
+    const { card, sourceCol } = found
+    if (sourceCol === targetCol) return
 
-    const newStatus = targetCol === 'accepted' ? 'accepted' : 'declined'
     const submissionId = submission.id
 
     setData(prev => ({
       ...prev,
-      reviewing: prev.reviewing.filter(c => cardDragId(c) !== dragId),
+      [sourceCol]: prev[sourceCol].filter(c => cardDragId(c) !== dragId),
       [targetCol]: [
         ...prev[targetCol],
         { ...card, latestSubmission: { ...submission, status: newStatus } },
@@ -307,10 +330,10 @@ export default function AdminKanbanPage() {
           ))}
         </div>
         <DragOverlay>
-          {activeCard && (
+          {activeCard?.latestSubmission && (
             <KanbanCardView
               card={activeCard}
-              col={COLS.find(c => c.key === 'reviewing')!}
+              col={COLS.find(c => c.key === colForStatus(activeCard.latestSubmission!.status))!}
               draggable={false}
               showHomework={showHomework}
             />
