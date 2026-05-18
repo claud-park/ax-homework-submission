@@ -1,11 +1,40 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone, User } from '@/lib/types'
 
 type HomeworkInfo = { id: number; title: string } | null
 type MilestoneWithUser = Milestone & { users: User; homeworks: HomeworkInfo }
 type ViewMode = 'user' | 'homework'
+
+type CharterContent = {
+  problem_definition?: string
+  goal?: string
+  scope_in?: string
+  scope_out?: string
+  expected_outcomes?: string
+  risks?: string
+  [key: string]: string | undefined
+}
+type CharterWithUser = {
+  id: string
+  user_id: string
+  homework_id: number | null
+  project_name: string | null
+  content: CharterContent
+  submitted_at: string
+  updated_at: string
+  users: User
+}
+
+const CHARTER_SECTIONS: { key: string; label: string }[] = [
+  { key: 'problem_definition', label: '문제 정의 (AS-IS)' },
+  { key: 'goal', label: '목표 (TO-BE)' },
+  { key: 'scope_in', label: '범위 In' },
+  { key: 'scope_out', label: '범위 Out' },
+  { key: 'expected_outcomes', label: '기대 효과' },
+  { key: 'risks', label: '리스크' },
+]
 
 const STATUS_LABEL: Record<string, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
@@ -30,6 +59,8 @@ function isOverdue(m: Milestone) {
 function daysFromToday(dueDate: string): number {
   return Math.ceil((new Date(dueDate).getTime() - todayMs) / 86400000)
 }
+
+function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
 
 // ─── shared sub-components ────────────────────────────────────────────────────
 
@@ -108,9 +139,193 @@ function OverdueBadge({ count }: { count: number }) {
   )
 }
 
+// ─── Charter card ─────────────────────────────────────────────────────────────
+
+function CharterCard({ charter, onClick }: { charter: CharterWithUser; onClick: () => void }) {
+  const preview = CHARTER_SECTIONS
+    .map(s => stripHtml(charter.content[s.key] ?? ''))
+    .find(t => t.length > 0) ?? ''
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: '148px', flexShrink: 0, textAlign: 'left',
+        borderRadius: '10px',
+        border: '1.5px solid rgba(37,99,235,0.35)',
+        background: 'rgba(37,99,235,0.04)',
+        padding: '10px 12px',
+        display: 'flex', flexDirection: 'column', gap: '4px',
+        cursor: 'pointer',
+        transition: 'border-color 0.15s, background 0.15s',
+      }}
+      onMouseEnter={e => {
+        ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(37,99,235,0.10)'
+        ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--blue-600)'
+      }}
+      onMouseLeave={e => {
+        ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(37,99,235,0.04)'
+        ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(37,99,235,0.35)'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+        <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--blue-600)', background: 'rgba(37,99,235,0.12)', padding: '1px 5px', borderRadius: '4px' }}>
+          과제정의서
+        </span>
+      </div>
+      <p style={{
+        fontSize: '12px', fontWeight: 600, margin: 0,
+        color: 'var(--text-primary)', lineHeight: 1.35,
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+      }}>
+        {charter.project_name || '(제목 없음)'}
+      </p>
+      {preview && (
+        <p style={{
+          fontSize: '10px', margin: 0,
+          color: 'var(--text-secondary)', lineHeight: 1.4,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {preview}
+        </p>
+      )}
+      <p style={{ fontSize: '10px', margin: '2px 0 0', color: 'var(--text-disabled)' }}>
+        {new Date(charter.submitted_at).toLocaleDateString('ko-KR')}
+      </p>
+    </button>
+  )
+}
+
+// ─── Charter side panel ───────────────────────────────────────────────────────
+
+function CharterPanel({ charter, onClose }: { charter: CharterWithUser; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.25)',
+        }}
+      />
+      {/* Panel */}
+      <div
+        ref={ref}
+        style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0,
+          width: '480px', zIndex: 201,
+          background: 'var(--surface-primary)',
+          borderLeft: '1px solid var(--border-subtle)',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '-8px 0 40px rgba(0,0,0,0.15)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
+          background: 'var(--surface-secondary)', flexShrink: 0,
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '16px', color: 'var(--text-secondary)', padding: '2px 6px',
+              borderRadius: '6px', lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--blue-600)', background: 'rgba(37,99,235,0.12)', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
+                과제정의서
+              </span>
+              {charter.homework_id && (
+                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  과제 #{String(charter.homework_id).padStart(2, '0')}
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {charter.project_name || '(제목 없음)'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <UserAvatar user={charter.users} size={24} />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{charter.users.name}</span>
+          </div>
+        </div>
+
+        {/* Meta */}
+        <div style={{
+          padding: '8px 18px', borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex', gap: '16px', flexShrink: 0, background: 'var(--surface-secondary)',
+        }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
+            제출: {new Date(charter.submitted_at).toLocaleString('ko-KR')}
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
+            수정: {new Date(charter.updated_at).toLocaleString('ko-KR')}
+          </span>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {CHARTER_SECTIONS.map(({ key, label }) => {
+              const html = charter.content[key] ?? ''
+              const text = stripHtml(html)
+              return (
+                <div key={key}>
+                  <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px 0', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                    {label}
+                  </p>
+                  {text ? (
+                    <div
+                      style={{
+                        fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.65,
+                        background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px',
+                        border: '1px solid var(--border-subtle)',
+                      }}
+                      dangerouslySetInnerHTML={{ __html: html || '' }}
+                    />
+                  ) : (
+                    <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>
+                      (내용 없음)
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── View by User ─────────────────────────────────────────────────────────────
 
-function HomeworkGroup({ hwId, hwTitle, milestones }: { hwId: number | null; hwTitle: string | null; milestones: MilestoneWithUser[] }) {
+function HomeworkGroup({
+  hwId, hwTitle, milestones, charters, onCharterClick,
+}: {
+  hwId: number | null
+  hwTitle: string | null
+  milestones: MilestoneWithUser[]
+  charters: CharterWithUser[]
+  onCharterClick: (c: CharterWithUser) => void
+}) {
   const overdueCount = milestones.filter(isOverdue).length
   const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
 
@@ -122,28 +337,36 @@ function HomeworkGroup({ hwId, hwTitle, milestones }: { hwId: number | null; hwT
         <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        {charters.map(c => (
+          <CharterCard key={c.id} charter={c} onClick={() => onCharterClick(c)} />
+        ))}
         {milestones.map(m => <MilestoneCard key={m.id} m={m} />)}
       </div>
     </div>
   )
 }
 
-function ChampionSection({ user, milestones }: { user: User; milestones: MilestoneWithUser[] }) {
+function ChampionSection({
+  user, milestones, charters, onCharterClick,
+}: {
+  user: User
+  milestones: MilestoneWithUser[]
+  charters: CharterWithUser[]
+  onCharterClick: (c: CharterWithUser) => void
+}) {
   const overdueCount = milestones.filter(isOverdue).length
 
   const groups = useMemo(() => {
-    const map = new Map<string, MilestoneWithUser[]>()
-    for (const m of milestones) {
-      const key = m.homework_id !== null ? String(m.homework_id) : '__none__'
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(m)
-    }
-    return Array.from(map.entries()).sort(([a], [b]) => {
+    const keys = new Set<string>()
+    for (const m of milestones) keys.add(m.homework_id !== null ? String(m.homework_id) : '__none__')
+    for (const c of charters) keys.add(c.homework_id !== null ? String(c.homework_id) : '__none__')
+
+    return Array.from(keys).sort((a, b) => {
       if (a === '__none__') return 1
       if (b === '__none__') return -1
       return Number(a) - Number(b)
     })
-  }, [milestones])
+  }, [milestones, charters])
 
   return (
     <div style={{
@@ -159,12 +382,30 @@ function ChampionSection({ user, milestones }: { user: User; milestones: Milesto
         <UserAvatar user={user} />
         <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', flex: 1, margin: 0 }}>{user.name}</p>
         <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>{milestones.length}개 마일스톤</span>
+        {charters.length > 0 && (
+          <span style={{ fontSize: '11px', color: 'var(--blue-600)', fontWeight: 600 }}>
+            📋 {charters.length}개 과제정의서
+          </span>
+        )}
         <OverdueBadge count={overdueCount} />
       </div>
       <div style={{ padding: '16px 16px 0' }}>
-        {groups.map(([key, ms]) => (
-          <HomeworkGroup key={key} hwId={key === '__none__' ? null : Number(key)} hwTitle={ms[0].homeworks?.title ?? null} milestones={ms} />
-        ))}
+        {groups.map(key => {
+          const hwId = key === '__none__' ? null : Number(key)
+          const groupMilestones = milestones.filter(m => (m.homework_id !== null ? String(m.homework_id) : '__none__') === key)
+          const groupCharters = charters.filter(c => (c.homework_id !== null ? String(c.homework_id) : '__none__') === key)
+          const hwTitle = groupMilestones[0]?.homeworks?.title ?? null
+          return (
+            <HomeworkGroup
+              key={key}
+              hwId={hwId}
+              hwTitle={hwTitle}
+              milestones={groupMilestones}
+              charters={groupCharters}
+              onCharterClick={onCharterClick}
+            />
+          )
+        })}
       </div>
     </div>
   )
@@ -172,7 +413,14 @@ function ChampionSection({ user, milestones }: { user: User; milestones: Milesto
 
 // ─── View by Homework ─────────────────────────────────────────────────────────
 
-function UserSubSection({ user, milestones }: { user: User; milestones: MilestoneWithUser[] }) {
+function UserSubSection({
+  user, milestones, charters, onCharterClick,
+}: {
+  user: User
+  milestones: MilestoneWithUser[]
+  charters: CharterWithUser[]
+  onCharterClick: (c: CharterWithUser) => void
+}) {
   const overdueCount = milestones.filter(isOverdue).length
 
   return (
@@ -182,27 +430,42 @@ function UserSubSection({ user, milestones }: { user: User; milestones: Mileston
         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.name}</span>
         <OverdueBadge count={overdueCount} />
         <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
-        <span style={{ fontSize: '10px', color: 'var(--text-disabled)', flexShrink: 0 }}>{milestones.length}개</span>
+        <span style={{ fontSize: '10px', color: 'var(--text-disabled)', flexShrink: 0 }}>{milestones.length}개 마일스톤</span>
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingLeft: '30px' }}>
+        {charters.map(c => (
+          <CharterCard key={c.id} charter={c} onClick={() => onCharterClick(c)} />
+        ))}
         {milestones.map(m => <MilestoneCard key={m.id} m={m} />)}
       </div>
     </div>
   )
 }
 
-function HomeworkSection({ hwId, hwTitle, milestones }: { hwId: number | null; hwTitle: string | null; milestones: MilestoneWithUser[] }) {
+function HomeworkSection({
+  hwId, hwTitle, milestones, charters, onCharterClick,
+}: {
+  hwId: number | null
+  hwTitle: string | null
+  milestones: MilestoneWithUser[]
+  charters: CharterWithUser[]
+  onCharterClick: (c: CharterWithUser) => void
+}) {
   const overdueCount = milestones.filter(isOverdue).length
   const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
 
   const byUser = useMemo(() => {
-    const map = new Map<string, { user: User; milestones: MilestoneWithUser[] }>()
+    const userMap = new Map<string, { user: User; milestones: MilestoneWithUser[]; charters: CharterWithUser[] }>()
     for (const m of milestones) {
-      if (!map.has(m.user_id)) map.set(m.user_id, { user: m.users, milestones: [] })
-      map.get(m.user_id)!.milestones.push(m)
+      if (!userMap.has(m.user_id)) userMap.set(m.user_id, { user: m.users, milestones: [], charters: [] })
+      userMap.get(m.user_id)!.milestones.push(m)
     }
-    return Array.from(map.values())
-  }, [milestones])
+    for (const c of charters) {
+      if (!userMap.has(c.user_id)) userMap.set(c.user_id, { user: c.users, milestones: [], charters: [] })
+      userMap.get(c.user_id)!.charters.push(c)
+    }
+    return Array.from(userMap.values())
+  }, [milestones, charters])
 
   return (
     <div style={{
@@ -210,7 +473,6 @@ function HomeworkSection({ hwId, hwTitle, milestones }: { hwId: number | null; h
       border: overdueCount > 0 ? '1.5px solid rgba(248,113,113,0.35)' : '1px solid var(--border-subtle)',
       background: 'var(--surface-primary)', overflow: 'hidden',
     }}>
-      {/* Homework header */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
         background: overdueCount > 0 ? 'rgba(248,113,113,0.04)' : 'var(--surface-secondary)',
@@ -220,11 +482,9 @@ function HomeworkSection({ hwId, hwTitle, milestones }: { hwId: number | null; h
         <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>{byUser.length}명 참여</span>
         <OverdueBadge count={overdueCount} />
       </div>
-
-      {/* Per-user sub-sections */}
       <div style={{ padding: '16px 16px 0' }}>
-        {byUser.map(({ user, milestones: ums }) => (
-          <UserSubSection key={user.id} user={user} milestones={ums} />
+        {byUser.map(({ user, milestones: ums, charters: ucs }) => (
+          <UserSubSection key={user.id} user={user} milestones={ums} charters={ucs} onCharterClick={onCharterClick} />
         ))}
       </div>
     </div>
@@ -235,14 +495,17 @@ function HomeworkSection({ hwId, hwTitle, milestones }: { hwId: number | null; h
 
 export default function AdminProgressPage() {
   const [milestones, setMilestones] = useState<MilestoneWithUser[]>([])
+  const [charters, setCharters] = useState<CharterWithUser[]>([])
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>('user')
+  const [selectedCharter, setSelectedCharter] = useState<CharterWithUser | null>(null)
 
   useEffect(() => {
     apiFetch<MilestoneWithUser[]>('/api/admin/milestones').then(data => {
       setMilestones(data)
       setSelectedUsers(new Set(data.map(m => m.user_id)))
     })
+    apiFetch<CharterWithUser[]>('/api/admin/charters').then(setCharters)
   }, [])
 
   const users = useMemo(
@@ -255,24 +518,36 @@ export default function AdminProgressPage() {
     [milestones, selectedUsers],
   )
 
-  // View by user
-  const byUser = useMemo(
-    () => users.filter(u => selectedUsers.has(u.id)).map(u => ({ user: u, milestones: filtered.filter(m => m.user_id === u.id) })),
-    [users, filtered, selectedUsers],
+  const filteredCharters = useMemo(
+    () => charters.filter(c => selectedUsers.has(c.user_id)),
+    [charters, selectedUsers],
   )
 
-  // View by homework
+  const byUser = useMemo(
+    () => users.filter(u => selectedUsers.has(u.id)).map(u => ({
+      user: u,
+      milestones: filtered.filter(m => m.user_id === u.id),
+      charters: filteredCharters.filter(c => c.user_id === u.id),
+    })),
+    [users, filtered, filteredCharters, selectedUsers],
+  )
+
   const byHomework = useMemo(() => {
-    const map = new Map<string, { hwId: number | null; hwTitle: string | null; milestones: MilestoneWithUser[] }>()
+    const map = new Map<string, { hwId: number | null; hwTitle: string | null; milestones: MilestoneWithUser[]; charters: CharterWithUser[] }>()
     for (const m of filtered) {
       const key = m.homework_id !== null ? String(m.homework_id) : '__none__'
-      if (!map.has(key)) map.set(key, { hwId: m.homework_id, hwTitle: m.homeworks?.title ?? null, milestones: [] })
+      if (!map.has(key)) map.set(key, { hwId: m.homework_id, hwTitle: m.homeworks?.title ?? null, milestones: [], charters: [] })
       map.get(key)!.milestones.push(m)
+    }
+    for (const c of filteredCharters) {
+      const key = c.homework_id !== null ? String(c.homework_id) : '__none__'
+      if (!map.has(key)) map.set(key, { hwId: c.homework_id, hwTitle: null, milestones: [], charters: [] })
+      map.get(key)!.charters.push(c)
     }
     return Array.from(map.entries())
       .sort(([a], [b]) => { if (a === '__none__') return 1; if (b === '__none__') return -1; return Number(a) - Number(b) })
       .map(([key, g]) => ({ key, ...g }))
-  }, [filtered])
+  }, [filtered, filteredCharters])
 
   function toggleUser(userId: string) {
     setSelectedUsers(prev => {
@@ -345,16 +620,29 @@ export default function AdminProgressPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {viewMode === 'user' ? (
           byUser.length > 0
-            ? byUser.map(({ user, milestones: ums }) => <ChampionSection key={user.id} user={user} milestones={ums} />)
+            ? byUser.map(({ user, milestones: ums, charters: ucs }) => (
+                <ChampionSection
+                  key={user.id}
+                  user={user}
+                  milestones={ums}
+                  charters={ucs}
+                  onCharterClick={setSelectedCharter}
+                />
+              ))
             : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 챔피언이 없습니다.</p>
         ) : (
           byHomework.length > 0
-            ? byHomework.map(({ key, hwId, hwTitle, milestones: hms }) => (
-                <HomeworkSection key={key} hwId={hwId} hwTitle={hwTitle} milestones={hms} />
+            ? byHomework.map(({ key, hwId, hwTitle, milestones: hms, charters: hcs }) => (
+                <HomeworkSection key={key} hwId={hwId} hwTitle={hwTitle} milestones={hms} charters={hcs} onCharterClick={setSelectedCharter} />
               ))
             : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 데이터가 없습니다.</p>
         )}
       </div>
+
+      {/* Charter side panel */}
+      {selectedCharter && (
+        <CharterPanel charter={selectedCharter} onClose={() => setSelectedCharter(null)} />
+      )}
     </div>
   )
 }

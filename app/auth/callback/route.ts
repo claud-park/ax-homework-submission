@@ -3,7 +3,10 @@ import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  const host = request.headers.get('host') ?? new URL(request.url).host
+  const proto = request.headers.get('x-forwarded-proto') ?? 'http'
+  const origin = `${proto}://${host}`
   const code = searchParams.get('code')
   if (!code) return NextResponse.redirect(`${origin}/login?error=no_code`)
 

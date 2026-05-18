@@ -1,13 +1,139 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
-import type { ProjectCharter, CharterSubmission } from '@/lib/types'
+import type { Homework, ProjectCharter, CharterSubmission } from '@/lib/types'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
+
+function HomeworkSelect({ value, onChange, homeworks }: {
+  value: number | ''
+  onChange: (v: number | '') => void
+  homeworks: Homework[]
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  const selected = value !== '' ? homeworks.find(h => h.id === value) : null
+  const label = selected
+    ? `과제 #${String(selected.id).padStart(2, '0')}  ${selected.title}`
+    : '과제 연결 없음'
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '5px',
+          padding: '3px 8px',
+          borderRadius: '6px',
+          border: `1px solid ${open ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
+          background: selected ? 'rgba(37,99,235,0.07)' : 'var(--surface-secondary)',
+          cursor: 'pointer',
+          fontSize: '11px',
+          fontWeight: selected ? 600 : 400,
+          color: selected ? 'var(--blue-600)' : 'var(--text-disabled)',
+          whiteSpace: 'nowrap',
+          transition: 'border-color 0.15s',
+        }}
+      >
+        {label}
+        <span style={{ fontSize: '9px', opacity: 0.7 }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: 0,
+          zIndex: 300,
+          minWidth: '220px',
+          background: 'var(--surface-primary)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+          overflow: 'hidden',
+        }}>
+          {/* 연결 없음 */}
+          <button
+            type="button"
+            onClick={() => { onChange(''); setOpen(false) }}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              padding: '9px 14px',
+              fontSize: '12px',
+              background: value === '' ? 'rgba(37,99,235,0.07)' : 'transparent',
+              color: value === '' ? 'var(--blue-600)' : 'var(--text-secondary)',
+              fontWeight: value === '' ? 600 : 400,
+              border: 'none',
+              borderBottom: '1px solid var(--border-subtle)',
+              cursor: 'pointer',
+            }}
+          >
+            과제 연결 없음
+          </button>
+          {/* Homework options */}
+          {homeworks.map(h => {
+            const isActive = value === h.id
+            return (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => { onChange(h.id); setOpen(false) }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '9px 14px',
+                  fontSize: '12px',
+                  background: isActive ? 'rgba(37,99,235,0.07)' : 'transparent',
+                  color: isActive ? 'var(--blue-600)' : 'var(--text-primary)',
+                  fontWeight: isActive ? 600 : 400,
+                  border: 'none',
+                  borderBottom: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  color: isActive ? 'var(--blue-600)' : 'var(--text-disabled)',
+                  background: isActive ? 'rgba(37,99,235,0.12)' : 'var(--surface-secondary)',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  flexShrink: 0,
+                }}>
+                  #{String(h.id).padStart(2, '0')}
+                </span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {h.title}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 type CharterContent = ProjectCharter['content']
 type SidePanel = null | 'new' | CharterSubmission
 
@@ -44,14 +170,16 @@ function SectionEditor({ label, required, content, onBlur }: {
 }
 
 // Keyed by submission id or 'new' — remounts when switching between items
-function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
+function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdated }: {
   mode: 'new' | 'edit'
   submission?: CharterSubmission
+  homeworks: Homework[]
   onClose: () => void
   onCreated: (sub: CharterSubmission) => void
   onUpdated: (sub: CharterSubmission) => void
 }) {
   const [projectName, setProjectName] = useState(submission?.project_name ?? '')
+  const [homeworkId, setHomeworkId] = useState<number | ''>(submission?.homework_id ?? '')
   const [saving, setSaving] = useState(false)
   const contentRef = useRef<CharterContent>(submission?.content ?? {})
 
@@ -65,7 +193,11 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
       if (mode === 'new') {
         const newSub = await apiFetch<CharterSubmission>('/api/charter/submissions', {
           method: 'POST',
-          body: JSON.stringify({ project_name: projectName, content: contentRef.current }),
+          body: JSON.stringify({
+            project_name: projectName,
+            content: contentRef.current,
+            homework_id: homeworkId !== '' ? homeworkId : null,
+          }),
         })
         onCreated(newSub)
       } else {
@@ -106,13 +238,28 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
         >
           ✕
         </button>
-        <input
-          value={projectName}
-          onChange={e => setProjectName(e.target.value)}
-          placeholder="프로젝트명을 입력하세요"
-          className="flex-1 text-sm font-semibold bg-transparent outline-none"
-          style={{ color: 'var(--text-primary)' }}
-        />
+        <div className="flex flex-col flex-1 min-w-0 gap-1">
+          <textarea
+            value={projectName}
+            onChange={e => setProjectName(e.target.value)}
+            placeholder="프로젝트명을 입력하세요"
+            rows={1}
+            className="text-sm font-semibold bg-transparent outline-none resize-none w-full"
+            style={{ color: 'var(--text-primary)' }}
+          />
+          {mode === 'new' && (
+            <HomeworkSelect
+              value={homeworkId}
+              onChange={setHomeworkId}
+              homeworks={homeworks}
+            />
+          )}
+          {mode === 'edit' && submission?.homework_id && (
+            <span style={{ fontSize: '11px', color: 'var(--blue-600)' }}>
+              과제 #{String(submission.homework_id).padStart(2, '0')}
+            </span>
+          )}
+        </div>
         <div className="flex gap-2 flex-shrink-0">
           <button
             onClick={exportDocx}
@@ -197,11 +344,33 @@ function SubmissionCard({ sub, compressed, active, onClick }: {
 
 export default function CharterPage() {
   const [submissions, setSubmissions] = useState<CharterSubmission[]>([])
+  const [homeworks, setHomeworks] = useState<Homework[]>([])
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
 
   useEffect(() => {
     apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions)
+    apiFetch<Homework[]>('/api/homeworks').then(setHomeworks)
   }, [])
+
+  // Build homework title lookup
+  const hwMap = useMemo(() => new Map(homeworks.map(h => [h.id, h.title])), [homeworks])
+
+  // Group submissions by homework_id, sorted by hw id asc, null last
+  const groups = useMemo(() => {
+    const map = new Map<string, { hwId: number | null; hwTitle: string | null; items: CharterSubmission[] }>()
+    for (const s of submissions) {
+      const key = s.homework_id !== null ? String(s.homework_id) : '__none__'
+      if (!map.has(key)) map.set(key, { hwId: s.homework_id, hwTitle: s.homework_id !== null ? (hwMap.get(s.homework_id) ?? null) : null, items: [] })
+      map.get(key)!.items.push(s)
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        if (a === '__none__') return 1
+        if (b === '__none__') return -1
+        return Number(a) - Number(b)
+      })
+      .map(([key, g]) => ({ key, ...g }))
+  }, [submissions, hwMap])
 
   const panelKey = sidePanel === null ? '' : sidePanel === 'new' ? 'new' : sidePanel.id
   const activeId = sidePanel !== null && sidePanel !== 'new' ? sidePanel.id : null
@@ -239,7 +408,7 @@ export default function CharterPage() {
               color: sidePanel === 'new' ? 'var(--blue-600)' : 'var(--text-secondary)',
             }}
           >
-            + 새 작성
+            + 과제정의서 추가
           </button>
         </div>
 
@@ -248,31 +417,67 @@ export default function CharterPage() {
           {submissions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-2" style={{ color: 'var(--text-disabled)' }}>
               <p className="text-sm">아직 제출한 과제정의서가 없습니다.</p>
-              <p className="text-xs">+ 새 작성으로 시작하세요.</p>
+              <p className="text-xs">+ 과제정의서를 추가해주세요.</p>
             </div>
           ) : sidePanel !== null ? (
-            // Compressed list
-            submissions.map(sub => (
-              <SubmissionCard
-                key={sub.id}
-                sub={sub}
-                compressed
-                active={activeId === sub.id}
-                onClick={() => setSidePanel(sub)}
-              />
-            ))
+            // Compressed list — grouped by homework
+            <div>
+              {groups.map(({ key, hwId, hwTitle, items }) => {
+                const sectionLabel = hwId !== null
+                  ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? `  ${hwTitle}` : ''}`
+                  : '독립 과제정의서'
+                return (
+                  <div key={key}>
+                    <div className="px-3 py-1.5 border-b" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}>
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-disabled)' }}>
+                        {sectionLabel}
+                      </span>
+                    </div>
+                    {items.map(sub => (
+                      <SubmissionCard
+                        key={sub.id}
+                        sub={sub}
+                        compressed
+                        active={activeId === sub.id}
+                        onClick={() => setSidePanel(sub)}
+                      />
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
-            // Full-width card grid
-            <div className="p-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-              {submissions.map(sub => (
-                <SubmissionCard
-                  key={sub.id}
-                  sub={sub}
-                  compressed={false}
-                  active={false}
-                  onClick={() => setSidePanel(sub)}
-                />
-              ))}
+            // Full-width grouped sections
+            <div className="p-4 flex flex-col gap-6">
+              {groups.map(({ key, hwId, hwTitle, items }) => {
+                const sectionLabel = hwId !== null
+                  ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? `  ${hwTitle}` : ''}`
+                  : '독립 과제정의서'
+                return (
+                  <div key={key}>
+                    {/* Section header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xs font-bold uppercase tracking-wide shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                        {sectionLabel}
+                      </span>
+                      <div className="flex-1" style={{ height: '1px', background: 'var(--border-subtle)' }} />
+                      <span className="text-xs shrink-0" style={{ color: 'var(--text-disabled)' }}>{items.length}개</span>
+                    </div>
+                    {/* Card grid */}
+                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+                      {items.map(sub => (
+                        <SubmissionCard
+                          key={sub.id}
+                          sub={sub}
+                          compressed={false}
+                          active={false}
+                          onClick={() => setSidePanel(sub)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -286,6 +491,7 @@ export default function CharterPage() {
               key={panelKey}
               mode={sidePanel === 'new' ? 'new' : 'edit'}
               submission={sidePanel !== 'new' ? sidePanel : undefined}
+              homeworks={homeworks}
               onClose={() => setSidePanel(null)}
               onCreated={handleCreated}
               onUpdated={handleUpdated}

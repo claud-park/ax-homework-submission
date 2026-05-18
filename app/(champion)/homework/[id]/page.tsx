@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api-client'
 import type { Homework, Submission, Comment, CharterSubmission, Milestone, ProjectCharter } from '@/lib/types'
 import DOMPurify from 'dompurify'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
-import DatePicker from '@/components/DatePicker'
+import DateRangePicker from '@/components/DateRangePicker'
 
 // ─── shared constants ────────────────────────────────────────────────────────
 
@@ -181,11 +181,12 @@ function CharterEditor({ homeworkId, charter, onSaved }: {
             <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>프로젝트명</span>
             <span className="text-xs" style={{ color: 'var(--amber)' }}>필수</span>
           </div>
-          <input
+          <textarea
             value={projectName}
             onChange={e => setProjectName(e.target.value)}
             placeholder="프로젝트명을 입력하세요"
-            className="w-full p-3 text-sm bg-transparent outline-none"
+            rows={1}
+            className="w-full p-3 text-sm bg-transparent outline-none resize-none"
             style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}
           />
         </div>
@@ -263,30 +264,80 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ title: '', start_date: '', due_date: '', description: '' })
+  const [form, setForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
+  const [editForm, setEditForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const inputStyle = {
+    background: 'var(--surface-secondary)',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '8px',
+    color: 'var(--text-primary)',
+    padding: '8px 12px',
+    fontSize: '13px',
+  }
 
   useEffect(() => {
     apiFetch<Milestone[]>(`/api/milestones?homework_id=${homeworkId}`)
       .then(data => { setMilestones(data); setLoading(false) })
   }, [homeworkId])
 
-  async function handleCreate() {
-    if (!form.title || !form.start_date || !form.due_date) {
-      setFormError('마일스톤 이름, 시작일, 마감일은 필수입니다.'); return
-    }
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.start_date || !form.due_date) { setFormError('작업 기간을 선택해주세요.'); return }
     setSaving(true); setFormError('')
     try {
       const m = await apiFetch<Milestone>('/api/milestones', {
         method: 'POST',
-        body: JSON.stringify({ ...form, homework_id: homeworkId }),
+        body: JSON.stringify({ ...form, week_number: parseInt(form.week_number), homework_id: homeworkId }),
       })
       setMilestones(prev => [...prev, m])
       setShowForm(false)
-      setForm({ title: '', start_date: '', due_date: '', description: '' })
+      setForm({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
+    } catch {
+      setFormError('마일스톤 추가에 실패했습니다.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openEdit(m: Milestone) {
+    setEditingMilestone(m)
+    setEditForm({ week_number: String(m.week_number), title: m.title, start_date: m.start_date, due_date: m.due_date, description: m.description ?? '' })
+    setConfirmDeleteId(null)
+  }
+
+  async function handleEditSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingMilestone) return
+    if (!editForm.start_date || !editForm.due_date) { setFormError('작업 기간을 선택해주세요.'); return }
+    setEditSaving(true)
+    try {
+      const updated = await apiFetch<Milestone>(`/api/milestones/${editingMilestone.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ...editForm, week_number: parseInt(editForm.week_number) }),
+      })
+      setMilestones(prev => prev.map(m => m.id === updated.id ? updated : m))
+      setEditingMilestone(null)
+    } catch {
+      setFormError('수정에 실패했습니다.')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await apiFetch(`/api/milestones/${id}`, { method: 'DELETE' })
+      setMilestones(prev => prev.filter(m => m.id !== id))
+      setEditingMilestone(null)
+      setConfirmDeleteId(null)
+    } catch {
+      setFormError('삭제에 실패했습니다.')
     }
   }
 
@@ -309,14 +360,21 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
           <table className="w-full text-sm mb-4">
             <thead>
               <tr className="border-b text-left" style={{ borderColor: 'var(--border-subtle)' }}>
+                <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</th>
                 <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤</th>
                 <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</th>
                 <th className="pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>상태</th>
+                <th className="pb-2" />
               </tr>
             </thead>
             <tbody>
               {milestones.map(m => (
                 <tr key={m.id} className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <td className="py-3 pr-4">
+                    <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' }}>
+                      {m.week_number}주차
+                    </span>
+                  </td>
                   <td className="py-3 pr-4">
                     <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
                     {m.description && (
@@ -330,6 +388,15 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
                     <span className="text-xs font-semibold" style={{ color: MILESTONE_STATUS_COLOR[m.status] }}>
                       {MILESTONE_STATUS_LABEL[m.status]}
                     </span>
+                  </td>
+                  <td className="py-3 text-right">
+                    <button
+                      onClick={() => openEdit(m)}
+                      title="편집"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)', fontSize: '13px', padding: '2px 4px' }}
+                    >
+                      ✏
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -347,59 +414,106 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
       )}
 
       {showForm && (
-        <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-          <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>새 마일스톤</p>
-          <div className="flex flex-col gap-2">
-            <input
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              placeholder="마일스톤 이름 *"
-              className="w-full text-sm p-2 rounded-lg border"
-              style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+        <form onSubmit={handleCreate} className="p-4 rounded-xl border flex flex-col gap-3" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>새 마일스톤</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
+              <input type="number" value={form.week_number} onChange={e => setForm(f => ({ ...f, week_number: e.target.value }))} min="1" required style={inputStyle} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+              <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
+            <DateRangePicker
+              startDate={form.start_date}
+              endDate={form.due_date}
+              onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))}
             />
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--text-secondary)' }}>시작일 *</label>
-                <DatePicker
-                  value={form.start_date}
-                  onChange={v => setForm(f => ({ ...f, start_date: v }))}
-                  required
-                  placeholder="날짜 선택"
-                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명</label>
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="선택사항" rows={2} style={{ ...inputStyle, resize: 'none', width: '100%' }} />
+          </div>
+          {formError && <p className="text-xs" style={{ color: 'var(--error)' }}>{formError}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setShowForm(false); setFormError('') }}
+              className="px-3 py-2 rounded-lg text-sm"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
+              취소
+            </button>
+            <button type="submit" disabled={saving}
+              className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+              style={{ background: 'var(--blue-600)', color: '#fff' }}>
+              {saving ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Edit modal */}
+      {editingMilestone && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.65)' }}>
+          <div className="w-full max-w-md mx-4 p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>마일스톤 편집</h3>
+              <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '18px', lineHeight: 1 }}>✕</button>
+            </div>
+            <form onSubmit={handleEditSave} className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
+                  <input type="number" value={editForm.week_number} onChange={e => setEditForm(f => ({ ...f, week_number: e.target.value }))} min="1" required style={inputStyle} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+                  <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
+                <DateRangePicker
+                  startDate={editForm.start_date}
+                  endDate={editForm.due_date}
+                  onChange={(s, e) => setEditForm(f => ({ ...f, start_date: s, due_date: e }))}
                 />
               </div>
-              <div className="flex-1">
-                <label className="text-xs mb-1 block" style={{ color: 'var(--text-secondary)' }}>마감일 *</label>
-                <DatePicker
-                  value={form.due_date}
-                  onChange={v => setForm(f => ({ ...f, due_date: v }))}
-                  required
-                  placeholder="날짜 선택"
-                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }}
-                />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명</label>
+                <textarea value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="선택사항" rows={2} style={{ ...inputStyle, resize: 'none', width: '100%' }} />
               </div>
-            </div>
-            <textarea
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="설명 (선택)"
-              rows={2}
-              className="w-full text-sm p-2 rounded-lg border resize-none"
-              style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
-            />
-            {formError && <p className="text-xs" style={{ color: 'var(--error)' }}>{formError}</p>}
-            <div className="flex gap-2">
-              <button onClick={() => { setShowForm(false); setFormError('') }}
-                className="px-3 py-2 rounded-lg text-sm"
-                style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
-                취소
-              </button>
-              <button onClick={handleCreate} disabled={saving}
-                className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-                style={{ background: 'var(--blue-600)', color: '#fff' }}>
-                {saving ? '저장 중...' : '저장'}
-              </button>
-            </div>
+
+              {confirmDeleteId === editingMilestone.id ? (
+                <div className="p-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid var(--error)' }}>
+                  <p className="text-xs mb-2" style={{ color: 'var(--error)' }}>정말 삭제하시겠습니까? 되돌릴 수 없습니다.</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
+                    <button type="button" onClick={() => handleDelete(editingMilestone.id)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--error)', color: '#fff' }}>삭제 확인</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <button type="button" onClick={() => setConfirmDeleteId(editingMilestone.id)}
+                    className="px-3 py-2 rounded-lg text-xs font-semibold"
+                    style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
+                    삭제
+                  </button>
+                  <div className="flex-1" />
+                  <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
+                    className="px-3 py-2 rounded-lg text-xs"
+                    style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
+                    취소
+                  </button>
+                  <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
+                    {editSaving ? '저장 중...' : '저장'}
+                  </button>
+                </div>
+              )}
+            </form>
           </div>
         </div>
       )}
