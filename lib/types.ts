@@ -156,10 +156,4 @@ export interface KanbanCard {
 
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
 
-export interface KanbanDataV2 {
-  not_started: KanbanCard[]
-  in_progress: KanbanCard[]
-  reviewing: KanbanCard[]
-  accepted: KanbanCard[]
-  declined: KanbanCard[]
-}
+export type KanbanDataV2 = Record<KanbanColumn, KanbanCard[]>
