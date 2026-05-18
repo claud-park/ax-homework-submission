@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { Submission, Comment, CharterSubmission, CharterComment, Milestone } from '@/lib/types'
 import ReactMarkdown from 'react-markdown'
@@ -121,6 +122,8 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
     try {
       await apiFetch(`/api/admin/submissions/${subId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
       setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: status as Submission['status'] } : s))
+    } catch (e) {
+      toast.error('상태 변경 실패: ' + (e as Error).message)
     } finally { setSaving(false) }
   }
 
@@ -133,16 +136,22 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
       })
       setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, comments: [...(s.comments ?? []), newComment] } : s))
       setComment('')
+    } catch (e) {
+      toast.error('코멘트 저장 실패: ' + (e as Error).message)
     } finally { setSaving(false) }
   }
 
   async function handleEditComment(subId: string, c: Comment, newBody: string) {
-    const updated = await apiFetch<Comment>(`/api/admin/submissions/${subId}/comments/${c.id}`, {
-      method: 'PATCH', body: JSON.stringify({ body: newBody }),
-    })
-    setSubmissions(prev => prev.map(s =>
-      s.id === subId ? { ...s, comments: (s.comments ?? []).map(cm => cm.id === c.id ? updated : cm) } : s
-    ))
+    try {
+      const updated = await apiFetch<Comment>(`/api/admin/submissions/${subId}/comments/${c.id}`, {
+        method: 'PATCH', body: JSON.stringify({ body: newBody }),
+      })
+      setSubmissions(prev => prev.map(s =>
+        s.id === subId ? { ...s, comments: (s.comments ?? []).map(cm => cm.id === c.id ? updated : cm) } : s
+      ))
+    } catch (e) {
+      toast.error('코멘트 수정 실패: ' + (e as Error).message)
+    }
   }
 
   const activeSub = submissions.find(s => s.id === activeSubId)
@@ -449,30 +458,44 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
       })
       setComments(prev => [...prev, { ...created, replies: [] }])
       setNewComment('')
+    } catch (e) {
+      toast.error('피드백 작성 실패: ' + (e as Error).message)
     } finally { setPosting(false) }
   }
 
   async function handleReply(parentId: string, body: string) {
     if (!charter || charter === 'loading') return
-    const created = await apiFetch<CharterComment>(
-      `/api/charter/submissions/${charter.id}/comments/${parentId}/replies`,
-      { method: 'POST', body: JSON.stringify({ body }) }
-    )
-    setComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: [...(c.replies ?? []), created] } : c))
+    try {
+      const created = await apiFetch<CharterComment>(
+        `/api/charter/submissions/${charter.id}/comments/${parentId}/replies`,
+        { method: 'POST', body: JSON.stringify({ body }) }
+      )
+      setComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: [...(c.replies ?? []), created] } : c))
+    } catch (e) {
+      toast.error('답글 작성 실패: ' + (e as Error).message)
+    }
   }
 
   async function handleEdit(commentId: string, body: string) {
-    const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}`, {
-      method: 'PATCH', body: JSON.stringify({ body }),
-    })
-    setComments(prev => updateCommentInTree(prev, updated))
+    try {
+      const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}`, {
+        method: 'PATCH', body: JSON.stringify({ body }),
+      })
+      setComments(prev => updateCommentInTree(prev, updated))
+    } catch (e) {
+      toast.error('피드백 수정 실패: ' + (e as Error).message)
+    }
   }
 
   async function handleResolve(commentId: string, is_resolved: boolean) {
-    const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}/resolve`, {
-      method: 'PATCH', body: JSON.stringify({ is_resolved }),
-    })
-    setComments(prev => prev.map(c => c.id === commentId ? { ...updated, replies: c.replies } : c))
+    try {
+      const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}/resolve`, {
+        method: 'PATCH', body: JSON.stringify({ is_resolved }),
+      })
+      setComments(prev => prev.map(c => c.id === commentId ? { ...updated, replies: c.replies } : c))
+    } catch (e) {
+      toast.error('해결 상태 변경 실패: ' + (e as Error).message)
+    }
   }
 
   const unresolvedCount = comments.filter(c => !c.is_resolved).length
@@ -574,6 +597,7 @@ function MilestonesAdminTab({ homeworkId, userId }: { homeworkId: number; userId
   useEffect(() => {
     apiFetch<Milestone[]>(`/api/milestones?homework_id=${homeworkId}&user_id=${userId}`)
       .then(data => { setMilestones(data); setLoading(false) })
+      .catch((e: Error) => { toast.error('마일스톤 로드 실패: ' + e.message); setLoading(false) })
   }, [homeworkId, userId])
 
   if (loading) return <p className="text-sm p-4" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>

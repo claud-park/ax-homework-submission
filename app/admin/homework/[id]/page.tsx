@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { Submission, User, CharterSubmission } from '@/lib/types'
 
@@ -57,7 +58,7 @@ export default function AdminHomeworkSubmissionsPage() {
         setRows(Array.from(map.values()))
         setLoading(false)
       })
-      .catch(err => { setError(err.message); setLoading(false) })
+      .catch((err: Error) => { toast.error('제출 현황 로드 실패: ' + err.message); setError(err.message); setLoading(false) })
   }, [id])
 
   if (loading) return <p className="text-sm p-4" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>

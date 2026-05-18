@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone, User } from '@/lib/types'
 
@@ -504,8 +505,9 @@ export default function AdminProgressPage() {
     apiFetch<MilestoneWithUser[]>('/api/admin/milestones').then(data => {
       setMilestones(data)
       setSelectedUsers(new Set(data.map(m => m.user_id)))
-    })
+    }).catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
     apiFetch<CharterWithUser[]>('/api/admin/charters').then(setCharters)
+      .catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
   }, [])
 
   const users = useMemo(

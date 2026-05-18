@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { DeadlineChangeRequest } from '@/lib/types'
 
@@ -16,10 +17,14 @@ export default function AdminRequestsPage() {
   }, [])
 
   async function handleReview(id: string, status: 'approved' | 'rejected', review_note?: string) {
-    const updated = await apiFetch<DeadlineChangeRequest>(`/api/admin/deadline-requests/${id}`, {
-      method: 'PATCH', body: JSON.stringify({ status, review_note }),
-    })
-    setRequests(prev => prev.map(r => r.id === id ? updated : r))
+    try {
+      const updated = await apiFetch<DeadlineChangeRequest>(`/api/admin/deadline-requests/${id}`, {
+        method: 'PATCH', body: JSON.stringify({ status, review_note }),
+      })
+      setRequests(prev => prev.map(r => r.id === id ? updated : r))
+    } catch (e) {
+      toast.error('승인/반려 처리 실패: ' + (e as Error).message)
+    }
   }
 
   // Per milestone: all pending + most recent resolved

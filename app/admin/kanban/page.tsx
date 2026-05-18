@@ -5,6 +5,7 @@ import {
   PointerSensor, useSensor, useSensors, useDroppable,
 } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { Homework, KanbanCard, KanbanColumn, KanbanDataV2, SubmissionStatus } from '@/lib/types'
 
@@ -206,18 +207,12 @@ export default function AdminKanbanPage() {
   const [selectedHw, setSelectedHw] = useState<string>('')
   const [data, setData] = useState<KanbanDataV2>(EMPTY_DATA)
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
-  }
-
   const fetchKanban = useCallback(() => {
     const url = selectedHw ? `/api/admin/kanban?homework_id=${selectedHw}` : '/api/admin/kanban'
-    apiFetch<KanbanDataV2>(url).then(setData).catch(() => showToast('데이터 로드 실패'))
+    apiFetch<KanbanDataV2>(url).then(setData).catch(() => toast.error('데이터 로드 실패'))
   }, [selectedHw])
 
   useEffect(() => {
@@ -272,7 +267,7 @@ export default function AdminKanbanPage() {
         body: JSON.stringify({ status: newStatus }),
       })
     } catch {
-      showToast('상태 변경 실패. 되돌립니다.')
+      toast.error('상태 변경 실패. 되돌립니다.')
       fetchKanban()
     }
   }
@@ -303,19 +298,6 @@ export default function AdminKanbanPage() {
           ))}
         </select>
       </div>
-
-      {toast && (
-        <div
-          className="mb-4 p-3 rounded-lg text-sm"
-          style={{
-            background: 'rgba(220,38,38,0.1)',
-            color: 'var(--error)',
-            border: '1px solid var(--error)',
-          }}
-        >
-          {toast}
-        </div>
-      )}
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
