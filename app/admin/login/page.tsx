@@ -37,7 +37,7 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'hsl(var(--background))' }}>
       <div className="w-full max-w-sm p-8 rounded-2xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
         <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>관리자 로그인</h1>
         <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>AX Homework Admin</p>

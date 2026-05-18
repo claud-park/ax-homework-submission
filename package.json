@@ -19,17 +19,22 @@
     "@tiptap/pm": "^3.23.4",
     "@tiptap/react": "^3.23.4",
     "@tiptap/starter-kit": "^3.23.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "docx": "^9.6.1",
     "dompurify": "^3.4.3",
     "file-saver": "^2.0.5",
     "gantt-task-react": "^0.3.9",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
+    "lucide-react": "^1.16.0",
     "next": "14.2.35",
     "nodemailer": "^8.0.7",
     "react": "^18",
     "react-dom": "^18",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/dompurify": "^3.2.0",

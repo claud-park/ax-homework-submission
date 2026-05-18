@@ -23,8 +23,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (pathname === '/admin/login') return <>{children}</>
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--background)' }}>
-      <aside className="w-44 flex-shrink-0 flex flex-col gap-1 p-4 border-r" style={{ background: 'var(--background)', borderColor: 'var(--border-subtle)' }}>
+    <div className="flex min-h-screen" style={{ background: 'hsl(var(--background))' }}>
+      <aside className="w-44 flex-shrink-0 flex flex-col gap-1 p-4 border-r" style={{ background: 'hsl(var(--background))', borderColor: 'var(--border-subtle)' }}>
         <span className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>관리자</span>
         {NAV.map(item => {
           const active = item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href)
