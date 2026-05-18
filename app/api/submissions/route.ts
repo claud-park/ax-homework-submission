@@ -57,22 +57,22 @@ export async function POST(req: NextRequest) {
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Fire-and-forget email notification (errors logged inside helper)
-  const { data: homework } = await supabase
-    .from('homeworks')
-    .select('*')
-    .eq('id', parseInt(homeworkId))
-    .single()
-  const { data: userRow } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-  if (homework && userRow) {
-    notifyNewSubmission({ user: userRow, homework, submission: data }).catch(e =>
+  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
+  void (async () => {
+    try {
+      const [{ data: homework }, { data: userRow }] = await Promise.all([
+        supabase.from('homeworks').select('*').eq('id', parseInt(homeworkId)).single(),
+        supabase.from('users').select('*').eq('id', user.id).single(),
+      ])
+      if (homework && userRow) {
+        await notifyNewSubmission({ user: userRow, homework, submission: data })
+      } else {
+        console.warn('[email] skipped notifyNewSubmission: homework or user lookup returned null', { homeworkId, userId: user.id })
+      }
+    } catch (e) {
       console.error('[email] outer catch:', e)
-    )
-  }
+    }
+  })()
 
   return NextResponse.json(data, { status: 201 })
 }
