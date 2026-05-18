@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Homework, Submission, SubmissionStatus } from '@/lib/types'
+import { toast } from 'sonner'
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '검토 중', accepted: '합격', declined: '불합격',
@@ -24,8 +25,8 @@ export default function HomeworkListPage() {
   )
 
   useEffect(() => {
-    apiFetch<Homework[]>('/api/homeworks').then(setHomeworks)
-    apiFetch<Submission[]>('/api/submissions/mine').then(setSubmissions)
+    apiFetch<Homework[]>('/api/homeworks').then(setHomeworks).catch((e: Error) => toast.error('과제 목록 로드 실패: ' + e.message))
+    apiFetch<Submission[]>('/api/submissions/mine').then(setSubmissions).catch((e: Error) => toast.error('제출 현황 로드 실패: ' + e.message))
   }, [])
 
   function setViewMode(v: 'list' | 'board') {

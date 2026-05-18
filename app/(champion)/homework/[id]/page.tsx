@@ -9,6 +9,7 @@ import type { Homework, Submission, Comment, CharterSubmission, Milestone, Proje
 import DOMPurify from 'dompurify'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 import DateRangePicker from '@/components/DateRangePicker'
+import { toast } from 'sonner'
 
 // ─── shared constants ────────────────────────────────────────────────────────
 
@@ -149,6 +150,8 @@ function CharterEditor({ homeworkId, charter, onSaved }: {
         })
         onSaved(created)
       }
+    } catch (e: unknown) {
+      toast.error('저장 실패: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setSaving(false)
     }
@@ -211,6 +214,7 @@ function CharterTab({ homeworkId }: { homeworkId: number }) {
   useEffect(() => {
     apiFetch<CharterSubmission[]>(`/api/charter/submissions?homework_id=${homeworkId}`)
       .then(data => { setCharter(data[0] ?? null); setLoading(false) })
+      .catch((e: Error) => { toast.error('과제정의서 로드 실패: ' + e.message); setLoading(false) })
   }, [homeworkId])
 
   if (loading) {
@@ -284,6 +288,7 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
   useEffect(() => {
     apiFetch<Milestone[]>(`/api/milestones?homework_id=${homeworkId}`)
       .then(data => { setMilestones(data); setLoading(false) })
+      .catch((e: Error) => { toast.error('마일스톤 로드 실패: ' + e.message); setLoading(false) })
   }, [homeworkId])
 
   async function handleCreate(e: React.FormEvent) {
@@ -539,8 +544,8 @@ export default function HomeworkDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('charter')
 
   useEffect(() => {
-    apiFetch<Homework>(`/api/homeworks/${id}`).then(setHomework)
-    apiFetch<Submission[]>(`/api/submissions/mine/${id}`).then(setSubmissions)
+    apiFetch<Homework>(`/api/homeworks/${id}`).then(setHomework).catch((e: Error) => toast.error('과제 로드 실패: ' + e.message))
+    apiFetch<Submission[]>(`/api/submissions/mine/${id}`).then(setSubmissions).catch((e: Error) => toast.error('제출 이력 로드 실패: ' + e.message))
     import('@/lib/supabase/client').then(({ createSupabaseBrowserClient }) => {
       createSupabaseBrowserClient().auth.getSession().then(({ data: { session } }) => {
         setUserId(session?.user?.id ?? null)
@@ -589,20 +594,26 @@ export default function HomeworkDetailPage() {
         s.id === subId ? { ...s, comments: [...(s.comments ?? []), newComment] } : s
       ))
       setNewComments(prev => ({ ...prev, [subId]: '' }))
+    } catch (e: unknown) {
+      toast.error('코멘트 작성 실패: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setSubmittingComment(null)
     }
   }
 
   async function handleEditComment(subId: string, comment: Comment, newBody: string) {
-    const updated = await apiFetch<Comment>(`/api/submissions/${subId}/comments/${comment.id}`, {
-      method: 'PATCH', body: JSON.stringify({ body: newBody }),
-    })
-    setSubmissions(prev => prev.map(s =>
-      s.id === subId
-        ? { ...s, comments: (s.comments ?? []).map(c => c.id === comment.id ? updated : c) }
-        : s
-    ))
+    try {
+      const updated = await apiFetch<Comment>(`/api/submissions/${subId}/comments/${comment.id}`, {
+        method: 'PATCH', body: JSON.stringify({ body: newBody }),
+      })
+      setSubmissions(prev => prev.map(s =>
+        s.id === subId
+          ? { ...s, comments: (s.comments ?? []).map(c => c.id === comment.id ? updated : c) }
+          : s
+      ))
+    } catch (e: unknown) {
+      toast.error('코멘트 수정 실패: ' + (e instanceof Error ? e.message : String(e)))
+    }
   }
 
   const TABS: { key: Tab; label: string }[] = [

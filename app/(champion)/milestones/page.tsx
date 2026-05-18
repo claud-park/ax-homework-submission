@@ -4,6 +4,7 @@ import { apiFetch, apiUpload } from '@/lib/api-client'
 import type { Milestone, DeadlineChangeRequest } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
 import DateRangePicker from '@/components/DateRangePicker'
+import { toast } from 'sonner'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -39,8 +40,8 @@ export default function MilestonesPage() {
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
   useEffect(() => {
-    apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones)
-    apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests)
+    apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones).catch((e: Error) => toast.error('마일스톤 목록 로드 실패: ' + e.message))
+    apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests).catch((e: Error) => toast.error('기한 변경 요청 로드 실패: ' + e.message))
   }, [])
 
   // Group by homework, sorted by homework id asc, standalone ('독립 WBS') last
@@ -78,8 +79,10 @@ export default function MilestonesPage() {
       setMilestones(prev => [...prev, created])
       setShowForm(false)
       setForm({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('마일스톤 추가에 실패했습니다.')
+      toast.error('마일스톤 생성 실패: ' + msg)
     }
   }
 
@@ -91,8 +94,10 @@ export default function MilestonesPage() {
       await apiUpload(`/api/milestones/${id}/deliverables`, body)
       const updated = await apiFetch<MilestoneWithHomework[]>('/api/milestones')
       setMilestones(updated)
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('파일 업로드에 실패했습니다.')
+      toast.error('파일 업로드 실패: ' + msg)
     }
   }
 
@@ -100,8 +105,10 @@ export default function MilestonesPage() {
     try {
       const { url } = await apiFetch<{ url: string; file_name: string }>(`/api/milestones/${milestoneId}/deliverables/download`)
       window.open(url, '_blank')
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('다운로드 링크를 가져올 수 없습니다.')
+      toast.error('다운로드 실패: ' + msg)
     }
   }
 
@@ -112,8 +119,10 @@ export default function MilestonesPage() {
         method: 'PATCH', body: JSON.stringify({ is_manual_progress: true }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('상태 변경에 실패했습니다.')
+      toast.error('상태 변경 실패: ' + msg)
     }
   }
 
@@ -138,8 +147,10 @@ export default function MilestonesPage() {
       setDeadlineModal(null)
       setReqForm({ requested_due_date: '', reason: '' })
       showSuccess(existingReqId ? '기한 변경 요청이 수정되었습니다.' : '기한 변경 요청이 제출되었습니다. 관리자 검토 후 반영됩니다.')
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('기한 변경 요청에 실패했습니다.')
+      toast.error('기한변경 요청 실패: ' + msg)
     }
   }
 
@@ -162,8 +173,10 @@ export default function MilestonesPage() {
       setMilestones(prev => prev.map(m => m.id === updated.id ? { ...updated, homeworks: m.homeworks } : m))
       setEditingMilestone(null)
       showSuccess('마일스톤이 수정되었습니다.')
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('수정에 실패했습니다.')
+      toast.error('마일스톤 수정 실패: ' + msg)
     } finally {
       setEditSaving(false)
     }
@@ -177,8 +190,10 @@ export default function MilestonesPage() {
       setEditingMilestone(null)
       setConfirmDeleteId(null)
       showSuccess('마일스톤이 삭제되었습니다.')
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('삭제에 실패했습니다.')
+      toast.error('마일스톤 삭제 실패: ' + msg)
     }
   }
 

@@ -6,6 +6,7 @@ import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
 import type { Homework, ProjectCharter, CharterSubmission } from '@/lib/types'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
+import { toast } from 'sonner'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
 
@@ -207,6 +208,8 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
         })
         onUpdated(updated)
       }
+    } catch (e: unknown) {
+      toast.error('저장 실패: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setSaving(false)
     }
@@ -348,8 +351,8 @@ export default function CharterPage() {
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
 
   useEffect(() => {
-    apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions)
-    apiFetch<Homework[]>('/api/homeworks').then(setHomeworks)
+    apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions).catch((e: Error) => toast.error('과제정의서 목록 로드 실패: ' + e.message))
+    apiFetch<Homework[]>('/api/homeworks').then(setHomeworks).catch((e: Error) => toast.error('과제 목록 로드 실패: ' + e.message))
   }, [])
 
   // Build homework title lookup
