@@ -10,6 +10,9 @@ import DOMPurify from 'dompurify'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 import DateRangePicker from '@/components/DateRangePicker'
 import { toast } from 'sonner'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
 
 // ─── shared constants ────────────────────────────────────────────────────────
 
@@ -460,14 +463,15 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
       )}
 
       {/* Edit modal */}
-      {editingMilestone && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.65)' }}>
-          <div className="w-full max-w-md mx-4 p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>마일스톤 편집</h3>
-              <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '18px', lineHeight: 1 }}>✕</button>
-            </div>
+      <Dialog
+        open={!!editingMilestone}
+        onOpenChange={open => { if (!open) { setEditingMilestone(null); setConfirmDeleteId(null) } }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>마일스톤 편집</DialogTitle>
+          </DialogHeader>
+          {editingMilestone && (
             <form onSubmit={handleEditSave} className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
@@ -501,13 +505,12 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                <DialogFooter className="border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
                   <button type="button" onClick={() => setConfirmDeleteId(editingMilestone.id)}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold"
+                    className="px-3 py-2 rounded-lg text-xs font-semibold mr-auto"
                     style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
                     삭제
                   </button>
-                  <div className="flex-1" />
                   <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
                     className="px-3 py-2 rounded-lg text-xs"
                     style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
@@ -516,12 +519,12 @@ function MilestonesTab({ homeworkId }: { homeworkId: number }) {
                   <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
                     {editSaving ? '저장 중...' : '저장'}
                   </button>
-                </div>
+                </DialogFooter>
               )}
             </form>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -732,6 +735,12 @@ export default function HomeworkDetailPage() {
                     <textarea
                       value={newComments[sub.id] ?? ''}
                       onChange={e => setNewComments(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                      onKeyDown={e => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddComment(sub.id)
+                        }
+                      }}
                       placeholder="코멘트 입력..." rows={2}
                       className="w-full text-xs rounded-lg p-2 resize-none"
                       style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />

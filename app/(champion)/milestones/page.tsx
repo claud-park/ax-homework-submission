@@ -5,6 +5,9 @@ import type { Milestone, DeadlineChangeRequest } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
 import DateRangePicker from '@/components/DateRangePicker'
 import { toast } from 'sonner'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -401,44 +404,46 @@ export default function MilestonesPage() {
       )}
 
       {/* Re-submission confirmation dialog */}
-      {confirmResubmitId && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="w-full max-w-sm p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)' }}>
-            <p className="text-sm mb-5" style={{ color: 'var(--text-primary)' }}>
+      <Dialog open={!!confirmResubmitId} onOpenChange={open => { if (!open) setConfirmResubmitId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>과제 재제출</DialogTitle>
+            <DialogDescription>
               과제 파일을 다시 제출하면 다시 승인을 받아야 합니다. 그래도 재제출 하시겠어요?
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirmResubmitId(null)}
-                className="px-4 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
-              >
-                아니요
-              </button>
-              <button
-                onClick={() => {
-                  resubmitInputRefs.current.get(confirmResubmitId)?.click()
-                  setConfirmResubmitId(null)
-                }}
-                className="px-4 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--blue-600)', color: '#fff' }}
-              >
-                네
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => setConfirmResubmitId(null)}
+              className="px-4 py-2 rounded-lg text-xs font-semibold"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+            >
+              아니요
+            </button>
+            <button
+              onClick={() => {
+                if (confirmResubmitId) resubmitInputRefs.current.get(confirmResubmitId)?.click()
+                setConfirmResubmitId(null)
+              }}
+              className="px-4 py-2 rounded-lg text-xs font-semibold"
+              style={{ background: 'var(--blue-600)', color: '#fff' }}
+            >
+              네
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit milestone modal */}
-      {editingMilestone && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.65)' }}>
-          <div className="w-full max-w-md mx-4 p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>마일스톤 편집</h3>
-              <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '18px', lineHeight: 1 }}>✕</button>
-            </div>
+      <Dialog
+        open={!!editingMilestone}
+        onOpenChange={open => { if (!open) { setEditingMilestone(null); setConfirmDeleteId(null) } }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>마일스톤 편집</DialogTitle>
+          </DialogHeader>
+          {editingMilestone && (
             <form onSubmit={handleEditSave} className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
@@ -468,13 +473,12 @@ export default function MilestonesPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                <DialogFooter className="border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
                   <button type="button" onClick={() => setConfirmDeleteId(editingMilestone.id)}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold"
+                    className="px-3 py-2 rounded-lg text-xs font-semibold mr-auto"
                     style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
                     삭제
                   </button>
-                  <div className="flex-1" />
                   <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
                     className="px-3 py-2 rounded-lg text-xs"
                     style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
@@ -483,32 +487,37 @@ export default function MilestonesPage() {
                   <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
                     {editSaving ? '저장 중...' : '저장'}
                   </button>
-                </div>
+                </DialogFooter>
               )}
             </form>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Deadline request modal */}
-      {deadlineModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <form onSubmit={handleDeadlineRequest} className="w-full max-w-sm p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)' }}>
-            <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>{deadlineModal?.existingReqId ? '기한 변경 요청 수정' : '기한 변경 요청'}</h3>
-            <div className="flex flex-col gap-3">
-              <div>
-                <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>현재 마감일: {deadlineModal.due_date}</p>
-                <DatePicker value={reqForm.requested_due_date} onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))} required placeholder="새 마감일 선택" style={{ ...inputStyle, width: '100%' }} />
-              </div>
+      <Dialog
+        open={!!deadlineModal}
+        onOpenChange={open => { if (!open) { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) } }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{deadlineModal?.existingReqId ? '기한 변경 요청 수정' : '기한 변경 요청'}</DialogTitle>
+            {deadlineModal && (
+              <DialogDescription>현재 마감일: {deadlineModal.due_date}</DialogDescription>
+            )}
+          </DialogHeader>
+          {deadlineModal && (
+            <form onSubmit={handleDeadlineRequest} className="flex flex-col gap-3">
+              <DatePicker value={reqForm.requested_due_date} onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))} required placeholder="새 마감일 선택" style={{ ...inputStyle, width: '100%' }} />
               <textarea value={reqForm.reason} onChange={e => setReqForm(r => ({ ...r, reason: e.target.value }))} placeholder="변경 사유" rows={3} required style={{ ...inputStyle, resize: 'none', width: '100%' }} />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button type="submit" className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>요청 보내기</button>
-              <button type="button" onClick={() => setDeadlineModal(null)} className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
-            </div>
-          </form>
-        </div>
-      )}
+              <DialogFooter>
+                <button type="button" onClick={() => { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) }} className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
+                <button type="submit" className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>요청 보내기</button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
