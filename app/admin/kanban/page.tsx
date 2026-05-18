@@ -18,8 +18,8 @@ const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: strin
   { key: 'declined',    label: '불합격',  color: 'var(--error)',           cardBorder: 'rgba(220,38,38,0.3)',    cardBg: 'rgba(220,38,38,0.04)',     avatarBg: 'rgba(220,38,38,0.12)'      },
 ]
 
-const DRAGGABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
-const DROPPABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
+const DRAGGABLE_COLS: KanbanColumn[] = ['reviewing']
+const DROPPABLE_COLS: KanbanColumn[] = ['accepted', 'declined']
 
 function cardDragId(card: KanbanCard) {
   return `${card.userId}_${card.homeworkId}`
