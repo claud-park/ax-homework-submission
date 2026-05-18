@@ -231,6 +231,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
         dirtyRef.current = false
         onUpdated(updated)
       }
+      toast.success('과제정의서가 저장되었습니다.')
     } catch (e: unknown) {
       toast.error('저장 실패: ' + (e instanceof Error ? e.message : String(e)))
     } finally {

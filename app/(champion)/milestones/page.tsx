@@ -8,6 +8,11 @@ import { toast } from 'sonner'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -33,13 +38,10 @@ export default function MilestonesPage() {
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; existingReqId?: string } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [confirmResubmitId, setConfirmResubmitId] = useState<string | null>(null)
   const [editingMilestone, setEditingMilestone] = useState<MilestoneWithHomework | null>(null)
   const [editForm, setEditForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
   useEffect(() => {
@@ -64,12 +66,6 @@ export default function MilestonesPage() {
       .map(([key, g]) => ({ key, ...g }))
   }, [milestones])
 
-  function showSuccess(msg: string) {
-    setSuccess(msg)
-    if (successTimer.current) clearTimeout(successTimer.current)
-    successTimer.current = setTimeout(() => setSuccess(null), 4000)
-  }
-
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!form.start_date || !form.due_date) { setError('작업 기간을 선택해주세요.'); return }
@@ -82,6 +78,7 @@ export default function MilestonesPage() {
       setMilestones(prev => [...prev, created])
       setShowForm(false)
       setForm({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
+      toast.success('마일스톤이 추가되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       setError('마일스톤 추가에 실패했습니다.')
@@ -97,6 +94,7 @@ export default function MilestonesPage() {
       await apiUpload(`/api/milestones/${id}/deliverables`, body)
       const updated = await apiFetch<MilestoneWithHomework[]>('/api/milestones')
       setMilestones(updated)
+      toast.success('파일이 업로드되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       setError('파일 업로드에 실패했습니다.')
@@ -122,6 +120,7 @@ export default function MilestonesPage() {
         method: 'PATCH', body: JSON.stringify({ is_manual_progress: true }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+      toast.success('상태가 변경되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       setError('상태 변경에 실패했습니다.')
@@ -149,7 +148,7 @@ export default function MilestonesPage() {
       )
       setDeadlineModal(null)
       setReqForm({ requested_due_date: '', reason: '' })
-      showSuccess(existingReqId ? '기한 변경 요청이 수정되었습니다.' : '기한 변경 요청이 제출되었습니다. 관리자 검토 후 반영됩니다.')
+      toast.success(existingReqId ? '기한 변경 요청이 수정되었습니다.' : '기한 변경 요청이 제출되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       setError('기한 변경 요청에 실패했습니다.')
@@ -160,7 +159,6 @@ export default function MilestonesPage() {
   function openEdit(m: MilestoneWithHomework) {
     setEditingMilestone(m)
     setEditForm({ week_number: String(m.week_number), title: m.title, start_date: m.start_date, due_date: m.due_date })
-    setConfirmDeleteId(null)
   }
 
   async function handleEditSave(e: React.FormEvent) {
@@ -175,7 +173,7 @@ export default function MilestonesPage() {
       })
       setMilestones(prev => prev.map(m => m.id === updated.id ? { ...updated, homeworks: m.homeworks } : m))
       setEditingMilestone(null)
-      showSuccess('마일스톤이 수정되었습니다.')
+      toast.success('마일스톤이 수정되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       setError('수정에 실패했습니다.')
@@ -191,8 +189,7 @@ export default function MilestonesPage() {
       await apiFetch(`/api/milestones/${id}`, { method: 'DELETE' })
       setMilestones(prev => prev.filter(m => m.id !== id))
       setEditingMilestone(null)
-      setConfirmDeleteId(null)
-      showSuccess('마일스톤이 삭제되었습니다.')
+      toast.success('마일스톤이 삭제되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       setError('삭제에 실패했습니다.')
@@ -243,12 +240,6 @@ export default function MilestonesPage() {
           </div>
           <button type="submit" className="px-4 py-2 rounded-lg text-xs font-semibold self-start" style={{ background: 'var(--blue-600)', color: '#fff' }}>저장</button>
         </form>
-      )}
-
-      {success && (
-        <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(22,163,74,0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
-          ✓ {success}
-        </div>
       )}
 
       {error && (
@@ -437,7 +428,7 @@ export default function MilestonesPage() {
       {/* Edit milestone modal */}
       <Dialog
         open={!!editingMilestone}
-        onOpenChange={open => { if (!open) { setEditingMilestone(null); setConfirmDeleteId(null) } }}
+        onOpenChange={open => { if (!open) setEditingMilestone(null) }}
       >
         <DialogContent>
           <DialogHeader>
@@ -464,31 +455,35 @@ export default function MilestonesPage() {
                 />
               </div>
 
-              {confirmDeleteId === editingMilestone.id ? (
-                <div className="p-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid var(--error)' }}>
-                  <p className="text-xs mb-2" style={{ color: 'var(--error)' }}>정말 삭제하시겠습니까? 되돌릴 수 없습니다.</p>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
-                    <button type="button" onClick={() => handleDelete(editingMilestone.id)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--error)', color: '#fff' }}>삭제 확인</button>
-                  </div>
-                </div>
-              ) : (
-                <DialogFooter className="border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
-                  <button type="button" onClick={() => setConfirmDeleteId(editingMilestone.id)}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold mr-auto"
-                    style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
-                    삭제
-                  </button>
-                  <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
-                    className="px-3 py-2 rounded-lg text-xs"
-                    style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
-                    취소
-                  </button>
-                  <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
-                    {editSaving ? '저장 중...' : '저장'}
-                  </button>
-                </DialogFooter>
-              )}
+              <DialogFooter className="border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button type="button"
+                      className="px-3 py-2 rounded-lg text-xs font-semibold mr-auto"
+                      style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
+                      삭제
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>마일스톤 삭제</AlertDialogTitle>
+                      <AlertDialogDescription>정말 삭제하시겠습니까? 되돌릴 수 없습니다.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>취소</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(editingMilestone.id)}>삭제</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <button type="button" onClick={() => setEditingMilestone(null)}
+                  className="px-3 py-2 rounded-lg text-xs"
+                  style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
+                  취소
+                </button>
+                <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
+                  {editSaving ? '저장 중...' : '저장'}
+                </button>
+              </DialogFooter>
             </form>
           )}
         </DialogContent>

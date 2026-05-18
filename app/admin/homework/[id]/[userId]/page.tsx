@@ -122,6 +122,7 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
     try {
       await apiFetch(`/api/admin/submissions/${subId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
       setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: status as Submission['status'] } : s))
+      toast.success(status === 'accepted' ? '합격 처리되었습니다.' : '불합격 처리되었습니다.')
     } catch (e) {
       toast.error('상태 변경 실패: ' + (e as Error).message)
     } finally { setSaving(false) }
@@ -136,6 +137,7 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
       })
       setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, comments: [...(s.comments ?? []), newComment] } : s))
       setComment('')
+      toast.success('코멘트가 작성되었습니다.')
     } catch (e) {
       toast.error('코멘트 저장 실패: ' + (e as Error).message)
     } finally { setSaving(false) }
@@ -149,6 +151,7 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
       setSubmissions(prev => prev.map(s =>
         s.id === subId ? { ...s, comments: (s.comments ?? []).map(cm => cm.id === c.id ? updated : cm) } : s
       ))
+      toast.success('코멘트가 수정되었습니다.')
     } catch (e) {
       toast.error('코멘트 수정 실패: ' + (e as Error).message)
     }
@@ -458,6 +461,7 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
       })
       setComments(prev => [...prev, { ...created, replies: [] }])
       setNewComment('')
+      toast.success('피드백이 작성되었습니다.')
     } catch (e) {
       toast.error('피드백 작성 실패: ' + (e as Error).message)
     } finally { setPosting(false) }
@@ -471,6 +475,7 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
         { method: 'POST', body: JSON.stringify({ body }) }
       )
       setComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: [...(c.replies ?? []), created] } : c))
+      toast.success('답글이 작성되었습니다.')
     } catch (e) {
       toast.error('답글 작성 실패: ' + (e as Error).message)
     }
@@ -482,6 +487,7 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
         method: 'PATCH', body: JSON.stringify({ body }),
       })
       setComments(prev => updateCommentInTree(prev, updated))
+      toast.success('피드백이 수정되었습니다.')
     } catch (e) {
       toast.error('피드백 수정 실패: ' + (e as Error).message)
     }
@@ -493,6 +499,7 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
         method: 'PATCH', body: JSON.stringify({ is_resolved }),
       })
       setComments(prev => prev.map(c => c.id === commentId ? { ...updated, replies: c.replies } : c))
+      toast.success(is_resolved ? '피드백이 해결됨으로 표시되었습니다.' : '피드백이 미해결로 표시되었습니다.')
     } catch (e) {
       toast.error('해결 상태 변경 실패: ' + (e as Error).message)
     }

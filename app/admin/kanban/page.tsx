@@ -266,6 +266,7 @@ export default function AdminKanbanPage() {
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus }),
       })
+      toast.success('상태가 변경되었습니다.')
     } catch {
       toast.error('상태 변경 실패. 되돌립니다.')
       fetchKanban()
