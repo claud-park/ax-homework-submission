@@ -5,7 +5,9 @@ import {
   PointerSensor, useSensor, useSensors, useDroppable,
 } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
+import { SubmissionDetailPanel } from '@/components/SubmissionDetailPanel'
 import type { Homework, KanbanCard, KanbanColumn, KanbanDataV2, SubmissionStatus } from '@/lib/types'
 
 const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: string; cardBg: string; avatarBg: string }[] = [
@@ -16,8 +18,8 @@ const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: strin
   { key: 'declined',    label: '불합격',  color: 'var(--error)',           cardBorder: 'rgba(220,38,38,0.3)',    cardBg: 'rgba(220,38,38,0.04)',     avatarBg: 'rgba(220,38,38,0.12)'      },
 ]
 
-const DRAGGABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
-const DROPPABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
+const DRAGGABLE_COLS: KanbanColumn[] = ['reviewing']
+const DROPPABLE_COLS: KanbanColumn[] = ['accepted', 'declined']
 
 function cardDragId(card: KanbanCard) {
   return `${card.userId}_${card.homeworkId}`
@@ -38,12 +40,16 @@ function KanbanCardView({
   card,
   col,
   draggable,
+  clickable,
   showHomework,
+  onClick,
 }: {
   card: KanbanCard
   col: typeof COLS[0]
   draggable: boolean
+  clickable: boolean
   showHomework: boolean
+  onClick?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: cardDragId(card),
@@ -55,16 +61,27 @@ function KanbanCardView({
     ? Math.round((card.milestoneCompleted / card.milestoneTotal) * 100)
     : 0
 
+  const cursor = draggable ? 'grab' : clickable ? 'pointer' : 'default'
+
   return (
     <div
       ref={setNodeRef}
       {...(draggable ? { ...attributes, ...listeners } : {})}
-      className="rounded-xl border text-xs p-3"
+      onClick={clickable ? onClick : undefined}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick?.()
+        }
+      } : undefined}
+      className="rounded-xl border text-xs p-3 transition-shadow hover:shadow-md"
       style={{
         background: col.cardBg,
         borderColor: col.cardBorder,
         opacity: isDragging ? 0.4 : 1,
-        cursor: draggable ? 'grab' : 'default',
+        cursor,
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       }}
     >
@@ -143,18 +160,23 @@ function KanbanCardView({
   )
 }
 
+const CLICKABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
+
 function DroppableCol({
   col,
   cards,
   showHomework,
   isDropTarget,
+  onCardClick,
 }: {
   col: typeof COLS[0]
   cards: KanbanCard[]
   showHomework: boolean
   isDropTarget: boolean
+  onCardClick: (card: KanbanCard) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.key, disabled: !isDropTarget })
+  const isClickable = CLICKABLE_COLS.includes(col.key)
 
   return (
     <div
@@ -185,7 +207,9 @@ function DroppableCol({
             card={card}
             col={col}
             draggable={DRAGGABLE_COLS.includes(col.key)}
+            clickable={isClickable}
             showHomework={showHomework}
+            onClick={() => onCardClick(card)}
           />
         ))}
       </div>
@@ -206,18 +230,13 @@ export default function AdminKanbanPage() {
   const [selectedHw, setSelectedHw] = useState<string>('')
   const [data, setData] = useState<KanbanDataV2>(EMPTY_DATA)
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
-  }
-
   const fetchKanban = useCallback(() => {
     const url = selectedHw ? `/api/admin/kanban?homework_id=${selectedHw}` : '/api/admin/kanban'
-    apiFetch<KanbanDataV2>(url).then(setData).catch(() => showToast('데이터 로드 실패'))
+    apiFetch<KanbanDataV2>(url).then(setData).catch(() => toast.error('데이터 로드 실패'))
   }, [selectedHw])
 
   useEffect(() => {
@@ -271,8 +290,9 @@ export default function AdminKanbanPage() {
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus }),
       })
+      toast.success('상태가 변경되었습니다.')
     } catch {
-      showToast('상태 변경 실패. 되돌립니다.')
+      toast.error('상태 변경 실패. 되돌립니다.')
       fetchKanban()
     }
   }
@@ -304,19 +324,6 @@ export default function AdminKanbanPage() {
         </select>
       </div>
 
-      {toast && (
-        <div
-          className="mb-4 p-3 rounded-lg text-sm"
-          style={{
-            background: 'rgba(220,38,38,0.1)',
-            color: 'var(--error)',
-            border: '1px solid var(--error)',
-          }}
-        >
-          {toast}
-        </div>
-      )}
-
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
           {COLS.map(col => (
@@ -326,6 +333,7 @@ export default function AdminKanbanPage() {
               cards={data[col.key]}
               showHomework={showHomework}
               isDropTarget={DROPPABLE_COLS.includes(col.key)}
+              onCardClick={setSelectedCard}
             />
           ))}
         </div>
@@ -335,11 +343,19 @@ export default function AdminKanbanPage() {
               card={activeCard}
               col={COLS.find(c => c.key === colForStatus(activeCard.latestSubmission!.status))!}
               draggable={false}
+              clickable={false}
               showHomework={showHomework}
             />
           )}
         </DragOverlay>
       </DndContext>
+
+      <SubmissionDetailPanel
+        card={selectedCard}
+        open={selectedCard !== null}
+        onOpenChange={(open) => { if (!open) setSelectedCard(null) }}
+        onStatusChanged={fetchKanban}
+      />
     </div>
   )
 }

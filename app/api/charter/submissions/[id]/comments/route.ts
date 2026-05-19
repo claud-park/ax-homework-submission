@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { notifyNewComment } from '@/lib/notifications'
 
 async function getCharterAndVerifyAccess(
   supabase: ReturnType<typeof createServiceClient>,
@@ -57,5 +58,61 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
+  void (async () => {
+    try {
+      const authorRole: 'admin' | 'user' = isAdmin ? 'admin' : 'user'
+      const { data: charterRow } = await supabase
+        .from('charter_submissions')
+        .select('user_id, project_name, users(name, email)')
+        .eq('id', params.id)
+        .single()
+      if (!charterRow) {
+        console.warn('[email] skipped notifyNewComment: charter lookup returned null', { charterId: params.id })
+        return
+      }
+      const champ = charterRow.users as { name: string; email: string } | { name: string; email: string }[] | null
+      const champRow = Array.isArray(champ) ? champ[0] : champ
+      const appBase = process.env.APP_BASE_URL ?? 'http://localhost:3000'
+      const contextTitle = `과제정의서 - ${charterRow.project_name ?? champRow?.name ?? ''}`
+
+      let recipientEmail: string | undefined
+      let recipientName: string
+      let authorName: string
+      let link: string
+
+      if (authorRole === 'admin') {
+        if (!champRow?.email) {
+          console.warn('[email] skipped notifyNewComment: champion email missing', { userId: charterRow.user_id })
+          return
+        }
+        recipientEmail = champRow.email
+        recipientName = champRow.name
+        authorName = '관리자'
+        link = `${appBase}/charter`
+      } else {
+        recipientEmail = process.env.ADMIN_NOTIFICATION_EMAIL
+        if (!recipientEmail) return
+        recipientName = '관리자'
+        authorName = champRow?.name ?? '챔피언'
+        link = `${appBase}/admin/progress`
+      }
+
+      await notifyNewComment({
+        recipientEmail,
+        recipientName,
+        authorName,
+        authorRole,
+        contextTitle,
+        body: data.body,
+        isReply: false,
+        link,
+      })
+    } catch (e) {
+      console.error('[email] outer catch:', e)
+    }
+  })()
+
   return NextResponse.json(data, { status: 201 })
 }

@@ -6,6 +6,20 @@ import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
 import type { Homework, ProjectCharter, CharterSubmission } from '@/lib/types'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Spinner } from '@/components/ui/spinner'
+import { EmptyState } from '@/components/ui/empty-state'
+import { FileText } from 'lucide-react'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
 
@@ -148,13 +162,14 @@ const SECTIONS: { key: SectionKey; label: string; required?: boolean }[] = [
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
 
-function SectionEditor({ label, required, content, onBlur }: {
-  label: string; required?: boolean; content: string; onBlur: (html: string) => void
+function SectionEditor({ label, required, content, onBlur, onDirty }: {
+  label: string; required?: boolean; content: string; onBlur: (html: string) => void; onDirty?: () => void
 }) {
   const editor = useEditor({
     extensions: [StarterKit, Underline],
     content,
     onBlur: ({ editor }) => onBlur(editor.getHTML()),
+    onUpdate: () => onDirty?.(),
   })
   return (
     <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
@@ -181,10 +196,21 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
   const [projectName, setProjectName] = useState(submission?.project_name ?? '')
   const [homeworkId, setHomeworkId] = useState<number | ''>(submission?.homework_id ?? '')
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const contentRef = useRef<CharterContent>(submission?.content ?? {})
+  const dirtyRef = useRef<boolean>(false)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
 
   function handleSectionBlur(key: SectionKey, html: string) {
     contentRef.current = { ...contentRef.current, [key]: html }
+  }
+
+  function handleCloseRequest() {
+    if (dirtyRef.current) {
+      setShowUnsavedDialog(true)
+    } else {
+      onClose()
+    }
   }
 
   async function handleSave() {
@@ -199,32 +225,42 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
             homework_id: homeworkId !== '' ? homeworkId : null,
           }),
         })
+        dirtyRef.current = false
         onCreated(newSub)
       } else {
         const updated = await apiFetch<CharterSubmission>(`/api/charter/submissions/${submission!.id}`, {
           method: 'PATCH',
           body: JSON.stringify({ project_name: projectName, content: contentRef.current }),
         })
+        dirtyRef.current = false
         onUpdated(updated)
       }
+      toast.success('과제정의서가 저장되었습니다.')
+    } catch (e: unknown) {
+      toast.error('저장 실패: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setSaving(false)
     }
   }
 
-  async function exportDocx() {
-    const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
-    const { saveAs } = await import('file-saver')
-    const src = contentRef.current
-    const sections = SECTIONS.map(s => [
-      new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? ''), break: 1 })] }),
-    ]).flat()
-    const doc = new Document({
-      sections: [{ children: [new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }), ...sections] }],
-    })
-    const blob = await Packer.toBlob(doc)
-    saveAs(blob, `과제정의서_${projectName || 'charter'}.docx`)
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
+      const { saveAs } = await import('file-saver')
+      const src = contentRef.current
+      const sections = SECTIONS.map(s => [
+        new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
+        new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? ''), break: 1 })] }),
+      ]).flat()
+      const doc = new Document({
+        sections: [{ children: [new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }), ...sections] }],
+      })
+      const blob = await Packer.toBlob(doc)
+      saveAs(blob, `과제정의서_${projectName || 'charter'}.docx`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -232,7 +268,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
       {/* Panel header */}
       <div className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
         <button
-          onClick={onClose}
+          onClick={handleCloseRequest}
           className="text-xs px-2 py-1 rounded"
           style={{ color: 'var(--text-secondary)', background: 'var(--surface-secondary)' }}
         >
@@ -241,7 +277,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
         <div className="flex flex-col flex-1 min-w-0 gap-1">
           <textarea
             value={projectName}
-            onChange={e => setProjectName(e.target.value)}
+            onChange={e => { dirtyRef.current = true; setProjectName(e.target.value) }}
             placeholder="프로젝트명을 입력하세요"
             rows={1}
             className="text-sm font-semibold bg-transparent outline-none resize-none w-full"
@@ -262,11 +298,16 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
         </div>
         <div className="flex gap-2 flex-shrink-0">
           <button
-            onClick={exportDocx}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
             style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
           >
-            📄 DOCX
+            {exporting ? (
+              <><Spinner size="sm" className="inline" /> 내보내는 중...</>
+            ) : (
+              '📄 DOCX'
+            )}
           </button>
           <button
             onClick={handleSave}
@@ -294,10 +335,24 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
               required={s.required}
               content={(submission?.content ?? {})[s.key] ?? ''}
               onBlur={html => handleSectionBlur(s.key, html)}
+              onDirty={() => { dirtyRef.current = true }}
             />
           ))}
         </div>
       </div>
+
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>저장하지 않은 변경사항이 있습니다</AlertDialogTitle>
+            <AlertDialogDescription>닫으면 변경사항이 사라집니다. 정말 닫으시겠습니까?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>계속 편집</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowUnsavedDialog(false); dirtyRef.current = false; onClose() }}>닫기</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -348,8 +403,8 @@ export default function CharterPage() {
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
 
   useEffect(() => {
-    apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions)
-    apiFetch<Homework[]>('/api/homeworks').then(setHomeworks)
+    apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions).catch((e: Error) => toast.error('과제정의서 목록 로드 실패: ' + e.message))
+    apiFetch<Homework[]>('/api/homeworks').then(setHomeworks).catch((e: Error) => toast.error('과제 목록 로드 실패: ' + e.message))
   }, [])
 
   // Build homework title lookup
@@ -415,10 +470,11 @@ export default function CharterPage() {
         {/* List body */}
         <div className="flex-1 overflow-y-auto">
           {submissions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2" style={{ color: 'var(--text-disabled)' }}>
-              <p className="text-sm">아직 제출한 과제정의서가 없습니다.</p>
-              <p className="text-xs">+ 과제정의서를 추가해주세요.</p>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="과제정의서가 없습니다"
+              description="과제정의서를 추가해주세요."
+            />
           ) : sidePanel !== null ? (
             // Compressed list — grouped by homework
             <div>

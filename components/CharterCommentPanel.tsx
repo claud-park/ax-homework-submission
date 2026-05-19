@@ -237,6 +237,12 @@ export function CharterCommentPanel({ charterId }: { charterId: string }) {
 
       <div className="p-3 border-t shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
         <textarea value={newBody} onChange={e => setNewBody(e.target.value)}
+          onKeyDown={e => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              e.preventDefault()
+              handlePost()
+            }
+          }}
           placeholder="새 코멘트 작성..."
           rows={2}
           className="w-full text-xs rounded-lg p-2 resize-none mb-2"

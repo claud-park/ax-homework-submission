@@ -12,7 +12,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'hsl(var(--background))' }}>
       <div className="w-full max-w-sm p-8 rounded-2xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
         <h1 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>AX Homework</h1>
         <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>챔피언 로그인</p>

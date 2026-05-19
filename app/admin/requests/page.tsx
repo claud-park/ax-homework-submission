@@ -1,7 +1,15 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { DeadlineChangeRequest } from '@/lib/types'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Inbox } from 'lucide-react'
 
 const STATUS_COLOR: Record<string, string> = {
   pending: 'var(--amber)', approved: 'var(--success)', rejected: 'var(--error)',
@@ -16,10 +24,15 @@ export default function AdminRequestsPage() {
   }, [])
 
   async function handleReview(id: string, status: 'approved' | 'rejected', review_note?: string) {
-    const updated = await apiFetch<DeadlineChangeRequest>(`/api/admin/deadline-requests/${id}`, {
-      method: 'PATCH', body: JSON.stringify({ status, review_note }),
-    })
-    setRequests(prev => prev.map(r => r.id === id ? updated : r))
+    try {
+      const updated = await apiFetch<DeadlineChangeRequest>(`/api/admin/deadline-requests/${id}`, {
+        method: 'PATCH', body: JSON.stringify({ status, review_note }),
+      })
+      setRequests(prev => prev.map(r => r.id === id ? updated : r))
+      toast.success(status === 'approved' ? '승인되었습니다.' : '반려되었습니다.')
+    } catch (e) {
+      toast.error('승인/반려 처리 실패: ' + (e as Error).message)
+    }
   }
 
   // Per milestone: all pending + most recent resolved
@@ -72,17 +85,45 @@ export default function AdminRequestsPage() {
             </div>
             {req.status === 'pending' && (
               <div className="flex gap-2 mt-3">
-                <button onClick={() => handleReview(req.id, 'approved')} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}>
-                  ✓ 승인
-                </button>
-                <button onClick={() => handleReview(req.id, 'rejected')} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
-                  ✗ 반려
-                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}>
+                      ✓ 승인
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>기한변경 요청 승인</AlertDialogTitle>
+                      <AlertDialogDescription>마일스톤 마감일이 요청 날짜로 변경됩니다. 진행하시겠습니까?</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>취소</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleReview(req.id, 'approved')}>승인</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
+                      ✗ 반려
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>기한변경 요청 반려</AlertDialogTitle>
+                      <AlertDialogDescription>이 요청을 반려하시겠습니까?</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>취소</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleReview(req.id, 'rejected')}>반려</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             )}
           </div>
         ))}
-        {displayed.length === 0 && <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>기한 변경 요청이 없습니다.</p>}
+        {displayed.length === 0 && <EmptyState icon={Inbox} title="대기 중인 요청이 없습니다" />}
       </div>
     </div>
   )

@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { Submission, Comment, CharterSubmission, CharterComment, Milestone } from '@/lib/types'
 import ReactMarkdown from 'react-markdown'
 import DOMPurify from 'dompurify'
+import { FullPageSpinner, Spinner } from '@/components/ui/spinner'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -121,6 +123,9 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
     try {
       await apiFetch(`/api/admin/submissions/${subId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
       setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: status as Submission['status'] } : s))
+      toast.success(status === 'accepted' ? '합격 처리되었습니다.' : '불합격 처리되었습니다.')
+    } catch (e) {
+      toast.error('상태 변경 실패: ' + (e as Error).message)
     } finally { setSaving(false) }
   }
 
@@ -133,16 +138,24 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
       })
       setSubmissions(prev => prev.map(s => s.id === subId ? { ...s, comments: [...(s.comments ?? []), newComment] } : s))
       setComment('')
+      toast.success('코멘트가 작성되었습니다.')
+    } catch (e) {
+      toast.error('코멘트 저장 실패: ' + (e as Error).message)
     } finally { setSaving(false) }
   }
 
   async function handleEditComment(subId: string, c: Comment, newBody: string) {
-    const updated = await apiFetch<Comment>(`/api/admin/submissions/${subId}/comments/${c.id}`, {
-      method: 'PATCH', body: JSON.stringify({ body: newBody }),
-    })
-    setSubmissions(prev => prev.map(s =>
-      s.id === subId ? { ...s, comments: (s.comments ?? []).map(cm => cm.id === c.id ? updated : cm) } : s
-    ))
+    try {
+      const updated = await apiFetch<Comment>(`/api/admin/submissions/${subId}/comments/${c.id}`, {
+        method: 'PATCH', body: JSON.stringify({ body: newBody }),
+      })
+      setSubmissions(prev => prev.map(s =>
+        s.id === subId ? { ...s, comments: (s.comments ?? []).map(cm => cm.id === c.id ? updated : cm) } : s
+      ))
+      toast.success('코멘트가 수정되었습니다.')
+    } catch (e) {
+      toast.error('코멘트 수정 실패: ' + (e as Error).message)
+    }
   }
 
   const activeSub = submissions.find(s => s.id === activeSubId)
@@ -245,7 +258,7 @@ function FilePanelContent({ submission, fileUrl }: { submission: Submission; fil
 
   if (!fileUrl) return (
     <div className="flex items-center justify-center h-32">
-      <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>파일 URL 로딩 중...</p>
+      <Spinner size="md" />
     </div>
   )
 
@@ -449,36 +462,54 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
       })
       setComments(prev => [...prev, { ...created, replies: [] }])
       setNewComment('')
+      toast.success('피드백이 작성되었습니다.')
+    } catch (e) {
+      toast.error('피드백 작성 실패: ' + (e as Error).message)
     } finally { setPosting(false) }
   }
 
   async function handleReply(parentId: string, body: string) {
     if (!charter || charter === 'loading') return
-    const created = await apiFetch<CharterComment>(
-      `/api/charter/submissions/${charter.id}/comments/${parentId}/replies`,
-      { method: 'POST', body: JSON.stringify({ body }) }
-    )
-    setComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: [...(c.replies ?? []), created] } : c))
+    try {
+      const created = await apiFetch<CharterComment>(
+        `/api/charter/submissions/${charter.id}/comments/${parentId}/replies`,
+        { method: 'POST', body: JSON.stringify({ body }) }
+      )
+      setComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: [...(c.replies ?? []), created] } : c))
+      toast.success('답글이 작성되었습니다.')
+    } catch (e) {
+      toast.error('답글 작성 실패: ' + (e as Error).message)
+    }
   }
 
   async function handleEdit(commentId: string, body: string) {
-    const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}`, {
-      method: 'PATCH', body: JSON.stringify({ body }),
-    })
-    setComments(prev => updateCommentInTree(prev, updated))
+    try {
+      const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}`, {
+        method: 'PATCH', body: JSON.stringify({ body }),
+      })
+      setComments(prev => updateCommentInTree(prev, updated))
+      toast.success('피드백이 수정되었습니다.')
+    } catch (e) {
+      toast.error('피드백 수정 실패: ' + (e as Error).message)
+    }
   }
 
   async function handleResolve(commentId: string, is_resolved: boolean) {
-    const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}/resolve`, {
-      method: 'PATCH', body: JSON.stringify({ is_resolved }),
-    })
-    setComments(prev => prev.map(c => c.id === commentId ? { ...updated, replies: c.replies } : c))
+    try {
+      const updated = await apiFetch<CharterComment>(`/api/charter/comments/${commentId}/resolve`, {
+        method: 'PATCH', body: JSON.stringify({ is_resolved }),
+      })
+      setComments(prev => prev.map(c => c.id === commentId ? { ...updated, replies: c.replies } : c))
+      toast.success(is_resolved ? '피드백이 해결됨으로 표시되었습니다.' : '피드백이 미해결로 표시되었습니다.')
+    } catch (e) {
+      toast.error('해결 상태 변경 실패: ' + (e as Error).message)
+    }
   }
 
   const unresolvedCount = comments.filter(c => !c.is_resolved).length
   const filtered = filter === 'unresolved' ? comments.filter(c => !c.is_resolved) : comments
 
-  if (charter === 'loading') return <p className="text-sm p-4" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>
+  if (charter === 'loading') return <FullPageSpinner />
 
   if (charter === null) return (
     <div className="p-6 text-center">
@@ -574,9 +605,10 @@ function MilestonesAdminTab({ homeworkId, userId }: { homeworkId: number; userId
   useEffect(() => {
     apiFetch<Milestone[]>(`/api/milestones?homework_id=${homeworkId}&user_id=${userId}`)
       .then(data => { setMilestones(data); setLoading(false) })
+      .catch((e: Error) => { toast.error('마일스톤 로드 실패: ' + e.message); setLoading(false) })
   }, [homeworkId, userId])
 
-  if (loading) return <p className="text-sm p-4" style={{ color: 'var(--text-disabled)' }}>로딩 중...</p>
+  if (loading) return <FullPageSpinner />
 
   if (milestones.length === 0) return (
     <div className="p-6 text-center">

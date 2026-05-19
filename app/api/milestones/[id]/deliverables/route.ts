@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { notifyNewSubmission, notifyMilestoneCompleted } from '@/lib/notifications'
+import type { Submission } from '@/lib/types'
 
 function sanitizeFileName(name: string): string {
   const dotIdx = name.lastIndexOf('.')
@@ -50,27 +52,58 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   await supabase.from('milestones').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', params.id).eq('user_id', user.id)
 
   // On re-submission: also create a homework submission (week_number → homework_id)
+  let createdSubmission: Submission | null = null
+  let resubmitHomeworkId: number | null = null
   if (isResubmit) {
-    const homeworkId = milestone.week_number
+    resubmitHomeworkId = milestone.week_number
     const { count } = await supabase
       .from('submissions')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .eq('homework_id', homeworkId)
+      .eq('homework_id', resubmitHomeworkId)
     const attemptNumber = (count ?? 0) + 1
-    const subFilePath = `${user.id}/${homeworkId}/${attemptNumber}/${safeFileName}`
+    const subFilePath = `${user.id}/${resubmitHomeworkId}/${attemptNumber}/${safeFileName}`
     await supabase.storage
       .from('submissions')
       .upload(subFilePath, arrayBuffer, { contentType: file.type, upsert: false })
-    await supabase.from('submissions').insert({
+    const { data: subRow } = await supabase.from('submissions').insert({
       user_id: user.id,
-      homework_id: homeworkId,
+      homework_id: resubmitHomeworkId,
       file_path: subFilePath,
       file_name: file.name,
       status: 'pending',
       attempt_number: attemptNumber,
-    })
+    }).select().single()
+    createdSubmission = subRow
   }
+
+  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
+  void (async () => {
+    try {
+      const { data: userRow } = await supabase.from('users').select('*').eq('id', user.id).single()
+      if (!userRow) {
+        console.warn('[email] skipped milestone deliverable notification: user lookup returned null', { userId: user.id })
+        return
+      }
+      if (isResubmit && createdSubmission && resubmitHomeworkId !== null) {
+        const { data: homework } = await supabase.from('homeworks').select('*').eq('id', resubmitHomeworkId).single()
+        if (!homework) {
+          console.warn('[email] skipped notifyNewSubmission: homework lookup returned null', { homeworkId: resubmitHomeworkId })
+          return
+        }
+        await notifyNewSubmission({ user: userRow, homework, submission: createdSubmission })
+      } else if (!isResubmit) {
+        const { data: milestoneFull } = await supabase.from('milestones').select('*').eq('id', params.id).single()
+        if (!milestoneFull) {
+          console.warn('[email] skipped notifyMilestoneCompleted: milestone lookup returned null', { milestoneId: params.id })
+          return
+        }
+        await notifyMilestoneCompleted({ user: userRow, milestone: milestoneFull, fileName: file.name })
+      }
+    } catch (e) {
+      console.error('[email] outer catch:', e)
+    }
+  })()
 
   return NextResponse.json({ ok: true }, { status: 201 })
 }

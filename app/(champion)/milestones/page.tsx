@@ -4,6 +4,17 @@ import { apiFetch, apiUpload } from '@/lib/api-client'
 import type { Milestone, DeadlineChangeRequest } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
 import DateRangePicker from '@/components/DateRangePicker'
+import { toast } from 'sonner'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ListTodo } from 'lucide-react'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -29,18 +40,15 @@ export default function MilestonesPage() {
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; existingReqId?: string } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [confirmResubmitId, setConfirmResubmitId] = useState<string | null>(null)
   const [editingMilestone, setEditingMilestone] = useState<MilestoneWithHomework | null>(null)
   const [editForm, setEditForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
   useEffect(() => {
-    apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones)
-    apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests)
+    apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones).catch((e: Error) => toast.error('마일스톤 목록 로드 실패: ' + e.message))
+    apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests).catch((e: Error) => toast.error('기한 변경 요청 로드 실패: ' + e.message))
   }, [])
 
   // Group by homework, sorted by homework id asc, standalone ('독립 WBS') last
@@ -60,12 +68,6 @@ export default function MilestonesPage() {
       .map(([key, g]) => ({ key, ...g }))
   }, [milestones])
 
-  function showSuccess(msg: string) {
-    setSuccess(msg)
-    if (successTimer.current) clearTimeout(successTimer.current)
-    successTimer.current = setTimeout(() => setSuccess(null), 4000)
-  }
-
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!form.start_date || !form.due_date) { setError('작업 기간을 선택해주세요.'); return }
@@ -78,8 +80,11 @@ export default function MilestonesPage() {
       setMilestones(prev => [...prev, created])
       setShowForm(false)
       setForm({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
-    } catch {
+      toast.success('마일스톤이 추가되었습니다.')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('마일스톤 추가에 실패했습니다.')
+      toast.error('마일스톤 생성 실패: ' + msg)
     }
   }
 
@@ -91,8 +96,11 @@ export default function MilestonesPage() {
       await apiUpload(`/api/milestones/${id}/deliverables`, body)
       const updated = await apiFetch<MilestoneWithHomework[]>('/api/milestones')
       setMilestones(updated)
-    } catch {
+      toast.success('파일이 업로드되었습니다.')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('파일 업로드에 실패했습니다.')
+      toast.error('파일 업로드 실패: ' + msg)
     }
   }
 
@@ -100,8 +108,10 @@ export default function MilestonesPage() {
     try {
       const { url } = await apiFetch<{ url: string; file_name: string }>(`/api/milestones/${milestoneId}/deliverables/download`)
       window.open(url, '_blank')
-    } catch {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('다운로드 링크를 가져올 수 없습니다.')
+      toast.error('다운로드 실패: ' + msg)
     }
   }
 
@@ -112,8 +122,11 @@ export default function MilestonesPage() {
         method: 'PATCH', body: JSON.stringify({ is_manual_progress: true }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
-    } catch {
+      toast.success('상태가 변경되었습니다.')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('상태 변경에 실패했습니다.')
+      toast.error('상태 변경 실패: ' + msg)
     }
   }
 
@@ -137,16 +150,17 @@ export default function MilestonesPage() {
       )
       setDeadlineModal(null)
       setReqForm({ requested_due_date: '', reason: '' })
-      showSuccess(existingReqId ? '기한 변경 요청이 수정되었습니다.' : '기한 변경 요청이 제출되었습니다. 관리자 검토 후 반영됩니다.')
-    } catch {
+      toast.success(existingReqId ? '기한 변경 요청이 수정되었습니다.' : '기한 변경 요청이 제출되었습니다.')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('기한 변경 요청에 실패했습니다.')
+      toast.error('기한변경 요청 실패: ' + msg)
     }
   }
 
   function openEdit(m: MilestoneWithHomework) {
     setEditingMilestone(m)
     setEditForm({ week_number: String(m.week_number), title: m.title, start_date: m.start_date, due_date: m.due_date })
-    setConfirmDeleteId(null)
   }
 
   async function handleEditSave(e: React.FormEvent) {
@@ -161,9 +175,11 @@ export default function MilestonesPage() {
       })
       setMilestones(prev => prev.map(m => m.id === updated.id ? { ...updated, homeworks: m.homeworks } : m))
       setEditingMilestone(null)
-      showSuccess('마일스톤이 수정되었습니다.')
-    } catch {
+      toast.success('마일스톤이 수정되었습니다.')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('수정에 실패했습니다.')
+      toast.error('마일스톤 수정 실패: ' + msg)
     } finally {
       setEditSaving(false)
     }
@@ -175,10 +191,11 @@ export default function MilestonesPage() {
       await apiFetch(`/api/milestones/${id}`, { method: 'DELETE' })
       setMilestones(prev => prev.filter(m => m.id !== id))
       setEditingMilestone(null)
-      setConfirmDeleteId(null)
-      showSuccess('마일스톤이 삭제되었습니다.')
-    } catch {
+      toast.success('마일스톤이 삭제되었습니다.')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       setError('삭제에 실패했습니다.')
+      toast.error('마일스톤 삭제 실패: ' + msg)
     }
   }
 
@@ -227,12 +244,6 @@ export default function MilestonesPage() {
         </form>
       )}
 
-      {success && (
-        <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(22,163,74,0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
-          ✓ {success}
-        </div>
-      )}
-
       {error && (
         <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
           {error}
@@ -240,9 +251,11 @@ export default function MilestonesPage() {
       )}
 
       {milestones.length === 0 ? (
-        <p className="p-6 text-center text-sm" style={{ color: 'var(--text-disabled)' }}>
-          아직 마일스톤이 없습니다. 추가해보세요.
-        </p>
+        <EmptyState
+          icon={ListTodo}
+          title="마일스톤이 없습니다"
+          description="아래에서 첫 마일스톤을 추가해보세요."
+        />
       ) : (
         <div className="flex flex-col gap-6">
           {groups.map(({ key, hwId, hwTitle, items }) => {
@@ -386,44 +399,46 @@ export default function MilestonesPage() {
       )}
 
       {/* Re-submission confirmation dialog */}
-      {confirmResubmitId && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="w-full max-w-sm p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)' }}>
-            <p className="text-sm mb-5" style={{ color: 'var(--text-primary)' }}>
+      <Dialog open={!!confirmResubmitId} onOpenChange={open => { if (!open) setConfirmResubmitId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>과제 재제출</DialogTitle>
+            <DialogDescription>
               과제 파일을 다시 제출하면 다시 승인을 받아야 합니다. 그래도 재제출 하시겠어요?
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirmResubmitId(null)}
-                className="px-4 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
-              >
-                아니요
-              </button>
-              <button
-                onClick={() => {
-                  resubmitInputRefs.current.get(confirmResubmitId)?.click()
-                  setConfirmResubmitId(null)
-                }}
-                className="px-4 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--blue-600)', color: '#fff' }}
-              >
-                네
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={() => setConfirmResubmitId(null)}
+              className="px-4 py-2 rounded-lg text-xs font-semibold"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+            >
+              아니요
+            </button>
+            <button
+              onClick={() => {
+                if (confirmResubmitId) resubmitInputRefs.current.get(confirmResubmitId)?.click()
+                setConfirmResubmitId(null)
+              }}
+              className="px-4 py-2 rounded-lg text-xs font-semibold"
+              style={{ background: 'var(--blue-600)', color: '#fff' }}
+            >
+              네
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit milestone modal */}
-      {editingMilestone && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.65)' }}>
-          <div className="w-full max-w-md mx-4 p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', boxShadow: '0 12px 40px rgba(0,0,0,0.2)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>마일스톤 편집</h3>
-              <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '18px', lineHeight: 1 }}>✕</button>
-            </div>
+      <Dialog
+        open={!!editingMilestone}
+        onOpenChange={open => { if (!open) setEditingMilestone(null) }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>마일스톤 편집</DialogTitle>
+          </DialogHeader>
+          {editingMilestone && (
             <form onSubmit={handleEditSave} className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
@@ -444,56 +459,64 @@ export default function MilestonesPage() {
                 />
               </div>
 
-              {confirmDeleteId === editingMilestone.id ? (
-                <div className="p-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid var(--error)' }}>
-                  <p className="text-xs mb-2" style={{ color: 'var(--error)' }}>정말 삭제하시겠습니까? 되돌릴 수 없습니다.</p>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setConfirmDeleteId(null)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
-                    <button type="button" onClick={() => handleDelete(editingMilestone.id)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--error)', color: '#fff' }}>삭제 확인</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex gap-2 pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-                  <button type="button" onClick={() => setConfirmDeleteId(editingMilestone.id)}
-                    className="px-3 py-2 rounded-lg text-xs font-semibold"
-                    style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
-                    삭제
-                  </button>
-                  <div className="flex-1" />
-                  <button type="button" onClick={() => { setEditingMilestone(null); setConfirmDeleteId(null) }}
-                    className="px-3 py-2 rounded-lg text-xs"
-                    style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
-                    취소
-                  </button>
-                  <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
-                    {editSaving ? '저장 중...' : '저장'}
-                  </button>
-                </div>
-              )}
+              <DialogFooter className="border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button type="button"
+                      className="px-3 py-2 rounded-lg text-xs font-semibold mr-auto"
+                      style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
+                      삭제
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>마일스톤 삭제</AlertDialogTitle>
+                      <AlertDialogDescription>정말 삭제하시겠습니까? 되돌릴 수 없습니다.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>취소</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(editingMilestone.id)}>삭제</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <button type="button" onClick={() => setEditingMilestone(null)}
+                  className="px-3 py-2 rounded-lg text-xs"
+                  style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
+                  취소
+                </button>
+                <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
+                  {editSaving ? '저장 중...' : '저장'}
+                </button>
+              </DialogFooter>
             </form>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Deadline request modal */}
-      {deadlineModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <form onSubmit={handleDeadlineRequest} className="w-full max-w-sm p-6 rounded-2xl" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)' }}>
-            <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>{deadlineModal?.existingReqId ? '기한 변경 요청 수정' : '기한 변경 요청'}</h3>
-            <div className="flex flex-col gap-3">
-              <div>
-                <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>현재 마감일: {deadlineModal.due_date}</p>
-                <DatePicker value={reqForm.requested_due_date} onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))} required placeholder="새 마감일 선택" style={{ ...inputStyle, width: '100%' }} />
-              </div>
+      <Dialog
+        open={!!deadlineModal}
+        onOpenChange={open => { if (!open) { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) } }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{deadlineModal?.existingReqId ? '기한 변경 요청 수정' : '기한 변경 요청'}</DialogTitle>
+            {deadlineModal && (
+              <DialogDescription>현재 마감일: {deadlineModal.due_date}</DialogDescription>
+            )}
+          </DialogHeader>
+          {deadlineModal && (
+            <form onSubmit={handleDeadlineRequest} className="flex flex-col gap-3">
+              <DatePicker value={reqForm.requested_due_date} onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))} required placeholder="새 마감일 선택" style={{ ...inputStyle, width: '100%' }} />
               <textarea value={reqForm.reason} onChange={e => setReqForm(r => ({ ...r, reason: e.target.value }))} placeholder="변경 사유" rows={3} required style={{ ...inputStyle, resize: 'none', width: '100%' }} />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button type="submit" className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>요청 보내기</button>
-              <button type="button" onClick={() => setDeadlineModal(null)} className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
-            </div>
-          </form>
-        </div>
-      )}
+              <DialogFooter>
+                <button type="button" onClick={() => { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) }} className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
+                <button type="submit" className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>요청 보내기</button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

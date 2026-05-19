@@ -3,10 +3,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 const NAV = [
-  { label: '📋 과제', href: '/' },
-  { label: '📄 과제정의서', href: '/charter' },
-  { label: '📅 WBS', href: '/milestones' },
-  { label: '📊 진척도', href: '/progress' },
+  { emoji: '📋', label: '과제', href: '/' },
+  { emoji: '📄', label: '과제정의서', href: '/charter' },
+  { emoji: '📅', label: 'WBS', href: '/milestones' },
+  { emoji: '📊', label: '진척도', href: '/progress' },
 ]
 
 export default function ChampionLayout({ children }: { children: React.ReactNode }) {
@@ -20,8 +20,8 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--background)' }}>
-      <aside className="w-44 flex-shrink-0 flex flex-col gap-1 p-4 border-r" style={{ background: 'var(--background)', borderColor: 'var(--border-subtle)' }}>
+    <div className="flex min-h-screen" style={{ background: 'hsl(var(--background))' }}>
+      <aside className="w-44 flex-shrink-0 flex flex-col gap-1 p-4 border-r" style={{ background: 'hsl(var(--background))', borderColor: 'var(--border-subtle)' }}>
         <span className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>AX Homework</span>
         {NAV.map(item => {
           const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
@@ -35,7 +35,7 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
                 color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
               }}
             >
-              {item.label}
+              <span aria-hidden="true">{item.emoji}</span> {item.label}
             </a>
           )
         })}
