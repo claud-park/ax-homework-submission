@@ -217,14 +217,16 @@ Single source of truth for the button-rule.
 | `app/admin/progress/page.tsx` | No code change — API filtering does the work. |
 | `app/(champion)/progress/page.tsx` | Filter to `publish_status = 'published'` only. Progress is a "what's done" metric; drafts are pre-work. |
 
-### Unsaved-changes dialog (charter + milestone modal)
+### Unsaved-changes dialog (charter)
 
-Existing charter dialog gets a third option. New milestone modal dialog mirrors it.
+Existing charter dialog gets a third option:
 
 ```
 "저장하지 않은 변경사항이 있습니다."
   [계속 편집]   [임시저장 후 닫기]   [저장 안 함]
 ```
+
+The milestone edit modal currently has no dirty tracking and discards changes on close — adding an unsaved-changes dialog there is meaningful UX work that is mostly orthogonal to drafting. Out of scope for this feature; tracked as a follow-up.
 
 ---
 
