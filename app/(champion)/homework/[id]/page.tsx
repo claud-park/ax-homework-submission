@@ -76,7 +76,7 @@ function CommentItem({ comment, isOwn, onEdit }: {
         {editing ? (
           <div className="flex-1">
             <textarea value={body} onChange={e => setBody(e.target.value)} rows={2}
-              className="w-full text-xs rounded p-2 resize-none"
+              className="w-full text-xs rounded p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-accent"
               style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
             <div className="flex gap-2 mt-1">
               <button onClick={() => { setEditing(false); setBody(comment.body) }}
@@ -120,14 +120,14 @@ function SectionEditor({ label, required, content, onBlur }: {
     onBlur: ({ editor }) => onBlur(editor.getHTML()),
   })
   return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+    <div className="rounded-xl border overflow-hidden focus-within:ring-2 focus-within:ring-blue-accent" style={{ borderColor: 'var(--border-subtle)' }}>
       <div className="flex items-center justify-between px-4 py-2 border-b"
         style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
         <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
         {required && <span className="text-xs" style={{ color: 'var(--amber)' }}>필수</span>}
       </div>
       <div style={{ background: 'var(--surface-secondary)' }}>
-        <EditorContent editor={editor} className="p-3 min-h-16 text-sm prose max-w-none" />
+        <EditorContent editor={editor} className="p-3 min-h-16 text-sm prose max-w-none [&_.ProseMirror]:outline-none" />
       </div>
     </div>
   )
@@ -194,12 +194,12 @@ function CharterEditor({ homeworkId, charter, onSaved }: {
             <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>프로젝트명</span>
             <span className="text-xs" style={{ color: 'var(--amber)' }}>필수</span>
           </div>
-          <textarea
+          <input
+            type="text"
             value={projectName}
             onChange={e => setProjectName(e.target.value)}
             placeholder="프로젝트명을 입력하세요"
-            rows={1}
-            className="w-full p-3 text-sm bg-transparent outline-none resize-none"
+            className="w-full p-3 text-sm bg-transparent outline-none"
             style={{ background: 'var(--surface-secondary)', color: 'var(--text-primary)' }}
           />
         </div>
@@ -661,7 +661,7 @@ export default function HomeworkDetailPage() {
       )}
 
       {/* Tab bar */}
-      <div className="flex border-b mb-6" style={{ borderColor: 'var(--border-subtle)' }}>
+      <div className="flex border-b mb-6 whitespace-nowrap" style={{ borderColor: 'var(--border-subtle)' }}>
         {TABS.map(t => (
           <button
             key={t.key}
@@ -755,7 +755,7 @@ export default function HomeworkDetailPage() {
                         }
                       }}
                       placeholder="코멘트 입력..." rows={2}
-                      className="w-full text-xs rounded-lg p-2 resize-none"
+                      className="w-full text-xs rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-accent"
                       style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
                     <button
                       onClick={() => handleAddComment(sub.id)}

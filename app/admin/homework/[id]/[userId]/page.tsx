@@ -7,6 +7,7 @@ import type { Submission, Comment, CharterSubmission, CharterComment, Milestone 
 import ReactMarkdown from 'react-markdown'
 import DOMPurify from 'dompurify'
 import { FullPageSpinner, Spinner } from '@/components/ui/spinner'
+import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ function AdminCommentItem({ comment, onEdit }: { comment: Comment; onEdit: (c: C
         {editing ? (
           <div className="flex-1">
             <textarea value={body} onChange={e => setBody(e.target.value)} rows={2}
-              className="w-full text-xs rounded p-2 resize-none"
+              className="w-full text-xs rounded p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-accent"
               style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
             <div className="flex gap-2 mt-1">
               <button onClick={() => { setEditing(false); setBody(comment.body) }}
@@ -102,6 +103,12 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
   const [activeSubId, setActiveSubId] = useState<string | null>(null)
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
+  const { width: previewWidth, onMouseDown: onResizePreview } = useResizableWidth({
+    initialWidth: 420,
+    min: 360,
+    max: 900,
+    side: 'left',
+  })
 
   useEffect(() => {
     apiFetch<Submission[]>(`/api/admin/homeworks/${homeworkId}/submissions/${userId}`).then(subs => {
@@ -211,7 +218,7 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
             )}
             <div className="mt-4">
               <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="코멘트 입력..." rows={3}
-                className="w-full text-sm rounded-lg p-3 resize-none"
+                className="w-full text-sm rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-accent"
                 style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
               <button onClick={() => handleComment(activeSub.id)} disabled={saving || !comment.trim()}
                 className="mt-2 px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"
@@ -224,9 +231,10 @@ function SubmissionTab({ homeworkId, userId }: { homeworkId: string; userId: str
 
       {/* Side panel: file preview */}
       {panelOpen && activeSub && (
-        <div className="flex flex-col rounded-xl border overflow-hidden"
-          style={{ width: '420px', minWidth: '360px', borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
-          <div className="flex items-center justify-between px-4 py-3 border-b shrink-0"
+        <div className="relative flex flex-col rounded-xl border overflow-hidden"
+          style={{ width: `${previewWidth}px`, borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
+          <ResizeHandle side="left" onMouseDown={onResizePreview} />
+          <div className="flex items-center justify-between px-4 py-3 border-b shrink-0 whitespace-nowrap"
             style={{ borderColor: 'var(--border-subtle)' }}>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{activeSub.file_name}</p>
@@ -545,7 +553,7 @@ function CharterReviewTab({ homeworkId, userId }: { homeworkId: number; userId: 
 
       {/* Right: feedback panel */}
       <div className="flex flex-col" style={{ width: '300px', minWidth: '280px' }}>
-        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b whitespace-nowrap" style={{ borderColor: 'var(--border-subtle)' }}>
           <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>피드백</span>
           <div className="flex gap-1.5">
             <button onClick={() => setFilter('unresolved')}
@@ -676,7 +684,7 @@ export default function SubmissionReviewPage() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b mb-6" style={{ borderColor: 'var(--border-subtle)' }}>
+      <div className="flex border-b mb-6 whitespace-nowrap" style={{ borderColor: 'var(--border-subtle)' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
             className="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors"

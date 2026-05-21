@@ -18,6 +18,7 @@ import { ListTodo } from 'lucide-react'
 import { DraftBadge } from '@/components/DraftBadge'
 import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
+import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -48,6 +49,23 @@ export default function MilestonesPage() {
   const [editForm, setEditForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const { width: listWidth, setWidth: setListWidth, onMouseDown: onResizeList } = useResizableWidth({
+    initialWidth: 320,
+    min: 240,
+    max: 1200,
+    side: 'right',
+  })
+
+  function openForm() {
+    if (!showForm && containerRef.current) {
+      setListWidth(Math.round(containerRef.current.getBoundingClientRect().width * 0.5))
+    }
+    setShowForm(true)
+  }
+  function closeForm() {
+    setShowForm(false)
+  }
 
   const [filter, setFilter] = useState<PublishFilterValue>(() => {
     if (typeof window === 'undefined') return 'all'
@@ -247,62 +265,43 @@ export default function MilestonesPage() {
   const COL_WIDTHS = ['72px', '22%', '30%', '20%', '20%']
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>주차별 WBS</h1>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{milestones.length}개 마일스톤</p>
-        </div>
-        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>
-          + 마일스톤 추가
-        </button>
-      </div>
-
-      <div className="mb-4">
-        <PublishStatusFilter value={filter} onChange={setFilter} />
-      </div>
-
-      {showForm && (
-        <form onSubmit={(e) => e.preventDefault()} className="mb-6 p-4 rounded-xl border flex flex-col gap-3" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
-              <input type="number" value={form.week_number} onChange={e => setForm(f => ({ ...f, week_number: e.target.value }))} min="1" required style={inputStyle} />
+    <div ref={containerRef} className="flex" style={{ height: 'calc(100vh - 48px)', minHeight: 0 }}>
+      {/* Left: header + filter + list */}
+      <div
+        className="relative flex flex-col flex-shrink-0 overflow-hidden"
+        style={{
+          width: showForm ? `${listWidth}px` : '100%',
+          borderRight: showForm ? '1px solid var(--border-subtle)' : 'none',
+        }}
+      >
+        {showForm && <ResizeHandle side="right" onMouseDown={onResizeList} />}
+        <div className="flex-1 overflow-y-auto pr-2">
+          <div className="flex items-center justify-between mb-6 whitespace-nowrap">
+            <div>
+              <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>주차별 WBS</h1>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{milestones.length}개 마일스톤</p>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-              <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
-            </div>
+            <button
+              onClick={() => (showForm ? closeForm() : openForm())}
+              className="px-4 py-2 rounded-lg text-xs font-semibold"
+              style={{
+                background: showForm ? 'rgba(37,99,235,0.15)' : 'var(--blue-600)',
+                color: showForm ? 'var(--blue-600)' : '#fff',
+              }}
+            >
+              + 마일스톤 추가
+            </button>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
-            <DateRangePicker
-              startDate={form.start_date}
-              endDate={form.due_date}
-              onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명</label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="선택사항" rows={2} style={{ ...inputStyle, resize: 'none', width: '100%' }} />
-          </div>
-          <div className="self-start">
-            <SaveOrPublishButtons
-              status="draft"
-              saving={false}
-              onSaveDraft={() => submitNew('draft')}
-              onPublish={() => submitNew('published')}
-              size="sm"
-            />
-          </div>
-        </form>
-      )}
 
-      {error && (
-        <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
-          {error}
-        </div>
-      )}
+          <div className="mb-4">
+            <PublishStatusFilter value={filter} onChange={setFilter} />
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
+              {error}
+            </div>
+          )}
 
       {milestones.length === 0 ? (
         <EmptyState
@@ -462,6 +461,57 @@ export default function MilestonesPage() {
               </div>
             )
           })}
+        </div>
+      )}
+        </div>
+      </div>
+
+      {/* Right: form panel */}
+      {showForm && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0 whitespace-nowrap" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
+            <button
+              onClick={closeForm}
+              className="text-xs px-2 py-1 rounded"
+              style={{ color: 'var(--text-secondary)', background: 'var(--surface-secondary)' }}
+            >
+              ✕
+            </button>
+            <span className="text-sm font-bold flex-1" style={{ color: 'var(--text-primary)' }}>마일스톤 추가</span>
+            <SaveOrPublishButtons
+              status="draft"
+              saving={false}
+              onSaveDraft={() => submitNew('draft')}
+              onPublish={() => submitNew('published')}
+              size="sm"
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto p-5">
+            <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
+                  <input type="number" value={form.week_number} onChange={e => setForm(f => ({ ...f, week_number: e.target.value }))} min="1" required style={inputStyle} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+                  <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
+                <DateRangePicker
+                  startDate={form.start_date}
+                  endDate={form.due_date}
+                  onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="선택사항" rows={2} style={{ ...inputStyle, resize: 'none', width: '100%' }} />
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

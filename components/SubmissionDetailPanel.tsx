@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { FullPageSpinner, Spinner } from '@/components/ui/spinner'
+import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 import type { KanbanCard, Submission, SubmissionStatus, Comment } from '@/lib/types'
 
 const STATUS_LABEL: Record<SubmissionStatus, string> = {
@@ -49,6 +50,12 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
   const [newComment, setNewComment] = useState('')
   const [posting, setPosting] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const { width: sheetWidth, onMouseDown: onResizeSheet } = useResizableWidth({
+    initialWidth: 520,
+    min: 380,
+    max: 1000,
+    side: 'left',
+  })
 
   const fetchDetail = useCallback(() => {
     if (!card) return
@@ -127,7 +134,12 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-[520px] overflow-y-auto">
+      <SheetContent
+        side="right"
+        className="overflow-y-auto !max-w-none"
+        style={{ width: `${sheetWidth}px` }}
+      >
+        <ResizeHandle side="left" onMouseDown={onResizeSheet} />
         <SheetHeader>
           <SheetTitle>{card.user.name}</SheetTitle>
           <SheetDescription>

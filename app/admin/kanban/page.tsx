@@ -301,7 +301,7 @@ export default function AdminKanbanPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 whitespace-nowrap">
         <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
           제출 현황 (Kanban)
         </h1>

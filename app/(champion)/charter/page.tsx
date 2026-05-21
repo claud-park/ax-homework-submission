@@ -23,6 +23,7 @@ import { FileText } from 'lucide-react'
 import { DraftBadge } from '@/components/DraftBadge'
 import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
+import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
 
@@ -175,13 +176,13 @@ function SectionEditor({ label, required, content, onBlur, onDirty }: {
     onUpdate: () => onDirty?.(),
   })
   return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+    <div className="rounded-xl border overflow-hidden focus-within:ring-2 focus-within:ring-blue-accent" style={{ borderColor: 'var(--border-subtle)' }}>
       <div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
         <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
         {required && <span className="text-xs" style={{ color: 'var(--amber)' }}>필수</span>}
       </div>
       <div style={{ background: 'var(--surface-secondary)' }}>
-        <EditorContent editor={editor} className="p-3 min-h-16 text-sm prose max-w-none" />
+        <EditorContent editor={editor} className="p-3 min-h-16 text-sm prose max-w-none [&_.ProseMirror]:outline-none" />
       </div>
     </div>
   )
@@ -284,7 +285,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
   return (
     <div className="flex flex-col h-full border-l" style={{ borderColor: 'var(--border-subtle)' }}>
       {/* Panel header */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
+      <div className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0 whitespace-nowrap" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
         <button
           onClick={handleCloseRequest}
           className="text-xs px-2 py-1 rounded"
@@ -293,12 +294,12 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
           ✕
         </button>
         <div className="flex flex-col flex-1 min-w-0 gap-1">
-          <textarea
+          <input
+            type="text"
             value={projectName}
             onChange={e => { dirtyRef.current = true; setProjectName(e.target.value) }}
             placeholder="프로젝트명을 입력하세요"
-            rows={1}
-            className="text-sm font-semibold bg-transparent outline-none resize-none w-full"
+            className="text-sm font-semibold bg-transparent outline-none w-full"
             style={{ color: 'var(--text-primary)' }}
           />
           {mode === 'new' && (
@@ -420,6 +421,22 @@ export default function CharterPage() {
   const [submissions, setSubmissions] = useState<CharterSubmission[]>([])
   const [homeworks, setHomeworks] = useState<Homework[]>([])
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const { width: listWidth, setWidth: setListWidth, onMouseDown: onResizeList } = useResizableWidth({
+    initialWidth: 272,
+    min: 220,
+    max: 1200,
+    side: 'right',
+  })
+
+  function openSidePanel(panel: Exclude<SidePanel, null>) {
+    if (sidePanel === null && containerRef.current) {
+      const hasCommentPanel = panel !== 'new' && panel.publish_status === 'published'
+      const ratio = hasCommentPanel ? 0.4 : 0.5
+      setListWidth(Math.round(containerRef.current.getBoundingClientRect().width * ratio))
+    }
+    setSidePanel(panel)
+  }
   const [filter, setFilter] = useState<PublishFilterValue>(() => {
     if (typeof window === 'undefined') return 'all'
     const q = new URLSearchParams(window.location.search).get('status') as PublishFilterValue | null
@@ -476,25 +493,25 @@ export default function CharterPage() {
   }
 
   return (
-    <div className="flex" style={{ height: 'calc(100vh - 40px)', minHeight: 0 }}>
+    <div ref={containerRef} className="flex" style={{ height: 'calc(100vh - 40px)', minHeight: 0 }}>
 
-      {/* Submission list — full-width when no panel, 272px when panel open */}
+      {/* Submission list — full-width when no panel, resizable when panel open */}
       <div
-        className="flex flex-col flex-shrink-0 overflow-hidden"
+        className="relative flex flex-col flex-shrink-0 overflow-hidden"
         style={{
-          width: sidePanel !== null ? '272px' : '100%',
+          width: sidePanel !== null ? `${listWidth}px` : '100%',
           borderRight: sidePanel !== null ? `1px solid var(--border-subtle)` : 'none',
-          transition: 'width 0.2s ease',
         }}
       >
+        {sidePanel !== null && <ResizeHandle side="right" onMouseDown={onResizeList} />}
         {/* List header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 whitespace-nowrap" style={{ borderColor: 'var(--border-subtle)' }}>
           <div className="flex items-center gap-3">
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</span>
             <PublishStatusFilter value={filter} onChange={setFilter} />
           </div>
           <button
-            onClick={() => setSidePanel('new')}
+            onClick={() => openSidePanel('new')}
             className="text-xs px-2.5 py-1 rounded-lg font-semibold"
             style={{
               background: sidePanel === 'new' ? 'rgba(37,99,235,0.15)' : 'var(--surface-secondary)',
@@ -533,7 +550,7 @@ export default function CharterPage() {
                         sub={sub}
                         compressed
                         active={activeId === sub.id}
-                        onClick={() => setSidePanel(sub)}
+                        onClick={() => openSidePanel(sub)}
                       />
                     ))}
                   </div>
@@ -565,7 +582,7 @@ export default function CharterPage() {
                           sub={sub}
                           compressed={false}
                           active={false}
-                          onClick={() => setSidePanel(sub)}
+                          onClick={() => openSidePanel(sub)}
                         />
                       ))}
                     </div>

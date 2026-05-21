@@ -33,7 +33,7 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 whitespace-nowrap">
         <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>대시보드</h1>
         <a href="/admin/homework/new">
           <button className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>

@@ -194,7 +194,7 @@ export function CharterCommentPanel({ charterId }: { charterId: string }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0"
+      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0 whitespace-nowrap"
         style={{ borderColor: 'var(--border-subtle)' }}>
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>피드백</span>

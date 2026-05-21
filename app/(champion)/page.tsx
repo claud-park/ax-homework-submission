@@ -54,7 +54,7 @@ export default function HomeworkListPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 whitespace-nowrap">
         <div>
           <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>과제 목록</h1>
           <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{homeworks.length}개 과제</p>
