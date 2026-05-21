@@ -23,6 +23,17 @@ export async function POST(req: NextRequest) {
   if (!milestone_id || !requested_due_date || !reason)
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
   const supabase = createServiceClient()
+
+  // Guard: reject deadline-change requests against draft milestones (defense-in-depth for notification gating)
+  const { data: msPub } = await supabase
+    .from('milestones')
+    .select('publish_status')
+    .eq('id', milestone_id)
+    .single()
+  if (!msPub || msPub.publish_status !== 'published') {
+    return NextResponse.json({ error: '게시되지 않은 마일스톤에는 기한 변경을 요청할 수 없습니다.' }, { status: 400 })
+  }
+
   const { data: ms } = await supabase.from('milestones').select('*').eq('id', milestone_id).eq('user_id', user.id).single()
   if (!ms) return NextResponse.json({ error: 'Milestone not found' }, { status: 404 })
 

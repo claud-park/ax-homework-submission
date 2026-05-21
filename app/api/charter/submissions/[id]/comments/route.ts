@@ -46,6 +46,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (charter === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { body } = await req.json()
   if (!body?.trim()) return NextResponse.json({ error: 'Body required' }, { status: 400 })
+
+  // Guard: reject comments against draft charter submissions (defense-in-depth for notification gating)
+  const { data: charterPub } = await supabase
+    .from('charter_submissions')
+    .select('publish_status')
+    .eq('id', params.id)
+    .single()
+  if (!charterPub || charterPub.publish_status !== 'published') {
+    return NextResponse.json({ error: '게시되지 않은 과제정의서에는 코멘트를 작성할 수 없습니다.' }, { status: 400 })
+  }
+
   const { data, error } = await supabase
     .from('charter_comments')
     .insert({
