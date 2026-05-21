@@ -20,6 +20,9 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FileText } from 'lucide-react'
+import { DraftBadge } from '@/components/DraftBadge'
+import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
+import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 
 type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
 
@@ -213,7 +216,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
     }
   }
 
-  async function handleSave() {
+  async function handleSave(targetStatus: 'draft' | 'published') {
     setSaving(true)
     try {
       if (mode === 'new') {
@@ -223,6 +226,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
             project_name: projectName,
             content: contentRef.current,
             homework_id: homeworkId !== '' ? homeworkId : null,
+            publish_status: targetStatus,
           }),
         })
         dirtyRef.current = false
@@ -230,14 +234,26 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
       } else {
         const updated = await apiFetch<CharterSubmission>(`/api/charter/submissions/${submission!.id}`, {
           method: 'PATCH',
-          body: JSON.stringify({ project_name: projectName, content: contentRef.current }),
+          body: JSON.stringify({
+            project_name: projectName,
+            content: contentRef.current,
+            publish_status: targetStatus,
+          }),
         })
         dirtyRef.current = false
         onUpdated(updated)
       }
-      toast.success('과제정의서가 저장되었습니다.')
+      toast.success(targetStatus === 'draft' ? '임시저장되었습니다.' : '게시되었습니다.')
     } catch (e: unknown) {
-      toast.error('저장 실패: ' + (e instanceof Error ? e.message : String(e)))
+      const msg = e instanceof Error ? e.message : String(e)
+      try {
+        const parsed = JSON.parse(msg)
+        if (parsed.error === 'validation_failed') {
+          toast.error('게시 실패: 필수 항목을 확인해주세요')
+          return
+        }
+      } catch { /* not JSON */ }
+      toast.error((targetStatus === 'draft' ? '임시저장 실패: ' : '게시 실패: ') + msg)
     } finally {
       setSaving(false)
     }
@@ -303,20 +319,15 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
             className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5"
             style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
           >
-            {exporting ? (
-              <><Spinner size="sm" className="inline" /> 내보내는 중...</>
-            ) : (
-              '📄 DOCX'
-            )}
+            {exporting ? (<><Spinner size="sm" className="inline" /> 내보내는 중...</>) : '📄 DOCX'}
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
-            style={{ background: 'var(--blue-600)', color: '#fff' }}
-          >
-            {saving ? '저장 중...' : mode === 'new' ? '제출하기' : '재제출하기'}
-          </button>
+          <SaveOrPublishButtons
+            status={submission?.publish_status}
+            saving={saving}
+            onSaveDraft={() => handleSave('draft')}
+            onPublish={() => handleSave('published')}
+            size="sm"
+          />
         </div>
       </div>
 
@@ -345,11 +356,22 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>저장하지 않은 변경사항이 있습니다</AlertDialogTitle>
-            <AlertDialogDescription>닫으면 변경사항이 사라집니다. 정말 닫으시겠습니까?</AlertDialogDescription>
+            <AlertDialogDescription>닫기 전에 어떻게 하시겠어요?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>계속 편집</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setShowUnsavedDialog(false); dirtyRef.current = false; onClose() }}>닫기</AlertDialogAction>
+            <button
+              onClick={async () => {
+                setShowUnsavedDialog(false)
+                await handleSave('draft')
+                onClose()
+              }}
+              className="px-4 py-2 rounded-lg text-xs font-semibold"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+            >
+              임시저장 후 닫기
+            </button>
+            <AlertDialogAction onClick={() => { setShowUnsavedDialog(false); dirtyRef.current = false; onClose() }}>저장 안 함</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -361,37 +383,32 @@ function SubmissionCard({ sub, compressed, active, onClick }: {
   sub: CharterSubmission; compressed: boolean; active: boolean; onClick: () => void
 }) {
   const date = new Date(sub.updated_at ?? sub.submitted_at).toLocaleDateString('ko-KR')
+  const isDraft = sub.publish_status === 'draft'
 
   if (compressed) {
     return (
-      <button
-        onClick={onClick}
-        className="w-full text-left px-3 py-2.5 border-b"
-        style={{
-          borderColor: 'var(--border-subtle)',
-          background: active ? 'rgba(37,99,235,0.08)' : 'transparent',
-        }}
-      >
-        <p className="text-xs font-semibold truncate" style={{ color: active ? 'var(--blue-600)' : 'var(--text-primary)' }}>
-          {sub.project_name || '(제목 없음)'}
-        </p>
+      <button onClick={onClick} className="w-full text-left px-3 py-2.5 border-b"
+        style={{ borderColor: 'var(--border-subtle)', background: active ? 'rgba(37,99,235,0.08)' : 'transparent' }}>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-semibold truncate flex-1" style={{ color: active ? 'var(--blue-600)' : 'var(--text-primary)' }}>
+            {sub.project_name || '(제목 없음)'}
+          </p>
+          {isDraft && <DraftBadge />}
+        </div>
         <p className="text-xs mt-0.5" style={{ color: 'var(--text-disabled)' }}>{date}</p>
       </button>
     )
   }
 
   return (
-    <button
-      onClick={onClick}
-      className="text-left p-4 rounded-xl border transition-colors"
-      style={{
-        borderColor: active ? 'var(--blue-600)' : 'var(--border-subtle)',
-        background: active ? 'rgba(37,99,235,0.06)' : 'var(--surface-primary)',
-      }}
-    >
-      <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-        {sub.project_name || '(제목 없음)'}
-      </p>
+    <button onClick={onClick} className="text-left p-4 rounded-xl border transition-colors"
+      style={{ borderColor: active ? 'var(--blue-600)' : 'var(--border-subtle)', background: active ? 'rgba(37,99,235,0.06)' : 'var(--surface-primary)' }}>
+      <div className="flex items-center gap-2 mb-1">
+        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {sub.project_name || '(제목 없음)'}
+        </p>
+        {isDraft && <DraftBadge />}
+      </div>
       <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>{date}</p>
     </button>
   )
@@ -401,6 +418,17 @@ export default function CharterPage() {
   const [submissions, setSubmissions] = useState<CharterSubmission[]>([])
   const [homeworks, setHomeworks] = useState<Homework[]>([])
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
+  const [filter, setFilter] = useState<PublishFilterValue>(() => {
+    if (typeof window === 'undefined') return 'all'
+    const q = new URLSearchParams(window.location.search).get('status') as PublishFilterValue | null
+    return q && ['all','published','draft'].includes(q) ? q : 'all'
+  })
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (filter === 'all') url.searchParams.delete('status')
+    else url.searchParams.set('status', filter)
+    window.history.replaceState({}, '', url.toString())
+  }, [filter])
 
   useEffect(() => {
     apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions).catch((e: Error) => toast.error('과제정의서 목록 로드 실패: ' + e.message))
@@ -410,10 +438,15 @@ export default function CharterPage() {
   // Build homework title lookup
   const hwMap = useMemo(() => new Map(homeworks.map(h => [h.id, h.title])), [homeworks])
 
+  const visibleSubmissions = useMemo(
+    () => filter === 'all' ? submissions : submissions.filter(s => s.publish_status === filter),
+    [submissions, filter]
+  )
+
   // Group submissions by homework_id, sorted by hw id asc, null last
   const groups = useMemo(() => {
     const map = new Map<string, { hwId: number | null; hwTitle: string | null; items: CharterSubmission[] }>()
-    for (const s of submissions) {
+    for (const s of visibleSubmissions) {
       const key = s.homework_id !== null ? String(s.homework_id) : '__none__'
       if (!map.has(key)) map.set(key, { hwId: s.homework_id, hwTitle: s.homework_id !== null ? (hwMap.get(s.homework_id) ?? null) : null, items: [] })
       map.get(key)!.items.push(s)
@@ -425,7 +458,7 @@ export default function CharterPage() {
         return Number(a) - Number(b)
       })
       .map(([key, g]) => ({ key, ...g }))
-  }, [submissions, hwMap])
+  }, [visibleSubmissions, hwMap])
 
   const panelKey = sidePanel === null ? '' : sidePanel === 'new' ? 'new' : sidePanel.id
   const activeId = sidePanel !== null && sidePanel !== 'new' ? sidePanel.id : null
@@ -454,7 +487,10 @@ export default function CharterPage() {
       >
         {/* List header */}
         <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
-          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</span>
+            <PublishStatusFilter value={filter} onChange={setFilter} />
+          </div>
           <button
             onClick={() => setSidePanel('new')}
             className="text-xs px-2.5 py-1 rounded-lg font-semibold"
@@ -553,7 +589,7 @@ export default function CharterPage() {
               onUpdated={handleUpdated}
             />
           </div>
-          {sidePanel !== 'new' && (
+          {sidePanel !== 'new' && sidePanel.publish_status === 'published' && (
             <div className="flex flex-col border-l" style={{ width: '300px', minWidth: '280px', borderColor: 'var(--border-subtle)' }}>
               <CharterCommentPanel key={sidePanel.id} charterId={sidePanel.id} />
             </div>
