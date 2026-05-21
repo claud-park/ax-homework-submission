@@ -1,6 +1,6 @@
 # AX Homework Submission Platform — PRD
 
-> **버전** 1.0 · **작성일** 2026-05-19 · **대상** Strategy Lead
+> **버전** 1.1 · **작성일** 2026-05-21 · **대상** Strategy Lead
 > **상태** Internal Review · **저장소** `AX/ax-homework-submission`
 
 ---
@@ -20,14 +20,16 @@
 | Charter 작성 | Word 첨부 | TipTap WYSIWYG + DOCX 내보내기 |
 | 진행 가시화 | 스프레드시트 수동 갱신 | Gantt + 칸반 자동 동기화 |
 | 검토 워크플로우 | 이메일 회람 | **단방향 DnD 칸반** (검토중 → 합격/불합격) |
-| 피드백 루프 | Slack/대면 | 양방향 댓글 + 이메일 자동 알림 (6 트리거) |
+| 피드백 루프 | Slack/대면 | 양방향 댓글 + 이메일 자동 알림 (7 트리거) |
+| 임시저장 | 없음 | Draft/Publish 이원화 (과제·Charter·Milestone) |
 | 데이터 보안 | 파일 서버 | Supabase RLS **DENY ALL** + 서버 API 단일 게이트웨이 |
+| 배포 자동화 | 수동 | GitHub Actions CI + Docker + Jenkins CD |
 
-### 현재 진척도 (2026-05-19 기준)
-- **기능 완성도**: 핵심 9개 영역 중 8개 완성 (88%) — 대시보드/리포팅만 골격 단계
-- **커밋 수**: 39+ (브랜치 `feature/ui-ux-enhancements` 32 commits)
-- **PR #1**: 머지 대기 중 (UI/UX 폴리시 마무리)
-- **데이터 모델**: 8개 핵심 테이블 + 2개 Storage 버킷, RLS 정책 적용 완료
+### 현재 진척도 (2026-05-21 기준)
+- **기능 완성도**: 핵심 11개 영역 중 9개 완성 (82%) — 대시보드/리포팅만 골격 단계
+- **커밋 수**: 50+ (임시저장·CI/CD·FK 수정 포함)
+- **데이터 모델**: 9개 핵심 테이블 + 3개 partial index + 2개 Storage 버킷, RLS 정책 적용 완료
+- **CI/CD**: GitHub Actions (lint·typecheck·build) + Docker + Jenkins 완료
 
 ### KPI 목표 (런칭 후 90일)
 | 지표 | 목표 | 측정 방식 |
@@ -141,12 +143,14 @@ flowchart LR
 | C2 | 과제 목록 (List/Board 뷰) | Next.js + dnd-kit | ✅ |
 | C3 | **Charter (과제정의서) 작성** | TipTap WYSIWYG, 6-section | ✅ |
 | C4 | Charter DOCX 내보내기 | `docx` 라이브러리 | ✅ |
-| C5 | Milestone (WBS) CRUD | 자동 상태 계산 | ✅ |
-| C6 | Milestone Gantt 시각화 | `gantt-task-react` | ✅ |
-| C7 | 산출물 업로드 | Supabase Storage | ✅ |
-| C8 | 기한변경 요청 | `deadline_change_requests` | ✅ |
-| C9 | 댓글 작성 / 답글 | 양방향 알림 | ✅ |
-| C10 | 진행상황 대시보드 | `/progress` | 🚧 골격 |
+| C5 | Charter 임시저장 / 게시 | `publish_status` enum | ✅ |
+| C6 | Milestone (WBS) CRUD | 자동 상태 계산 | ✅ |
+| C7 | Milestone Gantt 시각화 | `gantt-task-react` | ✅ |
+| C8 | Milestone 임시저장 / 게시 | `publish_status` enum | ✅ |
+| C9 | 산출물 업로드 | Supabase Storage | ✅ |
+| C10 | 기한변경 요청 | `deadline_change_requests` | ✅ |
+| C11 | 댓글 작성 / 답글 | 양방향 알림 | ✅ |
+| C12 | 진행상황 대시보드 | `/progress` | 🚧 골격 |
 
 #### Charter 6 섹션 구조
 1. **문제 정의 (AS-IS)** ⭐ 필수
@@ -159,12 +163,12 @@ flowchart LR
 ### 4.2 Admin Features
 | # | Feature | 핵심 기술 | 상태 |
 |---|---|---|---|
-| A1 | 과제 생성 / 편집 | TipTap (description) | ✅ |
+| A1 | 과제 생성 / 편집 (임시저장 포함) | TipTap (description) | ✅ |
 | A2 | **칸반 보드 (단방향 DnD)** | dnd-kit + 낙관적 업데이트 | ✅ |
-| A3 | 제출 상세 사이드 패널 | Sheet UI | ✅ |
+| A3 | 제출 상세 사이드 패널 | Sheet UI (리사이저블) | ✅ |
 | A4 | Charter 리뷰 & 댓글 | 양방향 알림 | ✅ |
 | A5 | 기한변경 요청 승인/거절 | 자동 마감일 갱신 | ✅ |
-| A6 | **이메일 알림 (6 트리거)** | Nodemailer + Gmail SMTP | ✅ |
+| A6 | **이메일 알림 (7 트리거)** | Nodemailer + Gmail SMTP | ✅ |
 | A7 | 전체 챔피언 진행 대시보드 | `/admin/progress` | 🚧 골격 |
 | A8 | 주간 리포트 | `/admin/reports/[week]` | 🚧 골격 |
 
@@ -175,7 +179,7 @@ flowchart LR
                               (단방향, 되돌릴 수 없음)
 ```
 
-### 4.3 Email Notification Matrix (6 Triggers)
+### 4.3 Email Notification Matrix (7 Triggers)
 | # | 트리거 이벤트 | Sender | Recipient | Function |
 |---|---|---|---|---|
 | E1 | Champion 과제 제출 | System | Admin | `notifyNewSubmission` |
@@ -184,7 +188,7 @@ flowchart LR
 | E4 | Admin이 제출물에 댓글 | System | Champion | `notifyNewComment` |
 | E5 | Champion이 Charter 댓글 | System | Admin | `notifyNewComment` |
 | E6 | Admin이 Charter 답글 | System | Champion | `notifyNewComment` |
-| (E7) | Milestone 산출물 업로드 | System | Admin | `notifyMilestoneCompleted` (추가됨) |
+| E7 | Milestone 산출물 업로드 | System | Admin | `notifyMilestoneCompleted` |
 
 ---
 
@@ -394,35 +398,41 @@ APP_BASE_URL
 ```
 
 ### 7.3 배포 옵션
-- **권장**: Vercel (Next.js 공식 호스팅)
-- **대안**: Node.js 셀프호스트 (`npm run build && npm run start`)
+- **운영**: Docker (Next.js standalone) + Jenkins CD (서버 직접 빌드·기동)
+- **CI**: GitHub Actions — PR 및 main push 시 `bun lint` · `typecheck` · `build` 검증
+- 상세: [`docs/deployment/docker.md`](deployment/docker.md)
 
 ---
 
 ## 8. Current Status & Roadmap
 
-### 8.1 As-Is (2026-05-19)
-- ✅ **MVP 완료**: 인증, Charter, Milestone, 제출, 칸반, 댓글, 이메일
-- ✅ **Design System**: shadcn/ui 통일 (Dialog, AlertDialog, Sheet, Toast)
-- 🚧 **PR #1**: `feature/ui-ux-enhancements` 32 commits 머지 대기
-- 🚧 **진행 중**: UI 폴리시 (CSS 토큰화, aria-label, 상태 배지)
+### 8.1 As-Is (2026-05-21)
+- ✅ **MVP 완료**: 인증, Charter, Milestone, 제출, 칸반, 댓글, 이메일 (7 트리거)
+- ✅ **Design System**: shadcn/ui 통일 (Dialog, AlertDialog, Sheet, Toast, 리사이저블 패널)
+- ✅ **임시저장 (Draft/Publish)**: 과제·Charter·Milestone 3종 완료
+- ✅ **CI/CD**: GitHub Actions (Bun) + Dockerfile + Docker Compose + Jenkins 가이드
+- 🚧 **미완성**: `/progress`, `/admin/progress`, `/admin/reports` — 골격만 존재
 
 ### 8.2 Roadmap
 
-| Phase | Scope | 기간 |
-|---|---|---|
-| **P0 — Stabilize** | PR #1 머지, 미해결 백로그 5건 처리, 보안 점검 | ~1주 |
-| **P1 — Insights** | Champion `/progress` + Admin `/admin/progress` 완성, 주간 리포트 | 2주 |
-| **P2 — Scale** | 어드민 다중화, 이메일 인프라 마이그레이션 (SendGrid/SES) | 2주 |
-| **P3 — Analytics** | 챔피언 성과 분석 대시보드, 코칭 인사이트 | 3주 |
-| **P4 — Reusability** | 화이트라벨화, 타 프로그램 적용 | TBD |
+| Phase | Scope | 예상 기간 | 공수 |
+|---|---|---|---|
+| **P0 — Stabilize** | 판정 취소 API, 이메일 에러 핸들링, CSS 변수 통일 | 1주 | 3 MD |
+| **P1 — Insights** | Champion `/progress` + Admin `/admin/progress` 완성, 주간 리포트 | 2주 | 6 MD |
+| **P2 — Scale** | 어드민 다중화, 이메일 인프라 마이그레이션 (SendGrid/SES) | 2주 | 6 MD |
+| **P3 — Analytics** | 챔피언 성과 분석 대시보드, 코칭 인사이트, In-app 알림 센터 | 3주 | 10 MD |
+| **P4 — Reusability** | 화이트라벨화, 타 프로그램 적용 | TBD | TBD |
 
-### 8.3 Backlog (Obsidian 기록 기준)
-1. Gmail 2FA → 앱 비밀번호 발급 (런칭 사전조건)
-2. `unwrapSingle<T>` 헬퍼 추출 (DB 응답 핸들링 중복 제거)
-3. UI 하드코딩 hex → CSS variable 통일 (~7개)
-4. Charter 답글 Ctrl+Enter 단축키
-5. 다크모드 지원 검토
+> 전체 WBS 및 공수 상세: [`docs/PRD-KO.md` §11](PRD-KO.md#11-wbs-및-개발-일정-공수-기준)
+
+### 8.3 Backlog
+1. 판정 취소 API — 오판정 복구 (P0 긴급)
+2. 이메일 `fire-and-forget` try-catch 래핑 (P0)
+3. Gmail 2FA → 앱 비밀번호 발급 (런칭 사전조건)
+4. `unwrapSingle<T>` 헬퍼 추출 (DB 응답 핸들링 중복 제거)
+5. UI 하드코딩 hex → CSS variable 통일 (~7개)
+6. Charter 답글 Ctrl+Enter 단축키
+7. 다크모드 지원 검토
 
 ---
 
@@ -491,12 +501,13 @@ Champion:                       Admin:
 
 ### C. 참고 문서
 - `docs/ERD.md` — 데이터 모델 상세
+- `docs/PRD-KO.md` — 한국어 PRD 전문 + WBS 공수표
+- `docs/deployment/docker.md` — Docker/Jenkins 배포 가이드
 - `README.md` — 셋업 / 환경변수 가이드
-- Obsidian: `_obsidian/Projects/ax-homework-submission.md` — 작업 일지
 
 ---
 
 **문서 메타**
 - Author: yr.park@dreamus.io
 - Review: Strategy Lead 1회 + Eng Lead 1회
-- Next Update: PR #1 머지 후
+- Next Update: 대시보드 기능 완성 후 (P1 완료 시)
