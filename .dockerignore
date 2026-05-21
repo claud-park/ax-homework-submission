@@ -1,0 +1,40 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts
+.next
+node_modules
+out
+
+# Local env (compose가 --env-file로 명시 주입)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+
+# Dev tools / IDE
+.vscode
+.idea
+.cursor
+*.swp
+.DS_Store
+
+# Docs / planning (런타임 불필요)
+docs
+.superpowers
+.claude
+README.md
+*.md
+
+# Logs / temp
+*.log
+npm-debug.log
+.cache
+
+# Test
+coverage
+.nyc_output

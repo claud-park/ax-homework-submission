@@ -29,45 +29,38 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Getting Started (Local)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+bun install
+cp .env.local.example .env.local   # 그 후 실제 값 채움
+bun run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`http://localhost:3000` 접속.
 
-## Deployment (Vercel)
+## Deployment (Docker + Jenkins)
 
-1. https://vercel.com/new 에서 GitHub repo `claud-park/ax-homework-submission` 임포트
-2. Framework Preset: **Next.js** (자동 감지됨)
-3. **Environment Variables** 등록 — 누락 시 런타임 실패:
+배포는 Jenkins가 서버에서 직접 빌드 + 기동한다. 컨테이너 레지스트리 없음. 자세한 운영 가이드: [`docs/deployment/docker.md`](docs/deployment/docker.md).
 
-   | 변수 | 환경 | 비고 |
-   |---|---|---|
-   | `NEXT_PUBLIC_SUPABASE_URL` | Production / Preview / Development | 클라이언트 노출 OK |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production / Preview / Development | 클라이언트 노출 OK |
-   | `SUPABASE_SERVICE_KEY` | Production / Preview | 서버 전용 — 절대 `NEXT_PUBLIC_` prefix 금지 |
-   | `GMAIL_USER` | Production / Preview | nodemailer SMTP 계정 |
-   | `GMAIL_APP_PASSWORD` | Production / Preview | Google 앱 비밀번호 |
-   | `ADMIN_NOTIFICATION_EMAIL` | Production / Preview | 알림 수신 어드민 메일 |
-   | `APP_BASE_URL` | Production | 실제 도메인 (예: `https://ax-homework.example.com`) |
-   | `APP_BASE_URL` | Preview | `https://${VERCEL_URL}` 권장 |
+핵심 흐름:
 
-4. **Deploy** 클릭
-
-이후 `main` push → Production 자동 배포, PR open → Preview 자동 배포(Vercel bot이 PR에 URL 코멘트).
-
-향후 Vercel → 자체 Docker 호스팅으로 옮기는 절차는 `docs/migration/vercel-to-docker.md` 참고.
+```bash
+cp .env.example .env   # 운영 호스트에서, 실제 값 채움. chmod 600 .env 권장.
+docker compose --env-file .env -p ax-homework-submission build
+docker compose --env-file .env -p ax-homework-submission up -d
+```
 
 ## CI
 
-`.github/workflows/ci.yml`이 PR과 `main` push 시 다음을 검증한다:
+`.github/workflows/ci.yml`이 PR과 `main` push 시 다음을 검증한다 (Bun 기반):
 
-- `npm ci` (lockfile 엄격)
-- `npm run lint` (eslint)
-- `npm run typecheck` (`tsc --noEmit`)
-- `npm run build` (Next.js production build, placeholder env)
+- `bun install --frozen-lockfile`
+- `bun run lint`
+- `bun run typecheck`
+- `bun run build` (placeholder env)
 
 로컬에서 동일 검증:
 ```bash
-npm ci && npm run lint && npm run typecheck && npm run build
+bun install && bun run lint && bun run typecheck && bun run build
 ```

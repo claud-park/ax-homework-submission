@@ -1,0 +1,30 @@
+# ax-homework-submission — docker compose
+# 사용법:
+#   docker compose --env-file .env -p ax-homework-submission build
+#   docker compose --env-file .env -p ax-homework-submission up -d
+#   docker compose -p ax-homework-submission logs -f frontend
+#   docker compose -p ax-homework-submission down
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    image: ax-homework-submission:latest
+    container_name: ax-homework-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # 이중 안전망: --env-file 누락 시에도 변수가 전달되도록
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      GMAIL_USER: ${GMAIL_USER}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
+      ADMIN_NOTIFICATION_EMAIL: ${ADMIN_NOTIFICATION_EMAIL}
+      APP_BASE_URL: ${APP_BASE_URL}
