@@ -20,6 +20,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
 
   const supabase = createServiceClient()
+
+  // Guard: reject deliverable uploads against draft milestones (defense-in-depth for notification gating)
+  const { data: milestonePub } = await supabase
+    .from('milestones')
+    .select('publish_status')
+    .eq('id', params.id)
+    .single()
+  if (!milestonePub || milestonePub.publish_status !== 'published') {
+    return NextResponse.json({ error: '게시되지 않은 마일스톤에는 산출물을 업로드할 수 없습니다.' }, { status: 400 })
+  }
+
   const { data: milestone } = await supabase
     .from('milestones')
     .select('id, week_number')

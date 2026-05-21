@@ -23,6 +23,16 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // Guard: reject submissions against draft homeworks (defense-in-depth for notification gating)
+  const { data: hw } = await supabase
+    .from('homeworks')
+    .select('publish_status')
+    .eq('id', parseInt(homeworkId))
+    .single()
+  if (!hw || hw.publish_status !== 'published') {
+    return NextResponse.json({ error: '게시되지 않은 과제에는 제출할 수 없습니다.' }, { status: 400 })
+  }
+
   // Determine attempt number
   const { count } = await supabase
     .from('submissions')

@@ -8,10 +8,10 @@ async function getCharterAndVerifyAccess(
   charterId: string,
   userId: string,
   isAdmin: boolean
-): Promise<{ id: string; user_id: string } | null | 'forbidden'> {
+): Promise<{ id: string; user_id: string; publish_status: string } | null | 'forbidden'> {
   const { data: charter } = await supabase
     .from('charter_submissions')
-    .select('id, user_id')
+    .select('id, user_id, publish_status')
     .eq('id', charterId)
     .single()
   if (!charter) return null
@@ -27,6 +27,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const charter = await getCharterAndVerifyAccess(supabase, params.id, user.id, isAdmin)
   if (charter === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (charter === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Draft visibility: only the author can see a draft charter's comments resource.
+  // Non-author callers (including admins) get 404 to preserve existence privacy.
+  // The author of a draft charter sees an empty list (drafts have no comments anyway).
+  if (charter.publish_status !== 'published') {
+    if (charter.user_id !== user.id) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    return NextResponse.json([])
+  }
   const { data, error } = await supabase
     .from('charter_comments')
     .select('*')
@@ -46,6 +55,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (charter === 'forbidden') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { body } = await req.json()
   if (!body?.trim()) return NextResponse.json({ error: 'Body required' }, { status: 400 })
+
+  // Guard: reject comments against draft charter submissions (defense-in-depth for notification gating)
+  const { data: charterPub } = await supabase
+    .from('charter_submissions')
+    .select('publish_status')
+    .eq('id', params.id)
+    .single()
+  if (!charterPub || charterPub.publish_status !== 'published') {
+    return NextResponse.json({ error: '게시되지 않은 과제정의서에는 코멘트를 작성할 수 없습니다.' }, { status: 400 })
+  }
+
   const { data, error } = await supabase
     .from('charter_comments')
     .insert({

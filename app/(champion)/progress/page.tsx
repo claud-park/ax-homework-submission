@@ -61,8 +61,9 @@ export default function ProgressPage() {
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
   const todayStr = today.toISOString().split('T')[0]
 
-  const tasks   = useMemo(() => milestones.filter(m => m.start_date && m.due_date), [milestones])
-  const delayed = useMemo(() => milestones.filter(m => m.status === 'delayed'),      [milestones])
+  const published = useMemo(() => milestones.filter(m => m.publish_status === 'published'), [milestones])
+  const tasks     = useMemo(() => published.filter(m => m.start_date && m.due_date), [published])
+  const delayed   = useMemo(() => published.filter(m => m.status === 'delayed'),     [published])
 
   // Group tasks by homework, sorted: homework groups (asc id), then standalone (null) last
   const groups = useMemo(() => {

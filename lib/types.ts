@@ -1,6 +1,7 @@
 export type SubmissionStatus = 'pending' | 'accepted' | 'declined'
 export type MilestoneStatus = 'not_started' | 'in_progress' | 'completed' | 'delayed'
 export type RequestStatus = 'pending' | 'approved' | 'rejected'
+export type PublishStatus = 'draft' | 'published'
 
 export interface User {
   id: string
@@ -16,6 +17,8 @@ export interface Homework {
   description: string | null
   due_date: string
   created_at: string
+  publish_status: PublishStatus
+  created_by: string | null
 }
 
 export interface Submission {
@@ -49,6 +52,7 @@ export interface CharterSubmission {
   content: ProjectCharter['content']
   submitted_at: string
   updated_at: string
+  publish_status: PublishStatus
 }
 
 export interface ProjectCharter {
@@ -81,6 +85,7 @@ export interface Milestone {
   display_order: number
   created_at: string
   updated_at: string
+  publish_status: PublishStatus
   deliverables?: MilestoneDeliverable[]
 }
 

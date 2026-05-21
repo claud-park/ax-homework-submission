@@ -12,6 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { weekNumber: 
     .from('milestones')
     .select('*, users(*), milestone_deliverables(*)')
     .eq('week_number', weekNumber)
+    .eq('publish_status', 'published')
     .order('user_id')
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ week_number: weekNumber, milestones: data })

@@ -22,6 +22,8 @@
 | title | text NOT NULL | |
 | description | text | HTML from TipTap WYSIWYG |
 | due_date | date NOT NULL | |
+| publish_status | enum | `draft` \| `published` — default `published` |
+| 🔗 created_by | uuid FK | → users.id (nullable for legacy rows; required for new) |
 | created_at | timestamptz | |
 
 ### `submissions`
@@ -75,6 +77,7 @@ Each champion's submitted/saved 과제정의서 versions. Mutable — champion c
 | content | jsonb | same shape as project_charters.content |
 | submitted_at | timestamptz | original submission time |
 | updated_at | timestamptz | last resubmit time |
+| publish_status | enum | `draft` \| `published` — default `published` |
 
 Unique constraint: `(user_id, homework_id) WHERE homework_id IS NOT NULL` — one 과제정의서 per homework per champion.
 
@@ -125,6 +128,7 @@ Champion-created weekly WBS items (self-serve).
 | display_order | int | ordering within same week |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
+| publish_status | enum | `draft` \| `published` — default `published` |
 
 **Status logic (computed server-side, stored for query efficiency):**
 - `completed` → has a deliverable uploaded
@@ -208,3 +212,15 @@ Both buckets: RLS DENY ALL. Signed URLs generated server-side (60s TTL).
 - RLS: **DENY ALL** on all tables and both storage buckets
 - All reads/writes via Next.js API routes using **service key** (server-side only)
 - Browser never holds service key — only Supabase Auth JWT
+
+---
+
+## Drafting partial indexes
+
+```sql
+homeworks_drafts_by_author          -- on homeworks(created_by)         where publish_status = 'draft'
+charter_submissions_drafts_by_user  -- on charter_submissions(user_id)  where publish_status = 'draft'
+milestones_drafts_by_user           -- on milestones(user_id)            where publish_status = 'draft'
+```
+
+Workload is published-heavy; partial indexes scoped to drafts stay small and serve the "my drafts" hot query without bloating published-row indexes.

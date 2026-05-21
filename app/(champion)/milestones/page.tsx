@@ -15,6 +15,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ListTodo } from 'lucide-react'
+import { DraftBadge } from '@/components/DraftBadge'
+import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
+import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -46,6 +49,23 @@ export default function MilestonesPage() {
   const [editSaving, setEditSaving] = useState(false)
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
+  const [filter, setFilter] = useState<PublishFilterValue>(() => {
+    if (typeof window === 'undefined') return 'all'
+    const q = new URLSearchParams(window.location.search).get('status') as PublishFilterValue | null
+    return q && ['all','published','draft'].includes(q) ? q : 'all'
+  })
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (filter === 'all') url.searchParams.delete('status')
+    else url.searchParams.set('status', filter)
+    window.history.replaceState({}, '', url.toString())
+  }, [filter])
+
+  const visibleMilestones = useMemo(
+    () => filter === 'all' ? milestones : milestones.filter(m => m.publish_status === filter),
+    [milestones, filter]
+  )
+
   useEffect(() => {
     apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones).catch((e: Error) => toast.error('마일스톤 목록 로드 실패: ' + e.message))
     apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests).catch((e: Error) => toast.error('기한 변경 요청 로드 실패: ' + e.message))
@@ -54,7 +74,7 @@ export default function MilestonesPage() {
   // Group by homework, sorted by homework id asc, standalone ('독립 WBS') last
   const groups = useMemo(() => {
     const map = new Map<string, { hwId: number | null; hwTitle: string | null; items: MilestoneWithHomework[] }>()
-    for (const m of milestones) {
+    for (const m of visibleMilestones) {
       const key = m.homework_id !== null ? String(m.homework_id) : '__none__'
       if (!map.has(key)) map.set(key, { hwId: m.homework_id, hwTitle: m.homeworks?.title ?? null, items: [] })
       map.get(key)!.items.push(m)
@@ -66,25 +86,36 @@ export default function MilestonesPage() {
         return Number(a) - Number(b)
       })
       .map(([key, g]) => ({ key, ...g }))
-  }, [milestones])
+  }, [visibleMilestones])
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.start_date || !form.due_date) { setError('작업 기간을 선택해주세요.'); return }
+  async function submitNew(publishStatus: 'draft' | 'published') {
     setError(null)
     try {
       const created = await apiFetch<MilestoneWithHomework>('/api/milestones', {
         method: 'POST',
-        body: JSON.stringify({ ...form, week_number: parseInt(form.week_number) }),
+        body: JSON.stringify({
+          ...form,
+          week_number: parseInt(form.week_number) || null,
+          start_date: form.start_date || null,
+          due_date: form.due_date || null,
+          publish_status: publishStatus,
+        }),
       })
       setMilestones(prev => [...prev, created])
       setShowForm(false)
       setForm({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
-      toast.success('마일스톤이 추가되었습니다.')
+      toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 추가되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      setError('마일스톤 추가에 실패했습니다.')
-      toast.error('마일스톤 생성 실패: ' + msg)
+      try {
+        const parsed = JSON.parse(msg)
+        if (parsed.error === 'validation_failed') {
+          setError('필수 항목을 확인해주세요: ' + parsed.fields.map((f: { field: string }) => f.field).join(', '))
+          return
+        }
+      } catch { /* not JSON */ }
+      setError('마일스톤 저장에 실패했습니다.')
+      toast.error('저장 실패: ' + msg)
     }
   }
 
@@ -163,21 +194,32 @@ export default function MilestonesPage() {
     setEditForm({ week_number: String(m.week_number), title: m.title, start_date: m.start_date, due_date: m.due_date })
   }
 
-  async function handleEditSave(e: React.FormEvent) {
-    e.preventDefault()
+  async function submitEdit(publishStatus: 'draft' | 'published') {
     if (!editingMilestone) return
-    if (!editForm.start_date || !editForm.due_date) { setError('작업 기간을 선택해주세요.'); return }
     setEditSaving(true)
     try {
       const updated = await apiFetch<MilestoneWithHomework>(`/api/milestones/${editingMilestone.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ ...editForm, week_number: parseInt(editForm.week_number) }),
+        body: JSON.stringify({
+          ...editForm,
+          week_number: parseInt(editForm.week_number) || null,
+          start_date: editForm.start_date || null,
+          due_date: editForm.due_date || null,
+          publish_status: publishStatus,
+        }),
       })
       setMilestones(prev => prev.map(m => m.id === updated.id ? { ...updated, homeworks: m.homeworks } : m))
       setEditingMilestone(null)
-      toast.success('마일스톤이 수정되었습니다.')
+      toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 수정되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
+      try {
+        const parsed = JSON.parse(msg)
+        if (parsed.error === 'validation_failed') {
+          setError('필수 항목을 확인해주세요: ' + parsed.fields.map((f: { field: string }) => f.field).join(', '))
+          return
+        }
+      } catch { /* not JSON */ }
       setError('수정에 실패했습니다.')
       toast.error('마일스톤 수정 실패: ' + msg)
     } finally {
@@ -216,8 +258,12 @@ export default function MilestonesPage() {
         </button>
       </div>
 
+      <div className="mb-4">
+        <PublishStatusFilter value={filter} onChange={setFilter} />
+      </div>
+
       {showForm && (
-        <form onSubmit={handleAdd} className="mb-6 p-4 rounded-xl border flex flex-col gap-3" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+        <form onSubmit={(e) => e.preventDefault()} className="mb-6 p-4 rounded-xl border flex flex-col gap-3" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
@@ -240,7 +286,15 @@ export default function MilestonesPage() {
             <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="선택사항" rows={2} style={{ ...inputStyle, resize: 'none', width: '100%' }} />
           </div>
-          <button type="submit" className="px-4 py-2 rounded-lg text-xs font-semibold self-start" style={{ background: 'var(--blue-600)', color: '#fff' }}>저장</button>
+          <div className="self-start">
+            <SaveOrPublishButtons
+              status="draft"
+              saving={false}
+              onSaveDraft={() => submitNew('draft')}
+              onPublish={() => submitNew('published')}
+              size="sm"
+            />
+          </div>
         </form>
       )}
 
@@ -303,11 +357,16 @@ export default function MilestonesPage() {
                                 </button>
                               </div>
                             </td>
-                            <td className="px-3 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</td>
+                            <td className="px-3 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>
+                              <div className="flex items-center gap-1.5">
+                                <span>{m.title || '(제목 없음)'}</span>
+                                {m.publish_status === 'draft' && <DraftBadge />}
+                              </div>
+                            </td>
                             <td className="px-3 py-3">
                               <div className="flex flex-col gap-1.5">
                                 <span style={{ color: 'var(--text-secondary)' }}>{m.start_date} – {m.due_date}</span>
-                                {(m.status === 'delayed' || m.status === 'in_progress') && (
+                                {m.publish_status === 'published' && (m.status === 'delayed' || m.status === 'in_progress') && (
                                   <button
                                     onClick={() => {
                                       const existing = milestoneReqs[0]
@@ -320,7 +379,7 @@ export default function MilestonesPage() {
                                     {milestoneReqs.length > 0 ? '기한 변경 요청 수정' : '기한 변경 요청'}
                                   </button>
                                 )}
-                                {(() => {
+                                {m.publish_status === 'published' && (() => {
                                   const pending = milestoneReqs.find(r => r.status === 'pending')
                                   const resolved = milestoneReqs.find(r => r.status === 'approved' || r.status === 'rejected')
                                   const toShow = [pending, resolved].filter(Boolean) as typeof milestoneReqs
@@ -345,7 +404,7 @@ export default function MilestonesPage() {
                                 <span style={{ color: STATUS_COLOR[m.status] }}>
                                   {STATUS_LABEL[m.status]}{m.status === 'delayed' ? ' ⚠️' : ''}
                                 </span>
-                                {(m.status === 'not_started' || m.status === 'delayed') && (
+                                {m.publish_status === 'published' && (m.status === 'not_started' || m.status === 'delayed') && (
                                   <button onClick={() => handleMarkProgress(m.id)} className="px-2 py-1 rounded font-semibold self-start" style={{ color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}>
                                     ▶ 과제 시작
                                   </button>
@@ -354,7 +413,7 @@ export default function MilestonesPage() {
                             </td>
                             <td className="px-3 py-3">
                               <div className="flex flex-col gap-2 items-start">
-                                {(() => {
+                                {m.publish_status === 'published' && (() => {
                                   const lastDeliverable = m.deliverables?.slice().sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0]
                                   return lastDeliverable ? (
                                     <button onClick={() => handleDownload(m.id)} className="text-xs underline text-left" style={{ color: 'var(--blue-600)' }}>
@@ -362,7 +421,15 @@ export default function MilestonesPage() {
                                     </button>
                                   ) : null
                                 })()}
-                                {m.status === 'completed' ? (
+                                {m.publish_status === 'draft' ? (
+                                  <span
+                                    title="임시저장 마일스톤은 산출물을 업로드할 수 없습니다. 먼저 게시해주세요."
+                                    className="px-2 py-1 rounded font-semibold opacity-50 cursor-not-allowed"
+                                    style={{ background: 'var(--surface-secondary)', color: 'var(--text-disabled)', border: '1px solid var(--border-subtle)' }}
+                                  >
+                                    📤 업로드 (게시 필요)
+                                  </span>
+                                ) : m.status === 'completed' ? (
                                   <>
                                     <button
                                       onClick={() => setConfirmResubmitId(m.id)}
@@ -439,7 +506,7 @@ export default function MilestonesPage() {
             <DialogTitle>마일스톤 편집</DialogTitle>
           </DialogHeader>
           {editingMilestone && (
-            <form onSubmit={handleEditSave} className="flex flex-col gap-3">
+            <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
@@ -484,9 +551,13 @@ export default function MilestonesPage() {
                   style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
                   취소
                 </button>
-                <button type="submit" disabled={editSaving} className="px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
-                  {editSaving ? '저장 중...' : '저장'}
-                </button>
+                <SaveOrPublishButtons
+                  status={editingMilestone.publish_status}
+                  saving={editSaving}
+                  onSaveDraft={() => submitEdit('draft')}
+                  onPublish={() => submitEdit('published')}
+                  size="sm"
+                />
               </DialogFooter>
             </form>
           )}

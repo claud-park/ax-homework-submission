@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from('homeworks')
     .select('*')
+    .eq('publish_status', 'published')
     .order('id', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)

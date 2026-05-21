@@ -4,8 +4,10 @@ import { useRouter } from 'next/navigation'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import DatePicker from '@/components/DatePicker'
+import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 
 function TipTapEditor({ editor }: { editor: ReturnType<typeof useEditor> }) {
   if (!editor) return null
@@ -42,26 +44,46 @@ export default function CreateHomeworkPage() {
   const [title, setTitle] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<{ title?: string; due_date?: string }>({})
 
   const editor = useEditor({
     extensions: [StarterKit, Underline],
     content: '',
   })
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!title || !dueDate) return
+  async function submit(publishStatus: 'draft' | 'published') {
+    setErrors({})
     setSaving(true)
-    setError(null)
     try {
-      await apiFetch('/api/admin/homeworks', {
+      const created = await apiFetch<{ id: number; publish_status: string }>('/api/admin/homeworks', {
         method: 'POST',
-        body: JSON.stringify({ title, description: editor?.getHTML() ?? '', due_date: dueDate }),
+        body: JSON.stringify({
+          title,
+          description: editor?.getHTML() ?? '',
+          due_date: dueDate || null,
+          publish_status: publishStatus,
+        }),
       })
-      router.push('/admin')
+      if (publishStatus === 'draft') {
+        toast.success('임시저장되었습니다.')
+        router.push(`/admin/homework/${created.id}/edit`)
+      } else {
+        toast.success('과제가 게시되었습니다.')
+        router.push('/admin')
+      }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Error')
+      const msg = e instanceof Error ? e.message : 'Error'
+      try {
+        const parsed = JSON.parse(msg)
+        if (parsed.error === 'validation_failed' && Array.isArray(parsed.fields)) {
+          const map: { title?: string; due_date?: string } = {}
+          for (const f of parsed.fields) map[f.field as 'title'|'due_date'] = f.message
+          setErrors(map)
+          toast.error('게시 실패: 필수 항목을 확인해주세요')
+          return
+        }
+      } catch { /* not a JSON validation error */ }
+      toast.error(publishStatus === 'draft' ? '임시저장 실패: ' + msg : '게시 실패: ' + msg)
     } finally {
       setSaving(false)
     }
@@ -77,6 +99,7 @@ export default function CreateHomeworkPage() {
     width: '100%',
     outline: 'none',
   }
+  const errorStyle = { color: 'var(--error)', fontSize: '11px', marginTop: '4px' }
 
   return (
     <div className="max-w-2xl">
@@ -84,18 +107,28 @@ export default function CreateHomeworkPage() {
         <a href="/admin" className="text-sm" style={{ color: 'var(--text-secondary)' }}>← 대시보드</a>
         <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>새 과제 만들기</h1>
       </div>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <input type="text" placeholder="과제 제목" value={title} onChange={e => setTitle(e.target.value)} required style={inputStyle} />
-        <DatePicker value={dueDate} onChange={setDueDate} required placeholder="마감일 선택" style={inputStyle} />
+      <div className="flex flex-col gap-4">
+        <div>
+          <input type="text" placeholder="과제 제목" value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} />
+          {errors.title && <p style={errorStyle}>{errors.title}</p>}
+        </div>
+        <div>
+          <DatePicker value={dueDate} onChange={setDueDate} placeholder="마감일 선택" style={inputStyle} />
+          {errors.due_date && <p style={errorStyle}>{errors.due_date}</p>}
+        </div>
         <div>
           <p className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-secondary)' }}>과제 설명</p>
           <TipTapEditor editor={editor} />
         </div>
-        {error && <p className="text-sm" style={{ color: 'var(--error)' }}>{error}</p>}
-        <button type="submit" disabled={saving} className="py-3 rounded-xl font-semibold text-sm disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
-          {saving ? '저장 중...' : '과제 만들기'}
-        </button>
-      </form>
+        <div className="flex justify-end pt-2">
+          <SaveOrPublishButtons
+            status="draft"
+            saving={saving}
+            onSaveDraft={() => submit('draft')}
+            onPublish={() => submit('published')}
+          />
+        </div>
+      </div>
     </div>
   )
 }

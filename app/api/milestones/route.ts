@@ -17,6 +17,10 @@ export async function GET(req: NextRequest) {
     .select('*, milestone_deliverables(*), homeworks(id, title)')
     .eq('user_id', effectiveUserId)
     .order('display_order')
+
+  // Admin fetching another user's milestones sees only published
+  if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
+
   if (homeworkId) {
     const hwId = parseInt(homeworkId, 10)
     if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
@@ -35,15 +39,34 @@ export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const { week_number, homework_id, title, start_date, due_date, description } = body
-  // week_number defaults to homework_id when creating from homework context
+  const { week_number, homework_id, title, start_date, due_date, description, publish_status } = body
+  const status = publish_status === 'published' ? 'published' : 'draft'
+
   const resolvedWeekNumber = week_number ?? homework_id ?? 1
-  if (!title || !start_date || !due_date)
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+
+  if (status === 'published') {
+    const fields: { field: string; message: string }[] = []
+    if (!title) fields.push({ field: 'title', message: '필수 항목입니다.' })
+    if (!start_date) fields.push({ field: 'start_date', message: '필수 항목입니다.' })
+    if (!due_date) fields.push({ field: 'due_date', message: '필수 항목입니다.' })
+    if (!resolvedWeekNumber) fields.push({ field: 'week_number', message: '필수 항목입니다.' })
+    if (fields.length > 0)
+      return NextResponse.json({ error: 'validation_failed', fields }, { status: 400 })
+  }
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('milestones')
-    .insert({ user_id: user.id, week_number: resolvedWeekNumber, homework_id: homework_id ?? null, title, start_date, due_date, description })
+    .insert({
+      user_id: user.id,
+      week_number: resolvedWeekNumber,
+      homework_id: homework_id ?? null,
+      title: title ?? '',
+      start_date: start_date ?? null,
+      due_date: due_date ?? null,
+      description: description ?? null,
+      publish_status: status,
+    })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
