@@ -10,7 +10,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .from('homeworks')
     .select('*')
     .eq('id', parseInt(params.id))
+    .eq('publish_status', 'published')
     .single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+  // Return 404 (not 403) when champion hits a draft to preserve existence privacy
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(data)
 }

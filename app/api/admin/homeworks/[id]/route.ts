@@ -97,14 +97,16 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .from('homeworks').select('publish_status, created_by').eq('id', id).single()
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  // Draft existence privacy: non-author admins must not be able to distinguish
+  // "exists but not yours" from "doesn't exist" — match GET semantics with 404.
+  if (existing.publish_status === 'draft' && existing.created_by !== admin.id) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
   if (existing.publish_status !== 'draft') {
     return NextResponse.json(
       { error: 'cannot_delete_published', message: '게시된 과제는 삭제할 수 없습니다.' },
       { status: 409 }
     )
-  }
-  if (existing.created_by !== admin.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const { error } = await supabase.from('homeworks').delete().eq('id', id)

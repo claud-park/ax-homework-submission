@@ -404,7 +404,7 @@ export default function MilestonesPage() {
                                 <span style={{ color: STATUS_COLOR[m.status] }}>
                                   {STATUS_LABEL[m.status]}{m.status === 'delayed' ? ' ⚠️' : ''}
                                 </span>
-                                {(m.status === 'not_started' || m.status === 'delayed') && (
+                                {m.publish_status === 'published' && (m.status === 'not_started' || m.status === 'delayed') && (
                                   <button onClick={() => handleMarkProgress(m.id)} className="px-2 py-1 rounded font-semibold self-start" style={{ color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}>
                                     ▶ 과제 시작
                                   </button>

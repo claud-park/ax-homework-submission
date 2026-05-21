@@ -15,11 +15,16 @@ export async function POST(
   // Verify charter access
   const { data: charter } = await supabase
     .from('charter_submissions')
-    .select('id, user_id')
+    .select('id, user_id, publish_status')
     .eq('id', params.id)
     .single()
   if (!charter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!isAdmin && charter.user_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  // Guard: reject replies against draft charter submissions (matches parent comments POST)
+  if (charter.publish_status !== 'published') {
+    return NextResponse.json({ error: '게시되지 않은 과제정의서에는 코멘트를 작성할 수 없습니다.' }, { status: 400 })
+  }
 
   // Verify parent is top-level (no reply-to-reply)
   let body: string | undefined
