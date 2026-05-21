@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
+function stripHtml(s: string | undefined | null) {
+  return (s ?? '').replace(/<[^>]*>/g, '').trim()
+}
+
+function validateCharter(content: Record<string, string>, projectName: string | null) {
+  const fields: { field: string; message: string }[] = []
+  if (!projectName || !projectName.trim()) fields.push({ field: 'project_name', message: '프로젝트명은 필수입니다.' })
+  for (const key of ['problem_definition', 'goal', 'scope_in', 'scope_out']) {
+    if (!stripHtml(content?.[key])) fields.push({ field: key, message: '필수 항목입니다.' })
+  }
+  return fields
+}
+
 export async function GET(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -9,12 +22,11 @@ export async function GET(req: NextRequest) {
   const isAdmin = !!user.user_metadata?.is_admin
   const homeworkId = req.nextUrl.searchParams.get('homework_id')
   const targetUserId = req.nextUrl.searchParams.get('user_id')
-  // Admins may fetch any user's charter by passing ?user_id=; users always get their own
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 
   const supabase = createServiceClient()
 
-  // Admin with homework_id but no user_id → list all users' charters for that homework
+  // Admin listing across users: published only (drafts are author-private)
   if (isAdmin && !targetUserId && homeworkId) {
     const hwId = parseInt(homeworkId, 10)
     if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
@@ -22,6 +34,7 @@ export async function GET(req: NextRequest) {
       .from('charter_submissions')
       .select('*, users(*)')
       .eq('homework_id', hwId)
+      .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json(data)
@@ -32,6 +45,10 @@ export async function GET(req: NextRequest) {
     .select('*')
     .eq('user_id', effectiveUserId)
     .order('submitted_at', { ascending: false })
+
+  // Admin fetching specific user's charter sees only published
+  if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
+
   if (homeworkId) {
     const hwId = parseInt(homeworkId, 10)
     if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
@@ -45,12 +62,25 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { project_name, content, homework_id } = await req.json()
-  if (!content) return NextResponse.json({ error: 'Missing content' }, { status: 400 })
+  const { project_name, content, homework_id, publish_status } = await req.json()
+  const status = publish_status === 'published' ? 'published' : 'draft'
+
+  if (status === 'published') {
+    const fields = validateCharter(content ?? {}, project_name)
+    if (fields.length > 0)
+      return NextResponse.json({ error: 'validation_failed', fields }, { status: 400 })
+  }
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('charter_submissions')
-    .insert({ user_id: user.id, project_name, content, ...(homework_id ? { homework_id } : {}) })
+    .insert({
+      user_id: user.id,
+      project_name: project_name ?? null,
+      content: content ?? {},
+      publish_status: status,
+      ...(homework_id ? { homework_id } : {}),
+    })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
