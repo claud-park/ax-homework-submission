@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (usersErr) return NextResponse.json({ error: usersErr.message }, { status: 500 })
 
   // 2. Homeworks
-  let hwQuery = supabase.from('homeworks').select('id, title')
+  let hwQuery = supabase.from('homeworks').select('id, title').eq('publish_status', 'published')
   if (homeworkId !== null) hwQuery = hwQuery.eq('id', homeworkId)
   const { data: homeworks, error: hwErr } = await hwQuery
   if (hwErr) return NextResponse.json({ error: hwErr.message }, { status: 500 })
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 4. Milestone counts per (user_id, homework_id)
-  let msQuery = supabase.from('milestones').select('user_id, homework_id, status')
+  let msQuery = supabase.from('milestones').select('user_id, homework_id, status').eq('publish_status', 'published')
   if (homeworkId !== null) msQuery = msQuery.eq('homework_id', homeworkId)
   const { data: milestones, error: msErr } = await msQuery
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 5. Charter existence per (user_id, homework_id)
-  let charterQuery = supabase.from('charter_submissions').select('user_id, homework_id')
+  let charterQuery = supabase.from('charter_submissions').select('user_id, homework_id').eq('publish_status', 'published')
   if (homeworkId !== null) charterQuery = charterQuery.eq('homework_id', homeworkId)
   const { data: charters, error: charterErr } = await charterQuery
   if (charterErr) return NextResponse.json({ error: charterErr.message }, { status: 500 })
