@@ -8,6 +8,17 @@ async function getToken(): Promise<string> {
   return session.access_token
 }
 
+function errorMessage(body: unknown): string {
+  if (body && typeof body === 'object' && 'fields' in (body as Record<string, unknown>)) {
+    // Preserve full payload for validation_failed responses so callers can render inline errors.
+    return JSON.stringify(body)
+  }
+  if (body && typeof body === 'object' && 'error' in (body as Record<string, unknown>)) {
+    return String((body as { error: unknown }).error)
+  }
+  return 'API error'
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getToken()
   const res = await fetch(path, {
@@ -19,8 +30,8 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     },
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error ?? 'API error')
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(errorMessage(body))
   }
   if (res.status === 204) return {} as T
   return res.json()
@@ -34,8 +45,8 @@ export async function apiUpload<T>(path: string, body: FormData): Promise<T> {
     body,
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error ?? 'Upload error')
+    const errBody = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(errorMessage(errBody))
   }
   return res.json()
 }

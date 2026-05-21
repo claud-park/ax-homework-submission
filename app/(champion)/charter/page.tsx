@@ -216,7 +216,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
     }
   }
 
-  async function handleSave(targetStatus: 'draft' | 'published') {
+  async function handleSave(targetStatus: 'draft' | 'published'): Promise<boolean> {
     setSaving(true)
     try {
       if (mode === 'new') {
@@ -244,16 +244,18 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
         onUpdated(updated)
       }
       toast.success(targetStatus === 'draft' ? '임시저장되었습니다.' : '게시되었습니다.')
+      return true
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       try {
         const parsed = JSON.parse(msg)
         if (parsed.error === 'validation_failed') {
           toast.error('게시 실패: 필수 항목을 확인해주세요')
-          return
+          return false
         }
       } catch { /* not JSON */ }
       toast.error((targetStatus === 'draft' ? '임시저장 실패: ' : '게시 실패: ') + msg)
+      return false
     } finally {
       setSaving(false)
     }
@@ -363,8 +365,8 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
             <button
               onClick={async () => {
                 setShowUnsavedDialog(false)
-                await handleSave('draft')
-                onClose()
+                const ok = await handleSave('draft')
+                if (ok) onClose()
               }}
               className="px-4 py-2 rounded-lg text-xs font-semibold"
               style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
