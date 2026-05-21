@@ -51,6 +51,26 @@ docker compose --env-file .env -p ax-homework-submission build
 docker compose --env-file .env -p ax-homework-submission up -d
 ```
 
+## Commit Convention
+
+모든 커밋 메시지는 아래 형식을 따라야 한다. `commit-msg` hook이 자동으로 검사한다.
+
+```
+[AX-NNN] type(scope): 설명
+```
+
+- `[AX-NNN]` — Jira 티켓 번호 (필수)
+- `type` — feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert 중 하나
+- `(scope)` — 선택 사항
+- `설명` — 한글 또는 영문, 비워둘 수 없음
+
+예시:
+```
+[AX-42] feat(kanban): 드래그앤드롭 컬럼 순서 변경 추가
+[AX-7] fix: 파일 업로드 null 포인터 오류 수정
+[AX-1] chore: 의존성 업데이트
+```
+
 ## CI
 
 `.github/workflows/ci.yml`이 PR과 `main` push 시 다음을 검증한다 (Bun 기반):
