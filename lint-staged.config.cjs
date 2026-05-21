@@ -1,6 +1,5 @@
-// lint-staged.config.js
 module.exports = {
   '**/*.{ts,tsx,js,jsx}': (filenames) =>
-    `next lint --fix --file ${filenames.join(' --file ')}`,
+    ['next', 'lint', '--fix', ...filenames.flatMap((f) => ['--file', f])],
   '**/*.{ts,tsx}': () => 'bun run typecheck',
 }
