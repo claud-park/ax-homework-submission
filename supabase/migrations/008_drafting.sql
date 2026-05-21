@@ -5,7 +5,7 @@ create type publish_status as enum ('draft', 'published');
 
 alter table homeworks
   add column publish_status publish_status not null default 'published',
-  add column created_by uuid references users(id);
+  add column created_by uuid references users(id) on delete set null;
 
 alter table charter_submissions
   add column publish_status publish_status not null default 'published';
