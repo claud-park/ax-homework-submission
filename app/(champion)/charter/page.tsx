@@ -25,7 +25,7 @@ import { PublishStatusFilter, type PublishFilterValue } from '@/components/Publi
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 
-type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
+type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build' | 'timeline'
 
 function HomeworkSelect({ value, onChange, homeworks }: {
   value: number | ''
@@ -156,12 +156,13 @@ type CharterContent = ProjectCharter['content']
 type SidePanel = null | 'new' | CharterSubmission
 
 const SECTIONS: { key: SectionKey; label: string; required?: boolean }[] = [
-  { key: 'problem_definition', label: '문제 정의 (AS-IS)', required: true },
-  { key: 'goal', label: '목표 (TO-BE)', required: true },
-  { key: 'scope_in', label: '범위 In (Scope In)', required: true },
-  { key: 'scope_out', label: '범위 Out (Scope Out)', required: true },
-  { key: 'expected_outcomes', label: '기대 효과' },
-  { key: 'risks', label: '리스크' },
+  { key: 'summary', label: '00. 30-Second Summary', required: true },
+  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가', required: true },
+  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가' },
+  { key: 'goal', label: '03. Goal · Success Metric' },
+  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
+  { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
+  { key: 'timeline', label: '06. Timeline · Milestones' },
 ]
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
@@ -268,12 +269,29 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
       const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
       const { saveAs } = await import('file-saver')
       const src = contentRef.current
-      const sections = SECTIONS.map(s => [
+      const today = new Date().toLocaleDateString('ko-KR')
+
+      const coverChildren = [
+        new Paragraph({
+          children: [new TextRun({ text: 'AX · 과제정의서', size: 18, color: '888888' })],
+        }),
+        new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }),
+        new Paragraph({ text: '' }),
+        new Paragraph({
+          children: [new TextRun({ text: `작성일: ${today}`, size: 20, color: '666666' })],
+        }),
+        new Paragraph({ text: '' }),
+        new Paragraph({ text: '' }),
+      ]
+
+      const bodyChildren = SECTIONS.flatMap(s => [
         new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
-        new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? ''), break: 1 })] }),
-      ]).flat()
+        new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? '') || '(내용 없음)', size: 22 })] }),
+        new Paragraph({ text: '' }),
+      ])
+
       const doc = new Document({
-        sections: [{ children: [new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }), ...sections] }],
+        sections: [{ children: [...coverChildren, ...bodyChildren] }],
       })
       const blob = await Packer.toBlob(doc)
       saveAs(blob, `과제정의서_${projectName || 'charter'}.docx`)
