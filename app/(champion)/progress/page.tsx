@@ -1,7 +1,7 @@
 'use client'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
-import type { Milestone } from '@/lib/types'
+import type { Milestone, Submission, SubmissionStatus } from '@/lib/types'
 
 type MilestoneWithHomework = Milestone & { homeworks: { id: number; title: string } | null }
 
@@ -49,11 +49,101 @@ const LEFT_W = 240
 const COL_W  = 44
 const H0 = 28, H1 = 24, H2 = 24
 
+const SUB_LABEL: Record<SubmissionStatus, string> = {
+  pending: '검토중', accepted: '합격', declined: '불합격',
+}
+const SUB_COLOR: Record<SubmissionStatus, string> = {
+  pending: 'var(--amber)', accepted: 'var(--success)', declined: 'var(--error)',
+}
+const SUB_BG: Record<SubmissionStatus, string> = {
+  pending: 'rgba(245,158,11,0.12)', accepted: 'rgba(34,197,94,0.12)', declined: 'rgba(248,113,113,0.12)',
+}
+
+type SummaryRow = { hwId: number; hwTitle: string; total: number; completed: number }
+
+function SummaryTable({ rows, latestSubs }: {
+  rows: SummaryRow[]
+  latestSubs: Map<number, SubmissionStatus>
+}) {
+  return (
+    <div className="mb-4 rounded-xl overflow-hidden" style={{ border: BORDER }}>
+      <div style={{ background: HEADER_BG, borderBottom: BORDER, padding: '7px 14px' }}>
+        <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>과제 현황</span>
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 160px 80px',
+        background: HEADER_BG, borderBottom: BORDER,
+        padding: '5px 14px',
+        fontSize: '10px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em',
+      }}>
+        <span>과제</span>
+        <span>마일스톤 진행률</span>
+        <span>최종 제출</span>
+      </div>
+      {rows.map((row, i) => {
+        const pct = row.total > 0 ? (row.completed / row.total) * 100 : 0
+        const subStatus = latestSubs.get(row.hwId) ?? null
+        return (
+          <div key={row.hwId} style={{
+            display: 'grid', gridTemplateColumns: '1fr 160px 80px',
+            padding: '9px 14px', alignItems: 'center',
+            borderBottom: i < rows.length - 1 ? BORDER : 'none',
+            background: '#fff',
+          }}>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                {row.hwTitle}
+              </p>
+              <p style={{ fontSize: '10px', color: '#94a3b8', margin: '2px 0 0' }}>
+                과제 #{String(row.hwId).padStart(2, '0')}
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '12px' }}>
+              <div style={{ flex: 1, height: '5px', borderRadius: '3px', background: '#e2e8f0' }}>
+                <div style={{
+                  width: `${pct}%`, height: '5px', borderRadius: '3px',
+                  background: '#22c55e', transition: 'width 0.3s',
+                }} />
+              </div>
+              <span style={{ fontSize: '10px', color: '#64748b', minWidth: '28px', textAlign: 'right' }}>
+                {row.completed}/{row.total}
+              </span>
+            </div>
+            {subStatus ? (
+              <span style={{
+                fontSize: '10px', fontWeight: 700, padding: '2px 8px',
+                borderRadius: '5px', whiteSpace: 'nowrap',
+                color: SUB_COLOR[subStatus], background: SUB_BG[subStatus],
+              }}>
+                {SUB_LABEL[subStatus]}
+              </span>
+            ) : (
+              <span style={{
+                fontSize: '10px', fontWeight: 600, padding: '2px 8px',
+                borderRadius: '5px', color: '#94a3b8', background: '#f1f5f9',
+              }}>
+                미제출
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function ProgressPage() {
   const [milestones, setMilestones] = useState<MilestoneWithHomework[]>([])
+  const [submissions, setSubmissions] = useState<Submission[]>([])
 
   useEffect(() => {
-    apiFetch<MilestoneWithHomework[]>('/api/milestones').then(setMilestones)
+    Promise.all([
+      apiFetch<MilestoneWithHomework[]>('/api/milestones'),
+      apiFetch<Submission[]>('/api/submissions/mine'),
+    ]).then(([ms, subs]) => {
+      setMilestones(ms)
+      setSubmissions(subs)
+    }).catch(console.error)
   }, [])
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -81,6 +171,36 @@ export default function ProgressPage() {
       })
       .map(([, g]) => g)
   }, [tasks])
+
+  // `/api/submissions/mine` 결과는 submitted_at DESC 정렬이므로 첫 번째 = 최신
+  const latestSubs = useMemo(() => {
+    const map = new Map<number, SubmissionStatus>()
+    for (const s of submissions) {
+      if (!map.has(s.homework_id)) map.set(s.homework_id, s.status)
+    }
+    return map
+  }, [submissions])
+
+  const summaryRows = useMemo<SummaryRow[]>(() => {
+    const hwLinked = published.filter(m => m.homework_id !== null)
+    if (hwLinked.length === 0) return []
+    const map = new Map<number, SummaryRow>()
+    for (const m of hwLinked) {
+      const id = m.homework_id!
+      if (!map.has(id)) {
+        map.set(id, {
+          hwId: id,
+          hwTitle: m.homeworks?.title ?? `과제 #${String(id).padStart(2, '0')}`,
+          total: 0,
+          completed: 0,
+        })
+      }
+      const row = map.get(id)!
+      row.total++
+      if (m.status === 'completed') row.completed++
+    }
+    return Array.from(map.values()).sort((a, b) => a.hwId - b.hwId)
+  }, [published])
 
   const { days, monthGroups } = useMemo(() => {
     if (!tasks.length) return { days: [] as Date[], monthGroups: [] as { label: string; count: number }[] }
@@ -113,6 +233,11 @@ export default function ProgressPage() {
             <p key={m.id} className="text-xs" style={{ color: '#64748b' }}>• {m.title} (마감: {m.due_date})</p>
           ))}
         </div>
+      )}
+
+      {/* 과제 현황 요약 테이블 */}
+      {summaryRows.length > 0 && (
+        <SummaryTable rows={summaryRows} latestSubs={latestSubs} />
       )}
 
       {/* Legend */}
