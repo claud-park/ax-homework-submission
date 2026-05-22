@@ -137,13 +137,12 @@ export default function ProgressPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
 
   useEffect(() => {
-    Promise.all([
-      apiFetch<MilestoneWithHomework[]>('/api/milestones'),
-      apiFetch<Submission[]>('/api/submissions/mine'),
-    ]).then(([ms, subs]) => {
-      setMilestones(ms)
-      setSubmissions(subs)
-    }).catch(console.error)
+    apiFetch<MilestoneWithHomework[]>('/api/milestones')
+      .then(setMilestones)
+      .catch(console.error)
+    apiFetch<Submission[]>('/api/submissions/mine')
+      .then(setSubmissions)
+      .catch(console.error)
   }, [])
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
