@@ -273,7 +273,7 @@ function CharterPanel({ mode, submission, homeworks, onClose, onCreated, onUpdat
 
       const coverChildren = [
         new Paragraph({
-          children: [new TextRun({ text: 'AX · 과제정의서', size: 18, color: '888888' })],
+          children: [new TextRun({ text: 'AX · 과제정의서', size: 24, color: '888888' })],
         }),
         new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }),
         new Paragraph({ text: '' }),
