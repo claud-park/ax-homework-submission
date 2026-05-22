@@ -35,12 +35,13 @@ const MILESTONE_STATUS_COLOR: Record<string, string> = {
   completed: 'var(--success)', delayed: 'var(--error)',
 }
 const CHARTER_SECTIONS = [
-  { key: 'problem_definition', label: '문제 정의 (AS-IS)' },
-  { key: 'goal', label: '목표 (TO-BE)' },
-  { key: 'scope_in', label: '범위 In' },
-  { key: 'scope_out', label: '범위 Out' },
-  { key: 'expected_outcomes', label: '기대 효과' },
-  { key: 'risks', label: '리스크' },
+  { key: 'summary', label: '00. 30-Second Summary' },
+  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가' },
+  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가' },
+  { key: 'goal', label: '03. Goal · Success Metric' },
+  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
+  { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
+  { key: 'timeline', label: '06. Timeline · Milestones' },
 ] as const
 
 // ─── submission tab ───────────────────────────────────────────────────────────

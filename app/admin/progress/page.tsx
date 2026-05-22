@@ -9,12 +9,13 @@ type MilestoneWithUser = Milestone & { users: User; homeworks: HomeworkInfo }
 type ViewMode = 'user' | 'homework'
 
 type CharterContent = {
-  problem_definition?: string
+  summary?: string
+  problem?: string
+  user?: string
   goal?: string
-  scope_in?: string
-  scope_out?: string
-  expected_outcomes?: string
-  risks?: string
+  solution?: string
+  build?: string
+  timeline?: string
   [key: string]: string | undefined
 }
 type CharterWithUser = {
@@ -29,12 +30,13 @@ type CharterWithUser = {
 }
 
 const CHARTER_SECTIONS: { key: string; label: string }[] = [
-  { key: 'problem_definition', label: '문제 정의 (AS-IS)' },
-  { key: 'goal', label: '목표 (TO-BE)' },
-  { key: 'scope_in', label: '범위 In' },
-  { key: 'scope_out', label: '범위 Out' },
-  { key: 'expected_outcomes', label: '기대 효과' },
-  { key: 'risks', label: '리스크' },
+  { key: 'summary', label: '00. 30-Second Summary' },
+  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가' },
+  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가' },
+  { key: 'goal', label: '03. Goal · Success Metric' },
+  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
+  { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
+  { key: 'timeline', label: '06. Timeline · Milestones' },
 ]
 
 const STATUS_LABEL: Record<string, string> = {
