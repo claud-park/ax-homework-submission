@@ -7,7 +7,7 @@ import type { KanbanDataV2, Milestone, User } from '@/lib/types'
 type HomeworkInfo = { id: number; title: string } | null
 type MilestoneWithUser = Milestone & { users: User; homeworks: HomeworkInfo }
 type ViewMode = 'user' | 'homework'
-type SubmissionStatusOrNull = 'accepted' | 'pending' | 'declined' | 'not_submitted'
+type BadgeStatus = 'accepted' | 'pending' | 'declined' | 'not_submitted'
 
 type CharterContent = {
   summary?: string
@@ -94,11 +94,11 @@ function StatsBar({ stats }: {
   )
 }
 
-function SubmissionBadge({ status }: { status: SubmissionStatusOrNull }) {
-  const config: Record<SubmissionStatusOrNull, { label: string; color: string; bg: string }> = {
-    accepted:      { label: '합격',   color: '#22c55e',             bg: 'rgba(34,197,94,0.15)' },
-    pending:       { label: '검토중', color: '#f59e0b',             bg: 'rgba(245,158,11,0.15)' },
-    declined:      { label: '불합격', color: '#f87171',             bg: 'rgba(248,113,113,0.15)' },
+function SubmissionBadge({ status }: { status: BadgeStatus }) {
+  const config: Record<BadgeStatus, { label: string; color: string; bg: string }> = {
+    accepted:      { label: '합격',   color: 'var(--success)',      bg: 'rgba(34,197,94,0.15)' },
+    pending:       { label: '검토중', color: 'var(--amber)',        bg: 'rgba(245,158,11,0.15)' },
+    declined:      { label: '불합격', color: 'var(--error)',        bg: 'rgba(248,113,113,0.15)' },
     not_submitted: { label: '미제출', color: 'var(--text-disabled)', bg: 'rgba(148,163,184,0.12)' },
   }
   const { label, color, bg } = config[status]
@@ -375,7 +375,7 @@ function HomeworkGroup({
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
-  subStatus?: SubmissionStatusOrNull
+  subStatus?: BadgeStatus
 }) {
   const overdueCount = milestones.filter(isOverdue).length
   const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
@@ -405,7 +405,7 @@ function ChampionSection({
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
-  subStatusMap: Map<string, SubmissionStatusOrNull>
+  subStatusMap: Map<string, BadgeStatus>
 }) {
   const overdueCount = milestones.filter(isOverdue).length
 
@@ -585,7 +585,7 @@ export default function AdminProgressPage() {
   )
 
   const subStatusMap = useMemo(() => {
-    const map = new Map<string, SubmissionStatusOrNull>()
+    const map = new Map<string, BadgeStatus>()
     for (const card of kanbanData.accepted)    map.set(`${card.userId}|${card.homeworkId}`, 'accepted')
     for (const card of kanbanData.reviewing)   map.set(`${card.userId}|${card.homeworkId}`, 'pending')
     for (const card of kanbanData.declined)    map.set(`${card.userId}|${card.homeworkId}`, 'declined')
