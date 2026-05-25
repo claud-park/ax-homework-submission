@@ -66,6 +66,34 @@ function daysFromToday(dueDate: string): number {
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
 
+function StatItem({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '20px', fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: '10px', color: 'var(--text-disabled)', marginTop: '2px' }}>{label}</div>
+    </div>
+  )
+}
+
+function StatsBar({ stats }: {
+  stats: { accepted: number; reviewing: number; declined: number; not_submitted: number; overdue: number }
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '20px',
+      background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)',
+      borderRadius: '12px', padding: '10px 18px', marginBottom: '16px',
+    }}>
+      <StatItem value={stats.accepted}      label="합격"          color="var(--success)" />
+      <StatItem value={stats.reviewing}     label="검토중"         color="var(--amber)" />
+      <StatItem value={stats.declined}      label="불합격"         color="var(--error)" />
+      <StatItem value={stats.not_submitted} label="미제출"         color="var(--text-disabled)" />
+      <div style={{ width: '1px', height: '32px', background: 'var(--border-subtle)' }} />
+      <StatItem value={stats.overdue}       label="지연 마일스톤" color="var(--error)" />
+    </div>
+  )
+}
+
 // ─── shared sub-components ────────────────────────────────────────────────────
 
 function UserAvatar({ user, size = 28 }: { user: User; size?: number }) {
@@ -599,6 +627,9 @@ export default function AdminProgressPage() {
         </h1>
         <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>오늘: {todayStr}</p>
       </div>
+
+      {/* Stats bar */}
+      <StatsBar stats={stats} />
 
       {/* View mode toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '20px' }}>
