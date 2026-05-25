@@ -468,12 +468,13 @@ function ChampionSection({
 // ─── View by Homework ─────────────────────────────────────────────────────────
 
 function UserSubSection({
-  user, milestones, charters, onCharterClick,
+  user, milestones, charters, onCharterClick, subStatus,
 }: {
   user: User
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatus?: BadgeStatus
 }) {
   const overdueCount = milestones.filter(isOverdue).length
 
@@ -482,6 +483,7 @@ function UserSubSection({
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         <UserAvatar user={user} size={22} />
         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.name}</span>
+        {subStatus !== undefined && <SubmissionBadge status={subStatus} />}
         <OverdueBadge count={overdueCount} />
         <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
         <span style={{ fontSize: '10px', color: 'var(--text-disabled)', flexShrink: 0 }}>{milestones.length}개 마일스톤</span>
@@ -497,13 +499,14 @@ function UserSubSection({
 }
 
 function HomeworkSection({
-  hwId, hwTitle, milestones, charters, onCharterClick,
+  hwId, hwTitle, milestones, charters, onCharterClick, subStatusMap,
 }: {
   hwId: number | null
   hwTitle: string | null
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatusMap: Map<string, BadgeStatus>
 }) {
   const overdueCount = milestones.filter(isOverdue).length
   const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
@@ -538,7 +541,14 @@ function HomeworkSection({
       </div>
       <div style={{ padding: '16px 16px 0' }}>
         {byUser.map(({ user, milestones: ums, charters: ucs }) => (
-          <UserSubSection key={user.id} user={user} milestones={ums} charters={ucs} onCharterClick={onCharterClick} />
+          <UserSubSection
+            key={user.id}
+            user={user}
+            milestones={ums}
+            charters={ucs}
+            onCharterClick={onCharterClick}
+            subStatus={hwId !== null ? subStatusMap.get(`${user.id}|${hwId}`) : undefined}
+          />
         ))}
       </div>
     </div>
@@ -719,7 +729,15 @@ export default function AdminProgressPage() {
         ) : (
           byHomework.length > 0
             ? byHomework.map(({ key, hwId, hwTitle, milestones: hms, charters: hcs }) => (
-                <HomeworkSection key={key} hwId={hwId} hwTitle={hwTitle} milestones={hms} charters={hcs} onCharterClick={setSelectedCharter} />
+                <HomeworkSection
+                  key={key}
+                  hwId={hwId}
+                  hwTitle={hwTitle}
+                  milestones={hms}
+                  charters={hcs}
+                  onCharterClick={setSelectedCharter}
+                  subStatusMap={subStatusMap}
+                />
               ))
             : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 데이터가 없습니다.</p>
         )}
