@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
-import type { Milestone, User } from '@/lib/types'
+import type { KanbanDataV2, Milestone, User } from '@/lib/types'
 
 type HomeworkInfo = { id: number; title: string } | null
 type MilestoneWithUser = Milestone & { users: User; homeworks: HomeworkInfo }
 type ViewMode = 'user' | 'homework'
+type SubmissionStatusOrNull = 'accepted' | 'pending' | 'declined' | 'not_submitted'
 
 type CharterContent = {
   summary?: string
@@ -502,6 +503,9 @@ export default function AdminProgressPage() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>('user')
   const [selectedCharter, setSelectedCharter] = useState<CharterWithUser | null>(null)
+  const [kanbanData, setKanbanData] = useState<KanbanDataV2>({
+    not_started: [], in_progress: [], reviewing: [], accepted: [], declined: [],
+  })
 
   useEffect(() => {
     apiFetch<MilestoneWithUser[]>('/api/admin/milestones').then(data => {
@@ -510,6 +514,9 @@ export default function AdminProgressPage() {
     }).catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
     apiFetch<CharterWithUser[]>('/api/admin/charters').then(setCharters)
       .catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
+    apiFetch<KanbanDataV2>('/api/admin/kanban')
+      .then(setKanbanData)
+      .catch((e: Error) => toast.error('제출 현황 로드 실패: ' + e.message))
   }, [])
 
   const users = useMemo(
@@ -526,6 +533,27 @@ export default function AdminProgressPage() {
     () => charters.filter(c => selectedUsers.has(c.user_id)),
     [charters, selectedUsers],
   )
+
+  const subStatusMap = useMemo(() => {
+    const map = new Map<string, SubmissionStatusOrNull>()
+    for (const card of kanbanData.accepted)    map.set(`${card.userId}|${card.homeworkId}`, 'accepted')
+    for (const card of kanbanData.reviewing)   map.set(`${card.userId}|${card.homeworkId}`, 'pending')
+    for (const card of kanbanData.declined)    map.set(`${card.userId}|${card.homeworkId}`, 'declined')
+    for (const card of kanbanData.in_progress) map.set(`${card.userId}|${card.homeworkId}`, 'not_submitted')
+    for (const card of kanbanData.not_started) map.set(`${card.userId}|${card.homeworkId}`, 'not_submitted')
+    return map
+  }, [kanbanData])
+
+  const stats = useMemo(() => {
+    let accepted = 0, reviewing = 0, declined = 0, not_submitted = 0
+    for (const card of kanbanData.accepted)    { if (selectedUsers.has(card.userId)) accepted++ }
+    for (const card of kanbanData.reviewing)   { if (selectedUsers.has(card.userId)) reviewing++ }
+    for (const card of kanbanData.declined)    { if (selectedUsers.has(card.userId)) declined++ }
+    for (const card of kanbanData.in_progress) { if (selectedUsers.has(card.userId)) not_submitted++ }
+    for (const card of kanbanData.not_started) { if (selectedUsers.has(card.userId)) not_submitted++ }
+    const overdue = milestones.filter(m => selectedUsers.has(m.user_id) && isOverdue(m)).length
+    return { accepted, reviewing, declined, not_submitted, overdue }
+  }, [kanbanData, selectedUsers, milestones])
 
   const byUser = useMemo(
     () => users.filter(u => selectedUsers.has(u.id)).map(u => ({
