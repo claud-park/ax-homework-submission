@@ -89,7 +89,7 @@ function StatsBar({ stats }: {
       <StatItem value={stats.declined}      label="불합격"         color="var(--error)" />
       <StatItem value={stats.not_submitted} label="미제출"         color="var(--text-disabled)" />
       <div style={{ width: '1px', height: '32px', background: 'var(--border-subtle)' }} />
-      <StatItem value={stats.overdue}       label="지연 마일스톤" color="var(--error)" />
+      <StatItem value={stats.overdue}       label="지연 마일스톤" color="var(--amber)" />
     </div>
   )
 }
@@ -566,6 +566,7 @@ export default function AdminProgressPage() {
   const [kanbanData, setKanbanData] = useState<KanbanDataV2>({
     not_started: [], in_progress: [], reviewing: [], accepted: [], declined: [],
   })
+  const [kanbanLoaded, setKanbanLoaded] = useState(false)
 
   useEffect(() => {
     apiFetch<MilestoneWithUser[]>('/api/admin/milestones').then(data => {
@@ -575,7 +576,7 @@ export default function AdminProgressPage() {
     apiFetch<CharterWithUser[]>('/api/admin/charters').then(setCharters)
       .catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
     apiFetch<KanbanDataV2>('/api/admin/kanban')
-      .then(setKanbanData)
+      .then(data => { setKanbanData(data); setKanbanLoaded(true) })
       .catch((e: Error) => toast.error('제출 현황 로드 실패: ' + e.message))
   }, [])
 
@@ -661,7 +662,7 @@ export default function AdminProgressPage() {
       </div>
 
       {/* Stats bar */}
-      <StatsBar stats={stats} />
+      {kanbanLoaded && <StatsBar stats={stats} />}
 
       {/* View mode toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '20px' }}>
