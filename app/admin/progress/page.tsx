@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
-import type { Milestone, User } from '@/lib/types'
+import type { KanbanDataV2, Milestone, User } from '@/lib/types'
 
 type HomeworkInfo = { id: number; title: string } | null
 type MilestoneWithUser = Milestone & { users: User; homeworks: HomeworkInfo }
 type ViewMode = 'user' | 'homework'
+type BadgeStatus = 'accepted' | 'pending' | 'declined' | 'not_submitted'
 
 type CharterContent = {
   summary?: string
@@ -64,6 +65,52 @@ function daysFromToday(dueDate: string): number {
 }
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
+
+function StatItem({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '20px', fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: '10px', color: 'var(--text-disabled)', marginTop: '2px' }}>{label}</div>
+    </div>
+  )
+}
+
+function StatsBar({ stats }: {
+  stats: { accepted: number; reviewing: number; declined: number; not_submitted: number; overdue: number }
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '20px',
+      background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)',
+      borderRadius: '12px', padding: '10px 18px', marginBottom: '16px',
+    }}>
+      <StatItem value={stats.accepted}      label="합격"          color="var(--success)" />
+      <StatItem value={stats.reviewing}     label="검토중"         color="var(--amber)" />
+      <StatItem value={stats.declined}      label="불합격"         color="var(--error)" />
+      <StatItem value={stats.not_submitted} label="미제출"         color="var(--text-disabled)" />
+      <div style={{ width: '1px', height: '32px', background: 'var(--border-subtle)' }} />
+      <StatItem value={stats.overdue}       label="지연 마일스톤" color="var(--amber)" />
+    </div>
+  )
+}
+
+function SubmissionBadge({ status }: { status: BadgeStatus }) {
+  const config: Record<BadgeStatus, { label: string; color: string; bg: string }> = {
+    accepted:      { label: '합격',   color: 'var(--success)',      bg: 'rgba(34,197,94,0.15)' },
+    pending:       { label: '검토중', color: 'var(--amber)',        bg: 'rgba(245,158,11,0.15)' },
+    declined:      { label: '불합격', color: 'var(--error)',        bg: 'rgba(248,113,113,0.15)' },
+    not_submitted: { label: '미제출', color: 'var(--text-disabled)', bg: 'rgba(148,163,184,0.12)' },
+  }
+  const { label, color, bg } = config[status]
+  return (
+    <span style={{
+      fontSize: '10px', fontWeight: 700, padding: '2px 7px',
+      borderRadius: '4px', background: bg, color,
+    }}>
+      {label}
+    </span>
+  )
+}
 
 // ─── shared sub-components ────────────────────────────────────────────────────
 
@@ -321,13 +368,14 @@ function CharterPanel({ charter, onClose }: { charter: CharterWithUser; onClose:
 // ─── View by User ─────────────────────────────────────────────────────────────
 
 function HomeworkGroup({
-  hwId, hwTitle, milestones, charters, onCharterClick,
+  hwId, hwTitle, milestones, charters, onCharterClick, subStatus,
 }: {
   hwId: number | null
   hwTitle: string | null
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatus?: BadgeStatus
 }) {
   const overdueCount = milestones.filter(isOverdue).length
   const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
@@ -336,6 +384,7 @@ function HomeworkGroup({
     <div style={{ marginBottom: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.03em' }}>{label}</span>
+        {subStatus !== undefined && <SubmissionBadge status={subStatus} />}
         {overdueCount > 0 && <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--error)' }}>⚠️ {overdueCount}건 지연</span>}
         <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
       </div>
@@ -350,12 +399,13 @@ function HomeworkGroup({
 }
 
 function ChampionSection({
-  user, milestones, charters, onCharterClick,
+  user, milestones, charters, onCharterClick, subStatusMap,
 }: {
   user: User
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatusMap: Map<string, BadgeStatus>
 }) {
   const overdueCount = milestones.filter(isOverdue).length
 
@@ -406,6 +456,7 @@ function ChampionSection({
               milestones={groupMilestones}
               charters={groupCharters}
               onCharterClick={onCharterClick}
+              subStatus={hwId !== null ? subStatusMap.get(`${user.id}|${hwId}`) : undefined}
             />
           )
         })}
@@ -417,12 +468,13 @@ function ChampionSection({
 // ─── View by Homework ─────────────────────────────────────────────────────────
 
 function UserSubSection({
-  user, milestones, charters, onCharterClick,
+  user, milestones, charters, onCharterClick, subStatus,
 }: {
   user: User
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatus?: BadgeStatus
 }) {
   const overdueCount = milestones.filter(isOverdue).length
 
@@ -431,6 +483,7 @@ function UserSubSection({
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         <UserAvatar user={user} size={22} />
         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.name}</span>
+        {subStatus !== undefined && <SubmissionBadge status={subStatus} />}
         <OverdueBadge count={overdueCount} />
         <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
         <span style={{ fontSize: '10px', color: 'var(--text-disabled)', flexShrink: 0 }}>{milestones.length}개 마일스톤</span>
@@ -446,13 +499,14 @@ function UserSubSection({
 }
 
 function HomeworkSection({
-  hwId, hwTitle, milestones, charters, onCharterClick,
+  hwId, hwTitle, milestones, charters, onCharterClick, subStatusMap,
 }: {
   hwId: number | null
   hwTitle: string | null
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatusMap: Map<string, BadgeStatus>
 }) {
   const overdueCount = milestones.filter(isOverdue).length
   const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
@@ -487,7 +541,14 @@ function HomeworkSection({
       </div>
       <div style={{ padding: '16px 16px 0' }}>
         {byUser.map(({ user, milestones: ums, charters: ucs }) => (
-          <UserSubSection key={user.id} user={user} milestones={ums} charters={ucs} onCharterClick={onCharterClick} />
+          <UserSubSection
+            key={user.id}
+            user={user}
+            milestones={ums}
+            charters={ucs}
+            onCharterClick={onCharterClick}
+            subStatus={hwId !== null ? subStatusMap.get(`${user.id}|${hwId}`) : undefined}
+          />
         ))}
       </div>
     </div>
@@ -502,6 +563,10 @@ export default function AdminProgressPage() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>('user')
   const [selectedCharter, setSelectedCharter] = useState<CharterWithUser | null>(null)
+  const [kanbanData, setKanbanData] = useState<KanbanDataV2>({
+    not_started: [], in_progress: [], reviewing: [], accepted: [], declined: [],
+  })
+  const [kanbanLoaded, setKanbanLoaded] = useState(false)
 
   useEffect(() => {
     apiFetch<MilestoneWithUser[]>('/api/admin/milestones').then(data => {
@@ -510,6 +575,9 @@ export default function AdminProgressPage() {
     }).catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
     apiFetch<CharterWithUser[]>('/api/admin/charters').then(setCharters)
       .catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
+    apiFetch<KanbanDataV2>('/api/admin/kanban')
+      .then(data => { setKanbanData(data); setKanbanLoaded(true) })
+      .catch((e: Error) => toast.error('제출 현황 로드 실패: ' + e.message))
   }, [])
 
   const users = useMemo(
@@ -526,6 +594,27 @@ export default function AdminProgressPage() {
     () => charters.filter(c => selectedUsers.has(c.user_id)),
     [charters, selectedUsers],
   )
+
+  const subStatusMap = useMemo(() => {
+    const map = new Map<string, BadgeStatus>()
+    for (const card of kanbanData.accepted)    map.set(`${card.userId}|${card.homeworkId}`, 'accepted')
+    for (const card of kanbanData.reviewing)   map.set(`${card.userId}|${card.homeworkId}`, 'pending')
+    for (const card of kanbanData.declined)    map.set(`${card.userId}|${card.homeworkId}`, 'declined')
+    for (const card of kanbanData.in_progress) map.set(`${card.userId}|${card.homeworkId}`, 'not_submitted')
+    for (const card of kanbanData.not_started) map.set(`${card.userId}|${card.homeworkId}`, 'not_submitted')
+    return map
+  }, [kanbanData])
+
+  const stats = useMemo(() => {
+    let accepted = 0, reviewing = 0, declined = 0, not_submitted = 0
+    for (const card of kanbanData.accepted)    { if (selectedUsers.has(card.userId)) accepted++ }
+    for (const card of kanbanData.reviewing)   { if (selectedUsers.has(card.userId)) reviewing++ }
+    for (const card of kanbanData.declined)    { if (selectedUsers.has(card.userId)) declined++ }
+    for (const card of kanbanData.in_progress) { if (selectedUsers.has(card.userId)) not_submitted++ }
+    for (const card of kanbanData.not_started) { if (selectedUsers.has(card.userId)) not_submitted++ }
+    const overdue = milestones.filter(m => selectedUsers.has(m.user_id) && isOverdue(m)).length
+    return { accepted, reviewing, declined, not_submitted, overdue }
+  }, [kanbanData, selectedUsers, milestones])
 
   const byUser = useMemo(
     () => users.filter(u => selectedUsers.has(u.id)).map(u => ({
@@ -571,6 +660,9 @@ export default function AdminProgressPage() {
         </h1>
         <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>오늘: {todayStr}</p>
       </div>
+
+      {/* Stats bar */}
+      {kanbanLoaded && <StatsBar stats={stats} />}
 
       {/* View mode toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '20px' }}>
@@ -631,13 +723,22 @@ export default function AdminProgressPage() {
                   milestones={ums}
                   charters={ucs}
                   onCharterClick={setSelectedCharter}
+                  subStatusMap={subStatusMap}
                 />
               ))
             : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 챔피언이 없습니다.</p>
         ) : (
           byHomework.length > 0
             ? byHomework.map(({ key, hwId, hwTitle, milestones: hms, charters: hcs }) => (
-                <HomeworkSection key={key} hwId={hwId} hwTitle={hwTitle} milestones={hms} charters={hcs} onCharterClick={setSelectedCharter} />
+                <HomeworkSection
+                  key={key}
+                  hwId={hwId}
+                  hwTitle={hwTitle}
+                  milestones={hms}
+                  charters={hcs}
+                  onCharterClick={setSelectedCharter}
+                  subStatusMap={subStatusMap}
+                />
               ))
             : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 데이터가 없습니다.</p>
         )}
