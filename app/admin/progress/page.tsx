@@ -94,6 +94,24 @@ function StatsBar({ stats }: {
   )
 }
 
+function SubmissionBadge({ status }: { status: SubmissionStatusOrNull }) {
+  const config: Record<SubmissionStatusOrNull, { label: string; color: string; bg: string }> = {
+    accepted:      { label: '합격',   color: '#22c55e',             bg: 'rgba(34,197,94,0.15)' },
+    pending:       { label: '검토중', color: '#f59e0b',             bg: 'rgba(245,158,11,0.15)' },
+    declined:      { label: '불합격', color: '#f87171',             bg: 'rgba(248,113,113,0.15)' },
+    not_submitted: { label: '미제출', color: 'var(--text-disabled)', bg: 'rgba(148,163,184,0.12)' },
+  }
+  const { label, color, bg } = config[status]
+  return (
+    <span style={{
+      fontSize: '10px', fontWeight: 700, padding: '2px 7px',
+      borderRadius: '4px', background: bg, color,
+    }}>
+      {label}
+    </span>
+  )
+}
+
 // ─── shared sub-components ────────────────────────────────────────────────────
 
 function UserAvatar({ user, size = 28 }: { user: User; size?: number }) {
@@ -350,13 +368,14 @@ function CharterPanel({ charter, onClose }: { charter: CharterWithUser; onClose:
 // ─── View by User ─────────────────────────────────────────────────────────────
 
 function HomeworkGroup({
-  hwId, hwTitle, milestones, charters, onCharterClick,
+  hwId, hwTitle, milestones, charters, onCharterClick, subStatus,
 }: {
   hwId: number | null
   hwTitle: string | null
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatus?: SubmissionStatusOrNull
 }) {
   const overdueCount = milestones.filter(isOverdue).length
   const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
@@ -365,6 +384,7 @@ function HomeworkGroup({
     <div style={{ marginBottom: '20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.03em' }}>{label}</span>
+        {subStatus !== undefined && <SubmissionBadge status={subStatus} />}
         {overdueCount > 0 && <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--error)' }}>⚠️ {overdueCount}건 지연</span>}
         <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
       </div>
@@ -379,12 +399,13 @@ function HomeworkGroup({
 }
 
 function ChampionSection({
-  user, milestones, charters, onCharterClick,
+  user, milestones, charters, onCharterClick, subStatusMap,
 }: {
   user: User
   milestones: MilestoneWithUser[]
   charters: CharterWithUser[]
   onCharterClick: (c: CharterWithUser) => void
+  subStatusMap: Map<string, SubmissionStatusOrNull>
 }) {
   const overdueCount = milestones.filter(isOverdue).length
 
@@ -435,6 +456,7 @@ function ChampionSection({
               milestones={groupMilestones}
               charters={groupCharters}
               onCharterClick={onCharterClick}
+              subStatus={hwId !== null ? subStatusMap.get(`${user.id}|${hwId}`) : undefined}
             />
           )
         })}
@@ -690,6 +712,7 @@ export default function AdminProgressPage() {
                   milestones={ums}
                   charters={ucs}
                   onCharterClick={setSelectedCharter}
+                  subStatusMap={subStatusMap}
                 />
               ))
             : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 챔피언이 없습니다.</p>
