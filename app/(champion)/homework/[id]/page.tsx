@@ -34,15 +34,16 @@ const MILESTONE_STATUS_COLOR: Record<string, string> = {
   completed: 'var(--success)', delayed: 'var(--error)',
 }
 
-type SectionKey = 'problem_definition' | 'goal' | 'scope_in' | 'scope_out' | 'expected_outcomes' | 'risks'
+type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build' | 'timeline'
 type CharterContent = ProjectCharter['content']
 const CHARTER_SECTIONS: { key: SectionKey; label: string; required?: boolean }[] = [
-  { key: 'problem_definition', label: '문제 정의 (AS-IS)', required: true },
-  { key: 'goal', label: '목표 (TO-BE)', required: true },
-  { key: 'scope_in', label: '범위 In (Scope In)', required: true },
-  { key: 'scope_out', label: '범위 Out (Scope Out)', required: true },
-  { key: 'expected_outcomes', label: '기대 효과' },
-  { key: 'risks', label: '리스크' },
+  { key: 'summary', label: '00. 30-Second Summary', required: true },
+  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가', required: true },
+  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가' },
+  { key: 'goal', label: '03. Goal · Success Metric' },
+  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
+  { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
+  { key: 'timeline', label: '06. Timeline · Milestones' },
 ]
 
 // ─── submission tab components ───────────────────────────────────────────────

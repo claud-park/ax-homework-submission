@@ -60,12 +60,13 @@ export interface ProjectCharter {
   user_id: string
   project_name: string | null
   content: {
-    problem_definition?: string
+    summary?: string
+    problem?: string
+    user?: string
     goal?: string
-    scope_in?: string
-    scope_out?: string
-    expected_outcomes?: string
-    risks?: string
+    solution?: string
+    build?: string
+    timeline?: string
   }
   updated_at: string
   created_at: string
