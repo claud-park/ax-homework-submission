@@ -10,7 +10,6 @@ export async function GET(req: NextRequest) {
     .from('charter_submissions')
     .select('*, users(*)')
     .eq('publish_status', 'published')
-    .order('homework_id', { ascending: true, nullsFirst: false })
     .order('submitted_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
