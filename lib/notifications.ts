@@ -1,4 +1,4 @@
-import type { User, Homework, Milestone, Submission, DeadlineChangeRequest } from '@/lib/types'
+import type { User, Milestone, Submission, DeadlineChangeRequest } from '@/lib/types'
 import { sendEmail } from '@/lib/email'
 
 function appBaseUrl(): string {
@@ -20,15 +20,13 @@ function escapeHtml(s: string): string {
 
 export async function notifyNewSubmission(params: {
   user: User
-  homework: Homework
   submission: Submission
 }): Promise<void> {
   const to = adminEmail()
   if (!to) return
-  const { user, homework, submission } = params
-  const hwNo = String(homework.id).padStart(2, '0')
-  const subject = `[과제 제출] ${user.name} - #${hwNo} ${homework.title}`
-  const link = `${appBaseUrl()}/admin/kanban?homework_id=${encodeURIComponent(homework.id)}`
+  const { user, submission } = params
+  const subject = `[과제 제출] ${user.name}`
+  const link = `${appBaseUrl()}/admin/kanban`
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
   <div style="border-bottom:2px solid #2563eb;padding-bottom:12px;margin-bottom:20px">
@@ -36,7 +34,6 @@ export async function notifyNewSubmission(params: {
   </div>
   <table style="width:100%;font-size:14px;border-collapse:collapse">
     <tr><td style="padding:8px 0;color:#64748b;width:100px">챔피언</td><td style="padding:8px 0;font-weight:600">${escapeHtml(user.name)}</td></tr>
-    <tr><td style="padding:8px 0;color:#64748b">과제</td><td style="padding:8px 0">#${hwNo} ${escapeHtml(homework.title)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">시도 횟수</td><td style="padding:8px 0">${String(submission.attempt_number)}회</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">파일명</td><td style="padding:8px 0">${escapeHtml(submission.file_name)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">제출 시각</td><td style="padding:8px 0">${escapeHtml(submission.submitted_at)}</td></tr>
