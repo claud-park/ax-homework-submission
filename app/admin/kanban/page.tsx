@@ -8,7 +8,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import { SubmissionDetailPanel } from '@/components/SubmissionDetailPanel'
-import type { Homework, KanbanCard, KanbanColumn, KanbanDataV2, SubmissionStatus } from '@/lib/types'
+import type { KanbanCard, KanbanColumn, KanbanDataV2, SubmissionStatus } from '@/lib/types'
 
 const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: string; cardBg: string; avatarBg: string }[] = [
   { key: 'not_started', label: '미시작',  color: 'var(--text-disabled)', cardBorder: 'var(--border-subtle)',    cardBg: 'var(--surface-secondary)', avatarBg: 'var(--surface-secondary)' },
@@ -22,7 +22,7 @@ const DRAGGABLE_COLS: KanbanColumn[] = ['reviewing']
 const DROPPABLE_COLS: KanbanColumn[] = ['accepted', 'declined']
 
 function cardDragId(card: KanbanCard) {
-  return `${card.userId}_${card.homeworkId}`
+  return card.userId
 }
 
 function colForStatus(status: SubmissionStatus): KanbanColumn {
@@ -41,14 +41,12 @@ function KanbanCardView({
   col,
   draggable,
   clickable,
-  showHomework,
   onClick,
 }: {
   card: KanbanCard
   col: typeof COLS[0]
   draggable: boolean
   clickable: boolean
-  showHomework: boolean
   onClick?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -102,11 +100,6 @@ function KanbanCardView({
         </div>
         <div>
           <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{card.user.name}</div>
-          {showHomework && (
-            <div style={{ color: 'var(--text-disabled)' }}>
-              #{String(card.homeworkId).padStart(2, '0')} {card.homeworkTitle}
-            </div>
-          )}
         </div>
       </div>
 
@@ -165,13 +158,11 @@ const CLICKABLE_COLS: KanbanColumn[] = ['reviewing', 'accepted', 'declined']
 function DroppableCol({
   col,
   cards,
-  showHomework,
   isDropTarget,
   onCardClick,
 }: {
   col: typeof COLS[0]
   cards: KanbanCard[]
-  showHomework: boolean
   isDropTarget: boolean
   onCardClick: (card: KanbanCard) => void
 }) {
@@ -208,7 +199,6 @@ function DroppableCol({
             col={col}
             draggable={DRAGGABLE_COLS.includes(col.key)}
             clickable={isClickable}
-            showHomework={showHomework}
             onClick={() => onCardClick(card)}
           />
         ))}
@@ -226,8 +216,6 @@ const EMPTY_DATA: KanbanDataV2 = {
 }
 
 export default function AdminKanbanPage() {
-  const [homeworks, setHomeworks] = useState<Homework[]>([])
-  const [selectedHw, setSelectedHw] = useState<string>('')
   const [data, setData] = useState<KanbanDataV2>(EMPTY_DATA)
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null)
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null)
@@ -235,12 +223,7 @@ export default function AdminKanbanPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const fetchKanban = useCallback(() => {
-    const url = selectedHw ? `/api/admin/kanban?homework_id=${selectedHw}` : '/api/admin/kanban'
-    apiFetch<KanbanDataV2>(url).then(setData).catch(() => toast.error('데이터 로드 실패'))
-  }, [selectedHw])
-
-  useEffect(() => {
-    apiFetch<Homework[]>('/api/admin/homeworks').then(setHomeworks)
+    apiFetch<KanbanDataV2>('/api/admin/kanban').then(setData).catch(() => toast.error('데이터 로드 실패'))
   }, [])
 
   useEffect(() => { fetchKanban() }, [fetchKanban])
@@ -297,31 +280,12 @@ export default function AdminKanbanPage() {
     }
   }
 
-  const showHomework = selectedHw === ''
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6 whitespace-nowrap">
         <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
           제출 현황 (Kanban)
         </h1>
-        <select
-          value={selectedHw}
-          onChange={e => setSelectedHw(e.target.value)}
-          className="text-sm rounded-lg px-3 py-2"
-          style={{
-            background: 'var(--surface-primary)',
-            border: '1px solid var(--border-subtle)',
-            color: 'var(--text-primary)',
-          }}
-        >
-          <option value="">전체 과제</option>
-          {homeworks.map(hw => (
-            <option key={hw.id} value={hw.id}>
-              #{String(hw.id).padStart(2, '0')} {hw.title}
-            </option>
-          ))}
-        </select>
       </div>
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -331,7 +295,6 @@ export default function AdminKanbanPage() {
               key={col.key}
               col={col}
               cards={data[col.key]}
-              showHomework={showHomework}
               isDropTarget={DROPPABLE_COLS.includes(col.key)}
               onCardClick={setSelectedCard}
             />
@@ -344,7 +307,6 @@ export default function AdminKanbanPage() {
               col={COLS.find(c => c.key === colForStatus(activeCard.latestSubmission!.status))!}
               draggable={false}
               clickable={false}
-              showHomework={showHomework}
             />
           )}
         </DragOverlay>
