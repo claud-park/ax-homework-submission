@@ -33,7 +33,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ```bash
 bun install
-cp .env.local.example .env.local   # 그 후 실제 값 채움
+cp .env.local.example .env.local   # 그 후 실제 값 채움 (.env.local.example=로컬 개발용, .env.example=Docker 운영용)
 bun run dev
 ```
 

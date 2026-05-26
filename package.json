@@ -2,6 +2,7 @@
   "name": "ax-homework-submission",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1",
   "scripts": {
     "dev": "bun --bun next dev",
     "build": "bun --bun next build",
