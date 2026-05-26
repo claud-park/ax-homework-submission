@@ -96,13 +96,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         console.warn('[email] skipped milestone deliverable notification: user lookup returned null', { userId: user.id })
         return
       }
-      if (isResubmit && createdSubmission && resubmitHomeworkId !== null) {
-        const { data: homework } = await supabase.from('homeworks').select('*').eq('id', resubmitHomeworkId).single()
-        if (!homework) {
-          console.warn('[email] skipped notifyNewSubmission: homework lookup returned null', { homeworkId: resubmitHomeworkId })
-          return
-        }
-        await notifyNewSubmission({ user: userRow, homework, submission: createdSubmission })
+      if (isResubmit && createdSubmission) {
+        await notifyNewSubmission({ user: userRow, submission: createdSubmission })
       } else if (!isResubmit) {
         const { data: milestoneFull } = await supabase.from('milestones').select('*').eq('id', params.id).single()
         if (!milestoneFull) {
