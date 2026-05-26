@@ -5,7 +5,6 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 const NAV = [
   { emoji: '📋', label: '대시보드', href: '/admin' },
   { emoji: '📦', label: '제출 현황', href: '/admin/kanban' },
-  { emoji: '📊', label: '진척도', href: '/admin/progress' },
   { emoji: '📅', label: '기한 변경 요청', href: '/admin/requests' },
   { emoji: '📄', label: '주간 리포트', href: '/admin/reports' },
 ]
