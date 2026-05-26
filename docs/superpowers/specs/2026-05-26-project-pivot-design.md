@@ -41,7 +41,7 @@ The system is being pivoted from a multi-homework submission model (admin create
 ### Department Parsing (no DB change)
 
 `users.name` from Google OAuth follows the format: `이름(Nickname)/부서명/회사명`  
-Example: `오영하(Noah)/전략 담당/Dreamus`
+Example: `박이비(Evie)/전략 담당/Dreamus`
 
 Parsing logic (app layer only):
 

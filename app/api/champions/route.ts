@@ -45,11 +45,11 @@ export async function GET(req: NextRequest) {
   const result: ChampionSummary[] = (users ?? []).map(u => {
     const { displayName, department } = parseName(u.name)
     const charter = charterMap.get(u.id)
-    const byWeek = milestonesByUser.get(u.id) ?? new Map()
+    const byWeek = milestonesByUser.get(u.id) ?? new Map<number, { status: MilestoneStatus }[]>()
     const weeklyStatus: Record<number, MilestoneStatus> = {}
-    for (const [week, mss] of byWeek) {
+    byWeek.forEach((mss, week) => {
       weeklyStatus[week] = aggregateWeekStatus(mss)
-    }
+    })
     return {
       userId: u.id,
       name: displayName,
