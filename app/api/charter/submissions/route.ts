@@ -20,20 +20,15 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const isAdmin = !!user.user_metadata?.is_admin
-  const homeworkId = req.nextUrl.searchParams.get('homework_id')
   const targetUserId = req.nextUrl.searchParams.get('user_id')
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 
   const supabase = createServiceClient()
 
-  // Admin listing across users: published only (drafts are author-private)
-  if (isAdmin && !targetUserId && homeworkId) {
-    const hwId = parseInt(homeworkId, 10)
-    if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
+  if (isAdmin && !targetUserId) {
     const { data, error } = await supabase
       .from('charter_submissions')
       .select('*, users(*)')
-      .eq('homework_id', hwId)
       .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -46,14 +41,8 @@ export async function GET(req: NextRequest) {
     .eq('user_id', effectiveUserId)
     .order('submitted_at', { ascending: false })
 
-  // Admin fetching specific user's charter sees only published
   if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
 
-  if (homeworkId) {
-    const hwId = parseInt(homeworkId, 10)
-    if (isNaN(hwId)) return NextResponse.json({ error: 'Invalid homework_id' }, { status: 400 })
-    query = query.eq('homework_id', hwId)
-  }
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
@@ -62,25 +51,27 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { project_name, content, homework_id, publish_status } = await req.json()
+  const { project_name, content, publish_status } = await req.json()
   const status = publish_status === 'published' ? 'published' : 'draft'
 
   if (status === 'published') {
     const fields = validateCharter(content ?? {}, project_name)
-    if (fields.length > 0)
-      return NextResponse.json({ error: 'validation_failed', fields }, { status: 400 })
+    if (fields.length > 0) return NextResponse.json({ error: 'validation_failed', fields }, { status: 400 })
   }
 
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('charter_submissions')
-    .insert({
-      user_id: user.id,
-      project_name: project_name ?? null,
-      content: content ?? {},
-      publish_status: status,
-      ...(homework_id ? { homework_id } : {}),
-    })
+    .upsert(
+      {
+        user_id: user.id,
+        project_name: project_name ?? null,
+        content: content ?? {},
+        publish_status: status,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
