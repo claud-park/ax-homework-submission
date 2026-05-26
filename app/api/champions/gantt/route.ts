@@ -17,6 +17,8 @@ export interface GanttChampion {
   userId: string
   name: string
   department: string
+  projectName: string | null
+  charterSubmissionId: string | null
   milestones: GanttMilestone[]
 }
 
@@ -28,9 +30,13 @@ export async function GET(req: NextRequest) {
 
   const [
     { data: users, error: usersErr },
+    { data: charters, error: chartersErr },
     { data: milestones, error: msErr },
   ] = await Promise.all([
     supabase.from('users').select('id, name'),
+    supabase
+      .from('charter_submissions')
+      .select('user_id, id, project_name'),
     supabase
       .from('milestones')
       .select('id, user_id, title, start_date, due_date, status, week_number')
@@ -42,7 +48,11 @@ export async function GET(req: NextRequest) {
   ])
 
   if (usersErr) return NextResponse.json({ error: usersErr.message }, { status: 500 })
+  if (chartersErr) return NextResponse.json({ error: chartersErr.message }, { status: 500 })
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
+
+  const charterMap = new Map<string, { id: string; project_name: string | null }>()
+  for (const c of charters ?? []) charterMap.set(c.user_id, c)
 
   const msMap = new Map<string, GanttMilestone[]>()
   for (const m of milestones ?? []) {
@@ -60,10 +70,13 @@ export async function GET(req: NextRequest) {
   const result: GanttChampion[] = (users ?? [])
     .map(u => {
       const { displayName, department } = parseName(u.name)
+      const charter = charterMap.get(u.id)
       return {
         userId: u.id,
         name: displayName,
         department,
+        projectName: charter?.project_name ?? null,
+        charterSubmissionId: charter?.id ?? null,
         milestones: msMap.get(u.id) ?? [],
       }
     })

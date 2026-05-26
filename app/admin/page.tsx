@@ -43,7 +43,7 @@ export default function AdminDashboard() {
           onCharterClick={(userId) => router.push(`/admin/champions/${userId}#charter`)}
         />
       ) : (
-        <ChampionGanttView />
+        <ChampionGanttView charterLinkBase="/admin/champions" />
       )}
     </div>
   )
