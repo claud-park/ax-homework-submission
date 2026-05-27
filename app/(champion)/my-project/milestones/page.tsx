@@ -482,7 +482,7 @@ export default function MilestonesPage() {
     setError(null)
     try {
       const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
-        method: 'PATCH', body: JSON.stringify({ is_manual_progress: true }),
+        method: 'PATCH', body: JSON.stringify({ is_manual_progress: true, bottleneck_type: null, bottleneck_note: null }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
       toast.success('상태가 변경되었습니다.')
