@@ -81,6 +81,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Fire-and-forget notifications
   const notifUser: User = {
@@ -93,7 +94,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.is_manual_completed === true && !existing.is_manual_completed) {
     notifyMilestoneCompleted({ user: notifUser, milestone: data }).catch(console.error)
   }
-  if (body.bottleneck_type != null && existing.bottleneck_type !== body.bottleneck_type) {
+  if (body.bottleneck_type != null && existing.bottleneck_type == null) {
     notifyBottleneck({ user: notifUser, milestone: data, type: body.bottleneck_type, note: body.bottleneck_note ?? null }).catch(console.error)
   }
 
