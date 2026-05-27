@@ -8,7 +8,7 @@ type View = 'table' | 'gantt'
 
 export default function SummaryPage() {
   const router = useRouter()
-  const [view, setView] = useState<View>('table')
+  const [view, setView] = useState<View>('gantt')
 
   return (
     <div>

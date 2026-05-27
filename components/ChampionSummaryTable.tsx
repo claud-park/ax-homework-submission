@@ -49,6 +49,7 @@ export function ChampionSummaryTable({ onChampionClick, onCharterClick, highligh
             {['부서', '이름', '과제명', '과제정의서', ...allWeeks.map(w => `W${w}`)].map(h => (
               <th
                 key={h}
+                scope="col"
                 style={{
                   padding: '8px 12px',
                   textAlign: 'left',

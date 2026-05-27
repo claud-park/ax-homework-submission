@@ -8,7 +8,7 @@ type View = 'table' | 'gantt'
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [view, setView] = useState<View>('table')
+  const [view, setView] = useState<View>('gantt')
 
   return (
     <div>
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
           onCharterClick={(userId) => router.push(`/admin/champions/${userId}#charter`)}
         />
       ) : (
-        <ChampionGanttView charterLinkBase="/admin/champions" />
+        <ChampionGanttView />
       )}
     </div>
   )
