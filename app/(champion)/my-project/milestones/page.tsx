@@ -34,6 +34,16 @@ const REQ_COLOR: Record<string, string> = {
 
 interface NewMilestone { week_number: string; title: string; start_date: string; due_date: string; description: string }
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return '방금'
+  if (mins < 60) return `${mins}분 전`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}시간 전`
+  return `${Math.floor(hours / 24)}일 전`
+}
+
 const BOTTLENECK_OPTIONS: { value: BottleneckType; label: string }[] = [
   { value: 'technical', label: '기술적 문제' },
   { value: 'resource', label: '리소스 부족' },
@@ -54,6 +64,7 @@ const CHECKIN_INPUT_STYLE: React.CSSProperties = {
 interface MilestoneCardProps {
   m: Milestone
   showActions: boolean
+  hasPendingDeadlineRequest: boolean
   onCompleteClick: (id: string) => void
   onDelayClick: (m: Milestone) => void
   onDeadlineExtension: (m: Milestone) => void
@@ -61,9 +72,33 @@ interface MilestoneCardProps {
   onGoToWBS: (m: Milestone) => void
 }
 
-function MilestoneCard({ m, showActions, onCompleteClick, onDelayClick, onDeadlineExtension, onInProgress, onGoToWBS }: MilestoneCardProps) {
+function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteClick, onDelayClick, onDeadlineExtension, onInProgress, onGoToWBS }: MilestoneCardProps) {
   const statusColor = STATUS_COLOR[m.status] ?? 'var(--text-disabled)'
   const statusLabel = STATUS_LABEL[m.status] ?? m.status
+
+  const isDelayPending = m.bottleneck_type !== null && m.bottleneck_reviewed_at === null
+  const hasAdminReply = m.bottleneck_reviewed_at !== null && !!m.bottleneck_admin_comment
+
+  // Status-based button visibility
+  const showComplete = m.status === 'in_progress' || m.status === 'delayed'
+  const showDelay = m.status === 'in_progress' || m.status === 'delayed'
+  const showDeadline = m.status === 'not_started' || m.status === 'in_progress' || m.status === 'delayed'
+  const showProgress = m.status === 'not_started'
+
+  const pendingPill = (
+    <span
+      className="text-xs px-3 py-1.5 rounded-full font-semibold"
+      style={{
+        background: 'rgba(251,191,36,0.12)',
+        color: 'var(--amber)',
+        cursor: 'default',
+        border: '1px solid rgba(251,191,36,0.4)',
+      }}
+    >
+      관리자 검토중
+    </span>
+  )
+
   return (
     <div
       style={{
@@ -86,36 +121,77 @@ function MilestoneCard({ m, showActions, onCompleteClick, onDelayClick, onDeadli
           {statusLabel}{m.status === 'delayed' ? ' ⚠️' : m.status === 'completed' ? ' ✅' : ''}
         </span>
       </div>
+
+      {/* Admin reply bubble — only when reviewed and comment is non-empty */}
+      {hasAdminReply && (
+        <div
+          style={{
+            borderLeft: '3px solid var(--blue-600)',
+            borderRadius: '0 6px 6px 0',
+            background: 'rgba(37,99,235,0.04)',
+            padding: '8px 10px 8px 12px',
+            marginBottom: '12px',
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded"
+              style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)' }}
+            >
+              관리자
+            </span>
+            <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>
+              {timeAgo(m.bottleneck_reviewed_at!)}
+            </span>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            {m.bottleneck_admin_comment}
+          </p>
+        </div>
+      )}
+
       {showActions ? (
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => onCompleteClick(m.id)}
-            className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-            style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}
-          >
-            ✅ 완료
-          </button>
-          <button
-            onClick={() => onDelayClick(m)}
-            className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-            style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }}
-          >
-            ⚠ 지연 신고
-          </button>
-          <button
-            onClick={() => onDeadlineExtension(m)}
-            className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-            style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--amber)', border: '1px solid var(--amber)' }}
-          >
-            📅 기한 연장
-          </button>
-          <button
-            onClick={() => onInProgress(m.id)}
-            className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-            style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
-          >
-            ▶ 진행 중
-          </button>
+          {showComplete && (
+            <button
+              onClick={() => onCompleteClick(m.id)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+              style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}
+            >
+              ✅ 완료
+            </button>
+          )}
+          {showDelay && (
+            isDelayPending ? pendingPill : (
+              <button
+                onClick={() => onDelayClick(m)}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }}
+              >
+                ⚠ 지연 신고
+              </button>
+            )
+          )}
+          {showDeadline && (
+            hasPendingDeadlineRequest ? pendingPill : (
+              <button
+                onClick={() => onDeadlineExtension(m)}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--amber)', border: '1px solid var(--amber)' }}
+              >
+                📅 기한 연장
+              </button>
+            )
+          )}
+          {showProgress && (
+            <button
+              onClick={() => onInProgress(m.id)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+              style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
+            >
+              ▶ 진행 중
+            </button>
+          )}
           <button
             onClick={() => onGoToWBS(m)}
             className="text-xs ml-auto"
@@ -133,6 +209,7 @@ function MilestoneCard({ m, showActions, onCompleteClick, onDelayClick, onDeadli
 
 interface CheckinTabProps {
   milestones: Milestone[]
+  requests: DeadlineChangeRequest[]
   onComplete: (id: string) => Promise<void>
   onDelayReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
   onInProgress: (id: string) => Promise<void>
@@ -140,7 +217,7 @@ interface CheckinTabProps {
   onGoToWBS: (m: Milestone) => void
 }
 
-function CheckinTab({ milestones, onComplete, onDelayReport, onInProgress, onDeadlineExtension, onGoToWBS }: CheckinTabProps) {
+function CheckinTab({ milestones, requests, onComplete, onDelayReport, onInProgress, onDeadlineExtension, onGoToWBS }: CheckinTabProps) {
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null)
   const [delayMilestone, setDelayMilestone] = useState<Milestone | null>(null)
   const [delayForm, setDelayForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })
@@ -180,6 +257,11 @@ function CheckinTab({ milestones, onComplete, onDelayReport, onInProgress, onDea
       new Date(m.start_date) <= today
     ),
     [published, today]
+  )
+
+  const pendingDeadlineIds = useMemo(
+    () => new Set(requests.filter(r => r.status === 'pending').map(r => r.milestone_id)),
+    [requests]
   )
 
   async function handleCompleteConfirm() {
@@ -226,6 +308,7 @@ function CheckinTab({ milestones, onComplete, onDelayReport, onInProgress, onDea
                     key={m.id}
                     m={m}
                     showActions
+                    hasPendingDeadlineRequest={pendingDeadlineIds.has(m.id)}
                     onCompleteClick={id => setCompleteConfirmId(id)}
                     onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
                     onDeadlineExtension={onDeadlineExtension}
@@ -245,6 +328,7 @@ function CheckinTab({ milestones, onComplete, onDelayReport, onInProgress, onDea
                     key={m.id}
                     m={m}
                     showActions
+                    hasPendingDeadlineRequest={pendingDeadlineIds.has(m.id)}
                     onCompleteClick={id => setCompleteConfirmId(id)}
                     onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
                     onDeadlineExtension={onDeadlineExtension}
@@ -264,6 +348,7 @@ function CheckinTab({ milestones, onComplete, onDelayReport, onInProgress, onDea
                     key={m.id}
                     m={m}
                     showActions={false}
+                    hasPendingDeadlineRequest={false}
                     onCompleteClick={() => {}}
                     onDelayClick={() => {}}
                     onDeadlineExtension={() => {}}
@@ -697,6 +782,7 @@ export default function MilestonesPage() {
       {activeTab === 'checkin' ? (
         <CheckinTab
           milestones={milestones}
+          requests={requests}
           onComplete={handleCheckinComplete}
           onDelayReport={handleCheckinDelayReport}
           onInProgress={handleCheckinInProgress}
