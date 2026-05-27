@@ -7,6 +7,7 @@ import { ChevronRight, ChevronDown, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import type { GanttChampion } from '@/app/api/champions/gantt/route'
 import type { ChampionProject, MilestoneStatus } from '@/lib/types'
+import { ChampionSummaryTable } from '@/components/ChampionSummaryTable'
 
 // Column widths for the custom task list (px)
 const W = { name: 130, dept: 72, project: 130, charter: 56 }
@@ -245,8 +246,6 @@ function CharterDetailPanel({ userId, champMap, onClose }: {
       display: 'flex',
       flexDirection: 'column',
       background: 'var(--surface-primary)',
-      overflow: 'hidden',
-      maxHeight: 600,
     }}>
       <div style={{
         display: 'flex',
@@ -311,6 +310,7 @@ export function ChampionGanttView() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [panelUserId, setPanelUserId] = useState<string | null>(null)
+  const [view, setView] = useState<'table' | 'gantt'>('gantt')
 
   useEffect(() => {
     apiFetch<GanttChampion[]>('/api/champions/gantt')
@@ -365,52 +365,82 @@ export function ChampionGanttView() {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0 }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="flex gap-1 mb-3">
-          {([ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => setViewMode(m)}
-              className="text-xs px-3 py-1 rounded-md"
-              style={{
-                background: viewMode === m ? 'rgba(37,99,235,0.15)' : 'transparent',
-                color: viewMode === m ? 'var(--blue-600)' : 'var(--text-secondary)',
-                border: '1px solid var(--border-subtle)',
-                cursor: 'pointer',
-              }}
-            >
-              {m === ViewMode.Day ? '일' : m === ViewMode.Week ? '주' : '월'}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ fontSize: 12 }}>
-          <Gantt
-            tasks={tasks}
-            viewMode={viewMode}
-            onExpanderClick={handleExpandChange}
-            listCellWidth={`${LIST_WIDTH}px`}
-            columnWidth={viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200}
-            rowHeight={36}
-            barCornerRadius={4}
-            locale="ko-KR"
-            todayColor="rgba(37,99,235,0.08)"
-            TaskListHeader={TaskListHeader}
-            TaskListTable={TaskListTable}
-          />
-        </div>
-
-        <div className="flex gap-4 mt-3">
-          {(Object.entries(STATUS_COLOR) as [MilestoneStatus, string][]).map(([status, color]) => (
-            <div key={status} className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ background: color }} />
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {STATUS_LABEL[status as MilestoneStatus]}
-              </span>
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex gap-1">
+            {(['table', 'gantt'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="text-xs px-3 py-1 rounded-md"
+                style={{
+                  background: view === v ? 'rgba(37,99,235,0.15)' : 'transparent',
+                  color: view === v ? 'var(--blue-600)' : 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                }}
+              >
+                {v === 'table' ? '표' : '간트'}
+              </button>
+            ))}
+          </div>
+          {view === 'gantt' && (
+            <div className="flex gap-1">
+              {([ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setViewMode(m)}
+                  className="text-xs px-3 py-1 rounded-md"
+                  style={{
+                    background: viewMode === m ? 'rgba(37,99,235,0.15)' : 'transparent',
+                    color: viewMode === m ? 'var(--blue-600)' : 'var(--text-secondary)',
+                    border: '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {m === ViewMode.Day ? '일' : m === ViewMode.Week ? '주' : '월'}
+                </button>
+              ))}
             </div>
-          ))}
+          )}
         </div>
+
+        {view === 'table' ? (
+          <ChampionSummaryTable
+            onChampionClick={() => {}}
+            onCharterClick={(userId) => setPanelUserId(prev => prev === userId ? null : userId)}
+          />
+        ) : (
+          <>
+            <div style={{ fontSize: 12 }}>
+              <Gantt
+                tasks={tasks}
+                viewMode={viewMode}
+                onExpanderClick={handleExpandChange}
+                listCellWidth={`${LIST_WIDTH}px`}
+                columnWidth={viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200}
+                rowHeight={36}
+                barCornerRadius={4}
+                locale="ko-KR"
+                todayColor="rgba(37,99,235,0.08)"
+                TaskListHeader={TaskListHeader}
+                TaskListTable={TaskListTable}
+              />
+            </div>
+
+            <div className="flex gap-4 mt-3">
+              {(Object.entries(STATUS_COLOR) as [MilestoneStatus, string][]).map(([status, color]) => (
+                <div key={status} className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm" style={{ background: color }} />
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {STATUS_LABEL[status as MilestoneStatus]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {panelUserId && (
