@@ -2,6 +2,7 @@ export type SubmissionStatus = 'pending' | 'accepted' | 'declined'
 export type MilestoneStatus = 'not_started' | 'in_progress' | 'completed' | 'delayed'
 export type RequestStatus = 'pending' | 'approved' | 'rejected'
 export type PublishStatus = 'draft' | 'published'
+export type BottleneckType = 'technical' | 'resource' | 'external' | 'other'
 
 export interface User {
   id: string
@@ -11,20 +12,9 @@ export interface User {
   created_at: string
 }
 
-export interface Homework {
-  id: number
-  title: string
-  description: string | null
-  due_date: string
-  created_at: string
-  publish_status: PublishStatus
-  created_by: string | null
-}
-
 export interface Submission {
   id: string
   user_id: string
-  homework_id: number
   file_path: string
   file_name: string
   status: SubmissionStatus
@@ -47,17 +37,6 @@ export interface Comment {
 export interface CharterSubmission {
   id: string
   user_id: string
-  homework_id: number | null
-  project_name: string | null
-  content: ProjectCharter['content']
-  submitted_at: string
-  updated_at: string
-  publish_status: PublishStatus
-}
-
-export interface ProjectCharter {
-  id: string
-  user_id: string
   project_name: string | null
   content: {
     summary?: string
@@ -68,6 +47,16 @@ export interface ProjectCharter {
     build?: string
     timeline?: string
   }
+  submitted_at: string
+  updated_at: string
+  publish_status: PublishStatus
+}
+
+export interface ProjectCharter {
+  id: string
+  user_id: string
+  project_name: string | null
+  content: CharterSubmission['content']
   updated_at: string
   created_at: string
 }
@@ -75,7 +64,6 @@ export interface ProjectCharter {
 export interface Milestone {
   id: string
   user_id: string
-  homework_id: number | null
   week_number: number
   title: string
   description: string | null
@@ -83,6 +71,11 @@ export interface Milestone {
   due_date: string
   status: MilestoneStatus
   is_manual_progress: boolean
+  is_manual_completed: boolean
+  bottleneck_type: BottleneckType | null
+  bottleneck_note: string | null
+  bottleneck_admin_comment: string | null
+  bottleneck_reviewed_at: string | null
   display_order: number
   created_at: string
   updated_at: string
@@ -115,12 +108,6 @@ export interface DeadlineChangeRequest {
   user?: User
 }
 
-export interface HomeworkWithCount extends Homework {
-  submission_count: number
-  user_count: number
-}
-
-
 export interface CharterComment {
   id: string
   charter_submission_id: string
@@ -136,10 +123,25 @@ export interface CharterComment {
   replies?: CharterComment[]
 }
 
+export interface ChampionSummary {
+  userId: string
+  name: string
+  department: string
+  projectName: string | null
+  charterStatus: PublishStatus | null
+  charterSubmissionId: string | null
+  weeklyStatus: Record<number, MilestoneStatus>
+}
+
+export interface ChampionProject {
+  user: User
+  charter: (CharterSubmission & { comments: CharterComment[] }) | null
+  milestones: Milestone[]
+  latestSubmission: Submission | null
+}
+
 export interface KanbanCard {
   userId: string
-  homeworkId: number
-  homeworkTitle: string
   user: User
   latestSubmission: {
     id: string
@@ -155,5 +157,4 @@ export interface KanbanCard {
 }
 
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
-
 export type KanbanDataV2 = Record<KanbanColumn, KanbanCard[]>

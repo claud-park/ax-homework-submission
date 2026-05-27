@@ -1,77 +1,50 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
-import { apiFetch } from '@/lib/api-client'
-import type { HomeworkWithCount, PublishStatus } from '@/lib/types'
-import { DraftBadge } from '@/components/DraftBadge'
-import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { ChampionSummaryTable } from '@/components/ChampionSummaryTable'
+import { ChampionGanttView } from '@/components/ChampionGanttView'
 
-type AdminHomework = HomeworkWithCount & { publish_status: PublishStatus }
+type View = 'table' | 'gantt'
 
 export default function AdminDashboard() {
-  const [homeworks, setHomeworks] = useState<AdminHomework[]>([])
-  const [filter, setFilter] = useState<PublishFilterValue>(() => {
-    if (typeof window === 'undefined') return 'all'
-    const q = new URLSearchParams(window.location.search).get('status') as PublishFilterValue | null
-    return q && ['all','published','draft'].includes(q) ? q : 'all'
-  })
-
-  useEffect(() => {
-    apiFetch<AdminHomework[]>('/api/admin/homeworks').then(setHomeworks)
-  }, [])
-
-  useEffect(() => {
-    const url = new URL(window.location.href)
-    if (filter === 'all') url.searchParams.delete('status')
-    else url.searchParams.set('status', filter)
-    window.history.replaceState({}, '', url.toString())
-  }, [filter])
-
-  const filtered = useMemo(() => {
-    if (filter === 'all') return homeworks
-    return homeworks.filter(hw => hw.publish_status === filter)
-  }, [homeworks, filter])
+  const router = useRouter()
+  const [view, setView] = useState<View>('gantt')
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6 whitespace-nowrap">
-        <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>대시보드</h1>
-        <a href="/admin/homework/new">
-          <button className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>
-            + 과제 만들기
-          </button>
-        </a>
-      </div>
-      <div className="mb-4">
-        <PublishStatusFilter value={filter} onChange={setFilter} />
-      </div>
-      <div className="flex flex-col gap-3">
-        {filtered.map(hw => {
-          const isDraft = hw.publish_status === 'draft'
-          const href = isDraft ? `/admin/homework/${hw.id}/edit` : `/admin/homework/${hw.id}`
-          return (
-            <a
-              key={hw.id}
-              href={href}
-              className="flex items-center justify-between p-4 rounded-xl border hover:border-blue-500 transition-colors"
-              style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>대시보드</h1>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>전체 챔피언 현황</p>
+        </div>
+        <div className="flex gap-1 p-1 rounded-lg" style={{ background: 'var(--surface-secondary)' }}>
+          {(['table', 'gantt'] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className="text-xs px-3 py-1.5 rounded-md font-medium transition-colors"
+              style={{
+                background: view === v ? 'hsl(var(--background))' : 'transparent',
+                color: view === v ? 'var(--text-primary)' : 'var(--text-secondary)',
+                boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
-              <div>
-                <span className="text-xs font-bold mr-2" style={{ color: 'var(--text-secondary)' }}>#{String(hw.id).padStart(2, '0')}</span>
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{hw.title || '(제목 없음)'}</span>
-                {isDraft && <span className="ml-2"><DraftBadge /></span>}
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>마감: {hw.due_date ?? '미정'}</p>
-              </div>
-              {isDraft ? (
-                <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>편집 →</span>
-              ) : (
-                <span className="text-sm font-bold" style={{ color: 'var(--text-secondary)' }}>
-                  {hw.submission_count} / {hw.user_count} 제출
-                </span>
-              )}
-            </a>
-          )
-        })}
+              {v === 'table' ? '📊 표' : '📅 간트'}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {view === 'table' ? (
+        <ChampionSummaryTable
+          onChampionClick={(userId) => router.push(`/admin/champions/${userId}`)}
+          onCharterClick={(userId) => router.push(`/admin/champions/${userId}#charter`)}
+        />
+      ) : (
+        <ChampionGanttView />
+      )}
     </div>
   )
 }

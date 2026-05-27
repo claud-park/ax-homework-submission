@@ -7,10 +7,12 @@ export async function GET(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const supabase = createServiceClient()
   const { data, error } = await supabase
-    .from('charter_submissions')
+    .from('milestones')
     .select('*, users(*)')
     .eq('publish_status', 'published')
-    .order('submitted_at', { ascending: false })
+    .not('bottleneck_type', 'is', null)
+    .is('bottleneck_reviewed_at', null)
+    .order('updated_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  return NextResponse.json(data ?? [])
 }

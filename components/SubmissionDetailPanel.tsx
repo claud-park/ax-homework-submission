@@ -60,7 +60,7 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
   const fetchDetail = useCallback(() => {
     if (!card) return
     setLoading(true)
-    apiFetch<(Submission & { comments?: Comment[] })[]>(`/api/admin/homeworks/${card.homeworkId}/submissions/${card.userId}`)
+    apiFetch<(Submission & { comments?: Comment[] })[]>(`/api/admin/users/${card.userId}/submissions`)
       .then(setSubmissions)
       .catch((e: Error) => toast.error('제출 이력 로드 실패: ' + e.message))
       .finally(() => setLoading(false))
@@ -129,8 +129,7 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
     }
   }
 
-  const hwNo = String(card.homeworkId).padStart(2, '0')
-  const fullReviewLink = `/admin/homework/${card.homeworkId}/${card.userId}`
+  const fullReviewLink = `/admin/champions/${card.userId}`
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -143,7 +142,7 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
         <SheetHeader>
           <SheetTitle>{card.user.name}</SheetTitle>
           <SheetDescription>
-            #{hwNo} {card.homeworkTitle}
+            제출 이력
           </SheetDescription>
         </SheetHeader>
 

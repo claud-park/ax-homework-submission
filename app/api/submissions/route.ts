@@ -16,47 +16,28 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData()
   const file = formData.get('file') as File | null
-  const homeworkId = formData.get('homework_id') as string | null
-
-  if (!file || !homeworkId)
-    return NextResponse.json({ error: 'Missing file or homework_id' }, { status: 400 })
+  if (!file) return NextResponse.json({ error: 'Missing file' }, { status: 400 })
 
   const supabase = createServiceClient()
 
-  // Guard: reject submissions against draft homeworks (defense-in-depth for notification gating)
-  const { data: hw } = await supabase
-    .from('homeworks')
-    .select('publish_status')
-    .eq('id', parseInt(homeworkId))
-    .single()
-  if (!hw || hw.publish_status !== 'published') {
-    return NextResponse.json({ error: '게시되지 않은 과제에는 제출할 수 없습니다.' }, { status: 400 })
-  }
-
-  // Determine attempt number
   const { count } = await supabase
     .from('submissions')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
-    .eq('homework_id', parseInt(homeworkId))
   const attemptNumber = (count ?? 0) + 1
 
-  // Upload file
   const safeFileName = sanitizeFileName(file.name)
-  const filePath = `${user.id}/${homeworkId}/${attemptNumber}/${safeFileName}`
+  const filePath = `${user.id}/${attemptNumber}/${safeFileName}`
   const arrayBuffer = await file.arrayBuffer()
   const { error: uploadError } = await supabase.storage
     .from('submissions')
     .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
-  if (uploadError)
-    return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
 
-  // Create submission record
   const { data, error } = await supabase
     .from('submissions')
     .insert({
       user_id: user.id,
-      homework_id: parseInt(homeworkId),
       file_path: filePath,
       file_name: file.name,
       status: 'pending',
@@ -64,21 +45,12 @@ export async function POST(req: NextRequest) {
     })
     .select()
     .single()
-  if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
   void (async () => {
     try {
-      const [{ data: homework }, { data: userRow }] = await Promise.all([
-        supabase.from('homeworks').select('*').eq('id', parseInt(homeworkId)).single(),
-        supabase.from('users').select('*').eq('id', user.id).single(),
-      ])
-      if (homework && userRow) {
-        await notifyNewSubmission({ user: userRow, homework, submission: data })
-      } else {
-        console.warn('[email] skipped notifyNewSubmission: homework or user lookup returned null', { homeworkId, userId: user.id })
-      }
+      const { data: userRow } = await supabase.from('users').select('*').eq('id', user.id).single()
+      if (userRow) await notifyNewSubmission({ user: userRow, submission: data })
     } catch (e) {
       console.error('[email] outer catch:', e)
     }

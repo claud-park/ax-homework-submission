@@ -4,9 +4,7 @@ import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone, User } from '@/lib/types'
 
-type HomeworkInfo = { id: number; title: string } | null
-type MilestoneWithUser = Milestone & { users: User; homeworks: HomeworkInfo }
-type ViewMode = 'user' | 'homework'
+type MilestoneWithUser = Milestone & { users: User }
 
 type CharterContent = {
   summary?: string
@@ -21,7 +19,6 @@ type CharterContent = {
 type CharterWithUser = {
   id: string
   user_id: string
-  homework_id: number | null
   project_name: string | null
   content: CharterContent
   submitted_at: string
@@ -254,11 +251,6 @@ function CharterPanel({ charter, onClose }: { charter: CharterWithUser; onClose:
               <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--blue-600)', background: 'rgba(37,99,235,0.12)', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
                 과제정의서
               </span>
-              {charter.homework_id && (
-                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  과제 #{String(charter.homework_id).padStart(2, '0')}
-                </span>
-              )}
             </div>
             <p style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {charter.project_name || '(제목 없음)'}
@@ -318,36 +310,7 @@ function CharterPanel({ charter, onClose }: { charter: CharterWithUser; onClose:
   )
 }
 
-// ─── View by User ─────────────────────────────────────────────────────────────
-
-function HomeworkGroup({
-  hwId, hwTitle, milestones, charters, onCharterClick,
-}: {
-  hwId: number | null
-  hwTitle: string | null
-  milestones: MilestoneWithUser[]
-  charters: CharterWithUser[]
-  onCharterClick: (c: CharterWithUser) => void
-}) {
-  const overdueCount = milestones.filter(isOverdue).length
-  const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
-
-  return (
-    <div style={{ marginBottom: '20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.03em' }}>{label}</span>
-        {overdueCount > 0 && <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--error)' }}>⚠️ {overdueCount}건 지연</span>}
-        <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
-      </div>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        {charters.map(c => (
-          <CharterCard key={c.id} charter={c} onClick={() => onCharterClick(c)} />
-        ))}
-        {milestones.map(m => <MilestoneCard key={m.id} m={m} />)}
-      </div>
-    </div>
-  )
-}
+// ─── Champion section (user view) ─────────────────────────────────────────────
 
 function ChampionSection({
   user, milestones, charters, onCharterClick,
@@ -358,18 +321,6 @@ function ChampionSection({
   onCharterClick: (c: CharterWithUser) => void
 }) {
   const overdueCount = milestones.filter(isOverdue).length
-
-  const groups = useMemo(() => {
-    const keys = new Set<string>()
-    for (const m of milestones) keys.add(m.homework_id !== null ? String(m.homework_id) : '__none__')
-    for (const c of charters) keys.add(c.homework_id !== null ? String(c.homework_id) : '__none__')
-
-    return Array.from(keys).sort((a, b) => {
-      if (a === '__none__') return 1
-      if (b === '__none__') return -1
-      return Number(a) - Number(b)
-    })
-  }, [milestones, charters])
 
   return (
     <div style={{
@@ -392,103 +343,11 @@ function ChampionSection({
         )}
         <OverdueBadge count={overdueCount} />
       </div>
-      <div style={{ padding: '16px 16px 0' }}>
-        {groups.map(key => {
-          const hwId = key === '__none__' ? null : Number(key)
-          const groupMilestones = milestones.filter(m => (m.homework_id !== null ? String(m.homework_id) : '__none__') === key)
-          const groupCharters = charters.filter(c => (c.homework_id !== null ? String(c.homework_id) : '__none__') === key)
-          const hwTitle = groupMilestones[0]?.homeworks?.title ?? null
-          return (
-            <HomeworkGroup
-              key={key}
-              hwId={hwId}
-              hwTitle={hwTitle}
-              milestones={groupMilestones}
-              charters={groupCharters}
-              onCharterClick={onCharterClick}
-            />
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─── View by Homework ─────────────────────────────────────────────────────────
-
-function UserSubSection({
-  user, milestones, charters, onCharterClick,
-}: {
-  user: User
-  milestones: MilestoneWithUser[]
-  charters: CharterWithUser[]
-  onCharterClick: (c: CharterWithUser) => void
-}) {
-  const overdueCount = milestones.filter(isOverdue).length
-
-  return (
-    <div style={{ marginBottom: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <UserAvatar user={user} size={22} />
-        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.name}</span>
-        <OverdueBadge count={overdueCount} />
-        <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
-        <span style={{ fontSize: '10px', color: 'var(--text-disabled)', flexShrink: 0 }}>{milestones.length}개 마일스톤</span>
-      </div>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingLeft: '30px' }}>
+      <div style={{ padding: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         {charters.map(c => (
           <CharterCard key={c.id} charter={c} onClick={() => onCharterClick(c)} />
         ))}
         {milestones.map(m => <MilestoneCard key={m.id} m={m} />)}
-      </div>
-    </div>
-  )
-}
-
-function HomeworkSection({
-  hwId, hwTitle, milestones, charters, onCharterClick,
-}: {
-  hwId: number | null
-  hwTitle: string | null
-  milestones: MilestoneWithUser[]
-  charters: CharterWithUser[]
-  onCharterClick: (c: CharterWithUser) => void
-}) {
-  const overdueCount = milestones.filter(isOverdue).length
-  const label = hwId !== null ? `과제 #${String(hwId).padStart(2, '0')}${hwTitle ? ` — ${hwTitle}` : ''}` : '독립 WBS'
-
-  const byUser = useMemo(() => {
-    const userMap = new Map<string, { user: User; milestones: MilestoneWithUser[]; charters: CharterWithUser[] }>()
-    for (const m of milestones) {
-      if (!userMap.has(m.user_id)) userMap.set(m.user_id, { user: m.users, milestones: [], charters: [] })
-      userMap.get(m.user_id)!.milestones.push(m)
-    }
-    for (const c of charters) {
-      if (!userMap.has(c.user_id)) userMap.set(c.user_id, { user: c.users, milestones: [], charters: [] })
-      userMap.get(c.user_id)!.charters.push(c)
-    }
-    return Array.from(userMap.values())
-  }, [milestones, charters])
-
-  return (
-    <div style={{
-      borderRadius: '16px',
-      border: overdueCount > 0 ? '1.5px solid rgba(248,113,113,0.35)' : '1px solid var(--border-subtle)',
-      background: 'var(--surface-primary)', overflow: 'hidden',
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
-        background: overdueCount > 0 ? 'rgba(248,113,113,0.04)' : 'var(--surface-secondary)',
-        borderBottom: '1px solid var(--border-subtle)',
-      }}>
-        <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', flex: 1, margin: 0 }}>{label}</p>
-        <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>{byUser.length}명 참여</span>
-        <OverdueBadge count={overdueCount} />
-      </div>
-      <div style={{ padding: '16px 16px 0' }}>
-        {byUser.map(({ user, milestones: ums, charters: ucs }) => (
-          <UserSubSection key={user.id} user={user} milestones={ums} charters={ucs} onCharterClick={onCharterClick} />
-        ))}
       </div>
     </div>
   )
@@ -500,7 +359,6 @@ export default function AdminProgressPage() {
   const [milestones, setMilestones] = useState<MilestoneWithUser[]>([])
   const [charters, setCharters] = useState<CharterWithUser[]>([])
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
-  const [viewMode, setViewMode] = useState<ViewMode>('user')
   const [selectedCharter, setSelectedCharter] = useState<CharterWithUser | null>(null)
 
   useEffect(() => {
@@ -536,23 +394,6 @@ export default function AdminProgressPage() {
     [users, filtered, filteredCharters, selectedUsers],
   )
 
-  const byHomework = useMemo(() => {
-    const map = new Map<string, { hwId: number | null; hwTitle: string | null; milestones: MilestoneWithUser[]; charters: CharterWithUser[] }>()
-    for (const m of filtered) {
-      const key = m.homework_id !== null ? String(m.homework_id) : '__none__'
-      if (!map.has(key)) map.set(key, { hwId: m.homework_id, hwTitle: m.homeworks?.title ?? null, milestones: [], charters: [] })
-      map.get(key)!.milestones.push(m)
-    }
-    for (const c of filteredCharters) {
-      const key = c.homework_id !== null ? String(c.homework_id) : '__none__'
-      if (!map.has(key)) map.set(key, { hwId: c.homework_id, hwTitle: null, milestones: [], charters: [] })
-      map.get(key)!.charters.push(c)
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => { if (a === '__none__') return 1; if (b === '__none__') return -1; return Number(a) - Number(b) })
-      .map(([key, g]) => ({ key, ...g }))
-  }, [filtered, filteredCharters])
-
   function toggleUser(userId: string) {
     setSelectedUsers(prev => {
       const next = new Set(prev)
@@ -572,75 +413,41 @@ export default function AdminProgressPage() {
         <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>오늘: {todayStr}</p>
       </div>
 
-      {/* View mode toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '20px' }}>
-        <div style={{
-          display: 'inline-flex', borderRadius: '10px', overflow: 'hidden',
-          border: '1px solid var(--border-subtle)', background: 'var(--surface-secondary)',
-        }}>
-          {([['user', '챔피언별'], ['homework', '과제별']] as [ViewMode, string][]).map(([mode, label]) => {
-            const active = viewMode === mode
-            return (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  padding: '6px 16px', fontSize: '12px', fontWeight: active ? 700 : 400,
-                  border: 'none', cursor: 'pointer',
-                  background: active ? 'var(--blue-600)' : 'transparent',
-                  color: active ? '#fff' : 'var(--text-secondary)',
-                  transition: 'background 0.15s, color 0.15s',
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Champion filter chips */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {users.map(u => {
-            const active = selectedUsers.has(u.id)
-            return (
-              <label key={u.id} style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                cursor: 'pointer', padding: '5px 12px', borderRadius: '20px',
-                border: `1px solid ${active ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
-                background: active ? 'rgba(37,99,235,0.1)' : 'var(--surface-primary)',
-                color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
-                fontSize: '12px', fontWeight: active ? 600 : 400, userSelect: 'none',
-              }}>
-                <input type="checkbox" checked={active} onChange={() => toggleUser(u.id)} style={{ display: 'none' }} />
-                {u.avatar_url && <img src={u.avatar_url} style={{ width: 16, height: 16, borderRadius: '50%' }} alt="" />}
-                {u.name}
-              </label>
-            )
-          })}
-        </div>
+      {/* Champion filter chips */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {users.map(u => {
+          const active = selectedUsers.has(u.id)
+          return (
+            <label key={u.id} style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              cursor: 'pointer', padding: '5px 12px', borderRadius: '20px',
+              border: `1px solid ${active ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
+              background: active ? 'rgba(37,99,235,0.1)' : 'var(--surface-primary)',
+              color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
+              fontSize: '12px', fontWeight: active ? 600 : 400, userSelect: 'none',
+            }}>
+              <input type="checkbox" checked={active} onChange={() => toggleUser(u.id)} style={{ display: 'none' }} />
+              {u.avatar_url && <img src={u.avatar_url} style={{ width: 16, height: 16, borderRadius: '50%' }} alt="" />}
+              {u.name}
+            </label>
+          )
+        })}
       </div>
 
       {/* Content */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {viewMode === 'user' ? (
-          byUser.length > 0
-            ? byUser.map(({ user, milestones: ums, charters: ucs }) => (
-                <ChampionSection
-                  key={user.id}
-                  user={user}
-                  milestones={ums}
-                  charters={ucs}
-                  onCharterClick={setSelectedCharter}
-                />
-              ))
-            : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 챔피언이 없습니다.</p>
-        ) : (
-          byHomework.length > 0
-            ? byHomework.map(({ key, hwId, hwTitle, milestones: hms, charters: hcs }) => (
-                <HomeworkSection key={key} hwId={hwId} hwTitle={hwTitle} milestones={hms} charters={hcs} onCharterClick={setSelectedCharter} />
-              ))
-            : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 데이터가 없습니다.</p>
-        )}
+        {byUser.length > 0
+          ? byUser.map(({ user, milestones: ums, charters: ucs }) => (
+              <ChampionSection
+                key={user.id}
+                user={user}
+                milestones={ums}
+                charters={ucs}
+                onCharterClick={setSelectedCharter}
+              />
+            ))
+          : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 챔피언이 없습니다.</p>
+        }
       </div>
 
       {/* Charter side panel */}

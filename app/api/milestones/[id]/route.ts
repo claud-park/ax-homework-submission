@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { notifyMilestoneCompleted, notifyBottleneck } from '@/lib/notifications'
+import type { MilestoneStatus, User } from '@/lib/types'
 
-function computeStatus(milestone: { due_date: string; is_manual_progress: boolean }, hasDeliverable: boolean) {
-  if (hasDeliverable) return 'completed'
+function computeStatus(
+  milestone: {
+    due_date: string
+    is_manual_progress: boolean
+    is_manual_completed: boolean
+    bottleneck_type: string | null
+  },
+  hasDeliverable: boolean,
+): MilestoneStatus {
+  if (hasDeliverable || milestone.is_manual_completed) return 'completed'
+  if (milestone.bottleneck_type) return 'delayed'
   if (milestone.is_manual_progress) return 'in_progress'
   if (milestone.due_date && new Date(milestone.due_date) < new Date()) return 'delayed'
   return 'not_started'
@@ -62,6 +73,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   delete (patch as { publish_status?: unknown }).publish_status
   patch.publish_status = nextStatus
 
+  // Reset admin review when champion re-files a delay report
+  if (body.bottleneck_type != null) {
+    patch.bottleneck_admin_comment = null
+    patch.bottleneck_reviewed_at = null
+  }
+
   const { data, error } = await supabase
     .from('milestones')
     .update(patch)
@@ -70,6 +87,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Fire-and-forget notifications
+  const notifUser: User = {
+    id: user.id,
+    email: user.email ?? '',
+    name: user.user_metadata?.name ?? user.email ?? '',
+    avatar_url: user.user_metadata?.avatar_url ?? null,
+    created_at: user.created_at,
+  }
+  if (body.is_manual_completed === true && !existing.is_manual_completed) {
+    notifyMilestoneCompleted({ user: notifUser, milestone: data }).catch(console.error)
+  }
+  if (body.bottleneck_type != null && existing.bottleneck_type == null) {
+    notifyBottleneck({ user: notifUser, milestone: data, type: body.bottleneck_type, note: body.bottleneck_note ?? null }).catch(console.error)
+  }
+
   return NextResponse.json(data)
 }
 

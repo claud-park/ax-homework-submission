@@ -1,11 +1,8 @@
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* === 기존 디자인 토큰 (보존) === */
-  /* --background / --foreground 는 shadcn @layer base 에서 HSL 포맷으로 정의 */
   --surface-primary: #ffffff;
   --surface-secondary: #f1f5f9;
   --text-primary: #0f172a;
@@ -22,10 +19,17 @@
 * { box-sizing: border-box; }
 html, body { background: hsl(var(--background)); color: var(--text-primary); font-family: Pretendard, 'Apple SD Gothic Neo', system-ui, sans-serif; }
 
+/* Global focus-visible ring — applies to all interactive elements */
+:focus-visible {
+  outline: 2px solid var(--blue-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @layer base {
   :root {
-    --background: 210 40% 98%;    /* #f8fafc — 기존 디자인 토큰과 일치 */
-    --foreground: 222.2 84% 4.9%; /* ≈ #0f172a — 기존 --text-primary 와 일치 */
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
@@ -75,6 +79,19 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* Custom token dark overrides */
+    --surface-primary: #1e293b;
+    --surface-secondary: #0f172a;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-disabled: #475569;
+    --blue-600: #3b82f6;
+    --app-accent: #3b82f6;
+    --border-subtle: #334155;
+    --error: #f87171;
+    --success: #4ade80;
+    --amber: #fbbf24;
   }
 }
 
