@@ -84,7 +84,21 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteCl
   const showDeadline = m.status === 'not_started' || m.status === 'in_progress' || m.status === 'delayed'
   const showProgress = m.status === 'not_started'
 
-  const pendingPill = (
+  const delayPendingPill = (
+    <span
+      className="text-xs px-3 py-1.5 rounded-full font-semibold"
+      style={{
+        background: 'rgba(248,113,113,0.1)',
+        color: 'var(--error)',
+        cursor: 'default',
+        border: '1px solid rgba(248,113,113,0.4)',
+      }}
+    >
+      지연 신고 검토중
+    </span>
+  )
+
+  const deadlinePendingPill = (
     <span
       className="text-xs px-3 py-1.5 rounded-full font-semibold"
       style={{
@@ -94,7 +108,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteCl
         border: '1px solid rgba(251,191,36,0.4)',
       }}
     >
-      관리자 검토중
+      기한 연장 검토중
     </span>
   )
 
@@ -161,7 +175,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteCl
             </button>
           )}
           {showDelay && (
-            isDelayPending ? pendingPill : (
+            isDelayPending ? delayPendingPill : (
               <button
                 onClick={() => onDelayClick(m)}
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold"
@@ -172,7 +186,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteCl
             )
           )}
           {showDeadline && (
-            hasPendingDeadlineRequest ? pendingPill : (
+            hasPendingDeadlineRequest ? deadlinePendingPill : (
               <button
                 onClick={() => onDeadlineExtension(m)}
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold"
