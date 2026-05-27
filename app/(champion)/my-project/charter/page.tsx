@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -30,20 +31,82 @@ type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build'
 type CharterContent = ProjectCharter['content']
 type SidePanel = null | 'new' | CharterSubmission
 
-const SECTIONS: { key: SectionKey; label: string; required?: boolean }[] = [
-  { key: 'summary', label: '00. 30-Second Summary', required: true },
-  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가', required: true },
-  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가' },
-  { key: 'goal', label: '03. Goal · Success Metric' },
-  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
-  { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
-  { key: 'timeline', label: '06. Timeline · Milestones' },
+const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: string }[] = [
+  { key: 'summary', label: '00. 30-Second Summary', required: true, tooltip: '이 프로젝트의 의의 — 어떤 반향을 기대하는가' },
+  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가', required: true, tooltip: '회사·부서·개인 차원에서 이 문제가 왜 중요한지 (영향 범위 넓을수록 좋아요)' },
+  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가', tooltip: '누가 쓸 것인가? Persona, 시나리오, Use Case 중심으로' },
+  { key: 'goal', label: '03. Goal · Success Metric', tooltip: "목표 한 줄 요약 — 정성/정량 모두 OK ('업무 시간 단축'도 충분해요)" },
+  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가', tooltip: '핵심 기능과 지표 — 무엇을 만들고 무엇으로 측정할지' },
+  { key: 'build', label: '05. Build · 어떻게 만들 것인가', tooltip: '어떻게 만들 것인가 — 기술 스택, 구현 접근법' },
+  { key: 'timeline', label: '06. Timeline · Milestones', tooltip: '주별 마일스톤 — WBS 탭과 연동됩니다' },
 ]
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
 
-function SectionEditor({ label, required, content, onBlur, onDirty }: {
-  label: string; required?: boolean; content: string; onBlur: (html: string) => void; onDirty?: () => void
+function InfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const id = `tooltip-${text.slice(0, 8).replace(/\s/g, '')}`
+
+  function openTooltip() {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({
+        top: r.top - 6,
+        left: Math.min(r.left, window.innerWidth - 308),
+      })
+    }
+    setShow(true)
+  }
+
+  return (
+    <div className="inline-flex items-center">
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label="설명 보기"
+        aria-describedby={show ? id : undefined}
+        onMouseEnter={openTooltip}
+        onMouseLeave={() => setShow(false)}
+        onFocus={openTooltip}
+        onBlur={() => setShow(false)}
+        style={{ background: 'none', border: 'none', cursor: 'default', padding: 0, color: 'var(--text-disabled)', fontSize: 11, userSelect: 'none', lineHeight: 1 }}
+      >
+        ⓘ
+      </button>
+      {show && createPortal(
+        <div
+          id={id}
+          role="tooltip"
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            transform: 'translateY(-100%)',
+            width: 300,
+            zIndex: 9999,
+            background: 'var(--text-primary)',
+            color: 'var(--surface-primary)',
+            borderRadius: 8,
+            padding: '6px 12px',
+            fontSize: 12,
+            lineHeight: 1.5,
+            whiteSpace: 'normal',
+            pointerEvents: 'none',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+          }}
+        >
+          {text}
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
+
+function SectionEditor({ label, required, tooltip, content, onBlur, onDirty }: {
+  label: string; required?: boolean; tooltip?: string; content: string; onBlur: (html: string) => void; onDirty?: () => void
 }) {
   const editor = useEditor({
     extensions: [StarterKit, Underline],
@@ -54,7 +117,10 @@ function SectionEditor({ label, required, content, onBlur, onDirty }: {
   return (
     <div className="rounded-xl border overflow-hidden focus-within:ring-2 focus-within:ring-blue-accent" style={{ borderColor: 'var(--border-subtle)' }}>
       <div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-        <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </div>
         {required && <span className="text-xs" style={{ color: 'var(--amber)' }}>필수</span>}
       </div>
       <div style={{ background: 'var(--surface-secondary)' }}>
@@ -139,7 +205,9 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
     setExporting(true)
     try {
       const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
-      const { saveAs } = await import('file-saver')
+      // file-saver may export saveAs as named or default depending on bundler
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { saveAs } = require('file-saver') as { saveAs: typeof import('file-saver').saveAs }
       const src = contentRef.current
       const today = new Date().toLocaleDateString('ko-KR')
 
@@ -184,7 +252,9 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
           ✕
         </button>
         <div className="flex flex-col flex-1 min-w-0 gap-1">
+          <label htmlFor="charter-project-name" className="sr-only">프로젝트명</label>
           <input
+            id="charter-project-name"
             type="text"
             value={projectName}
             onChange={e => { dirtyRef.current = true; setProjectName(e.target.value) }}
@@ -225,6 +295,7 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
               key={s.key}
               label={s.label}
               required={s.required}
+              tooltip={s.tooltip}
               content={(submission?.content ?? {})[s.key] ?? ''}
               onBlur={html => handleSectionBlur(s.key, html)}
               onDirty={() => { dirtyRef.current = true }}
