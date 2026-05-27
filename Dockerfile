@@ -41,5 +41,7 @@ COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
+HEALTHCHECK CMD curl -f http://localhost:3000/ || exit 1
+
 # standalone server.js는 PORT/HOSTNAME env 인식
 CMD ["bun", "server.js"]
