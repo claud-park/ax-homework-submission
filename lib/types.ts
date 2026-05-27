@@ -2,6 +2,7 @@ export type SubmissionStatus = 'pending' | 'accepted' | 'declined'
 export type MilestoneStatus = 'not_started' | 'in_progress' | 'completed' | 'delayed'
 export type RequestStatus = 'pending' | 'approved' | 'rejected'
 export type PublishStatus = 'draft' | 'published'
+export type BottleneckType = 'technical' | 'resource' | 'external' | 'other'
 
 export interface User {
   id: string
@@ -70,6 +71,9 @@ export interface Milestone {
   due_date: string
   status: MilestoneStatus
   is_manual_progress: boolean
+  is_manual_completed: boolean
+  bottleneck_type: BottleneckType | null
+  bottleneck_note: string | null
   display_order: number
   created_at: string
   updated_at: string
