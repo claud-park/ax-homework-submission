@@ -71,6 +71,7 @@ export default function AdminRequestsPage() {
         body: JSON.stringify({ admin_comment: comments[id] ?? '' }),
       })
       setBottleneckReports(prev => prev.filter(r => r.id !== id))
+      setComments(prev => { const next = { ...prev }; delete next[id]; return next })
       toast.success('확인 완료 처리되었습니다.')
     } catch (e) {
       toast.error('처리 실패: ' + (e as Error).message)
