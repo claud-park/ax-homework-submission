@@ -1,6 +1,6 @@
 # AX 과제 제출 플랫폼 — 제품 요구사항 명세서 (PRD)
 
-> **문서 버전** 1.1 · **최종 업데이트** 2026-05-21 · **작성자** yr.park@dreamus.io
+> **문서 버전** 1.2 · **최종 업데이트** 2026-05-27 · **작성자** yr.park@dreamus.io
 > **상태** 사내 검토 중 · **저장소** `AX/ax-homework-submission`
 
 ---
@@ -10,8 +10,8 @@
 | 항목 | 내용 |
 |---|---|
 | 프로젝트명 | AX 과제 제출 플랫폼 (ax-homework-submission) |
-| 버전 | v1.1 |
-| 작성일 | 2026-05-21 |
+| 버전 | v1.2 |
+| 작성일 | 2026-05-27 |
 | 작성자 | yr.park@dreamus.io |
 | 검토자 | Strategy Lead · Engineering Lead |
 | 다음 업데이트 | 대시보드 기능 완성 후 |
@@ -33,12 +33,12 @@ AX 프로그램은 다수의 챔피언(수강생)이 멀티-마일스톤 과제�
 | Charter 작성 | Word 파일 첨부 | TipTap WYSIWYG + DOCX 내보내기 |
 | 진행 현황 파악 | 스프레드시트 수동 갱신 | Gantt + 칸반 자동 연동 |
 | 검토 워크플로우 | 이메일 회람 | 단방향 DnD 칸반 (검토중 → 합격/불합격) |
-| 피드백 루프 | Slack·대면 | 양방향 댓글 + 이메일 자동 알림 (6 트리거) |
+| 피드백 루프 | Slack·대면 | 양방향 댓글 + 이메일 자동 알림 (8 트리거) |
 | 임시저장 | 없음 | 초안(Draft) / 게시(Publish) 이원화 |
 | 데이터 보안 | 공용 파일 서버 | Supabase RLS DENY ALL + 서버 단일 게이트웨이 |
 | 배포 | 수동 | GitHub Actions CI + Docker + Jenkins 자동화 |
 
-### 현재 진척도 (2026-05-21 기준)
+### 현재 진척도 (2026-05-27 기준)
 
 | 영역 | 상태 |
 |---|---|
@@ -47,14 +47,15 @@ AX 프로그램은 다수의 챔피언(수강생)이 멀티-마일스톤 과제�
 | Charter 작성·제출·댓글 | ✅ 완료 |
 | Milestone / WBS + Gantt | ✅ 완료 |
 | 파일 제출 + 칸반 판정 | ✅ 완료 |
-| 이메일 알림 (7 트리거) | ✅ 완료 |
+| 이메일 알림 (8 트리거) | ✅ 완료 |
 | 기한변경 요청 | ✅ 완료 |
 | 임시저장 (Draft/Publish) | ✅ 완료 |
 | CI/CD (GitHub Actions + Docker) | ✅ 완료 |
+| 주간 체크인 + 지연 신고 검토 | ✅ 완료 |
 | 챔피언 진행 대시보드 (`/progress`) | 🚧 골격만 |
 | 어드민 통합 대시보드 + 주간 리포트 | 🚧 골격만 |
 
-**전체 기능 완성도**: 핵심 11개 영역 중 9개 완료 (**82%**)
+**전체 기능 완성도**: 핵심 12개 영역 중 10개 완료 (**83%**)
 
 ---
 
@@ -124,7 +125,7 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 ┌──────────────────────────────────────────────────────────────┐
 │  Browser (CSR)                                               │
 │  챔피언 UI: /, /charter, /milestones, /progress              │
-│  어드민 UI: /admin, /admin/kanban, /admin/requests            │
+│  어드민 UI: /admin, /admin/kanban, /admin/requests (지연신고·기한변경) │
 └──────────────────┬───────────────────────────────────────────┘
                    │ HTTPS + JWT
 ┌──────────────────▼───────────────────────────────────────────┐
@@ -169,6 +170,7 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 | C10 | 기한변경 요청 | `deadline_change_requests` | ✅ |
 | C11 | 댓글 작성·답글 (양방향 알림) | charter_comments | ✅ |
 | C12 | 진행상황 대시보드 | `/progress` | 🚧 골격 |
+| C13 | 주간 체크인 탭 | 완료·지연 신고·기한 연장·진행 중 4가지 액션; 상태별 버튼 제한; [관리자 검토중] 태그; 관리자 답변 인카드 표시 | ✅ |
 
 #### Charter 6 섹션 구조
 
@@ -193,6 +195,7 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 | A6 | 이메일 알림 (7 트리거) | Nodemailer + Gmail SMTP | ✅ |
 | A7 | 전체 챔피언 진행 대시보드 | `/admin/progress` | 🚧 골격 |
 | A8 | 주간 리포트 | `/admin/reports/[week]` | 🚧 골격 |
+| A9 | 지연 신고 검토 및 답변 | `/admin/requests` 상단에 신규 섹션; 텍스트 답변 + 확인 완료 처리 | ✅ |
 
 #### 칸반 5-컬럼 구조 (단방향)
 
@@ -213,6 +216,7 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 | E5 | 챔피언이 Charter에 댓글 | 어드민 | `notifyNewComment` |
 | E6 | 어드민이 Charter에 답글 | 챔피언 | `notifyNewComment` |
 | E7 | 챔피언이 Milestone 산출물 업로드 | 어드민 | `notifyMilestoneCompleted` |
+| E8 | 챔피언이 지연 신고 제출 | 어드민 | `notifyBottleneck` |
 
 ### 4.4 임시저장 (Drafting) 기능 상세
 
@@ -288,14 +292,15 @@ WBS 마일스톤 등록 (주차·기간·제목) → Gantt 시각화
 | `milestone_deliverables` | Milestone 산출물 파일 | id(PK), milestone_id, file_path, file_name |
 | `deadline_change_requests` | 기한변경 요청 | id(PK), milestone_id, user_id, original_due_date, requested_due_date, status(pending·approved·rejected) |
 
-### 6.2 Milestone 상태 자동 계산 규칙 (서버사이드)
+### 6.2 Milestone 상태 자동 계산 규칙 (서버사이드, 우선순위 순)
 
-| 상태 | 조건 |
-|---|---|
-| `completed` | 산출물 업로드 완료 |
-| `in_progress` | `is_manual_progress = true` (챔피언이 수동 지정) |
-| `delayed` | `due_date < 오늘` + 산출물 없음 + 수동 지정 아님 |
-| `not_started` | 나머지 |
+| 우선순위 | 상태 | 조건 |
+|---|---|---|
+| 1 | `completed` | 산출물 업로드 완료 OR `is_manual_completed = true` |
+| 2 | `delayed` | `bottleneck_type IS NOT NULL` (지연 신고 제출됨) |
+| 3 | `in_progress` | `is_manual_progress = true` (챔피언이 수동 지정) |
+| 4 | `delayed` | `due_date < 오늘` + 위 조건 해당 없음 |
+| 5 | `not_started` | 나머지 |
 
 ### 6.3 Storage 버킷
 

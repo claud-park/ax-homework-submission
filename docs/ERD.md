@@ -1,6 +1,6 @@
-# Entity Relationship Diagram — v2
+# Entity Relationship Diagram — v3
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-05-15
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-05-27
 
 ---
 
@@ -125,16 +125,29 @@ Champion-created weekly WBS items (self-serve).
 | due_date | date NOT NULL | |
 | status | enum | `not_started` \| `in_progress` \| `completed` \| `delayed` |
 | is_manual_progress | boolean | true = user manually set to in_progress |
+| is_manual_completed | boolean | true = champion declared done without file upload (default false) |
+| bottleneck_type | text nullable | check: `technical` \| `resource` \| `external` \| `other` — 지연 신고 유형 |
+| bottleneck_note | text nullable | 지연 신고 설명 (optional) |
+| bottleneck_admin_comment | text nullable | 관리자 답변 텍스트 (null = 미검토 또는 빈 답변) |
+| bottleneck_reviewed_at | timestamptz nullable | 관리자가 지연 신고를 확인한 시각 |
 | display_order | int | ordering within same week |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 | publish_status | enum | `draft` \| `published` — default `published` |
 
-**Status logic (computed server-side, stored for query efficiency):**
-- `completed` → has a deliverable uploaded
-- `in_progress` → `is_manual_progress = true` (no deliverable yet, user asserts it's ongoing)
-- `delayed` → `due_date < today`, no deliverable, `is_manual_progress = false`
-- `not_started` → none of the above
+**Status logic (computed server-side, priority order):**
+
+| 우선순위 | 조건 | 결과 상태 |
+|---|---|---|
+| 1 | `hasDeliverable OR is_manual_completed = true` | `completed` |
+| 2 | `bottleneck_type IS NOT NULL` | `delayed` |
+| 3 | `is_manual_progress = true` | `in_progress` |
+| 4 | `due_date < today` | `delayed` |
+| 5 | 나머지 | `not_started` |
+
+**관리자 검토중 판정:**
+- 지연 신고 검토중: `bottleneck_type IS NOT NULL AND bottleneck_reviewed_at IS NULL`
+- 기한 연장 검토중: 해당 milestone의 `deadline_change_requests` 중 `status = 'pending'` 존재
 
 ### `milestone_deliverables`
 File uploads that complete a milestone.
