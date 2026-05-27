@@ -69,10 +69,9 @@ interface MilestoneCardProps {
   onDelayClick: (m: Milestone) => void
   onDeadlineExtension: (m: Milestone) => void
   onInProgress: (id: string) => void
-  onGoToWBS: (m: Milestone) => void
 }
 
-function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteClick, onDelayClick, onDeadlineExtension, onInProgress, onGoToWBS }: MilestoneCardProps) {
+function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteClick, onDelayClick, onDeadlineExtension, onInProgress }: MilestoneCardProps) {
   const statusColor = STATUS_COLOR[m.status] ?? 'var(--text-disabled)'
   const statusLabel = STATUS_LABEL[m.status] ?? m.status
 
@@ -192,13 +191,6 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, onCompleteCl
               ▶ 진행 중
             </button>
           )}
-          <button
-            onClick={() => onGoToWBS(m)}
-            className="text-xs ml-auto"
-            style={{ color: 'var(--text-disabled)' }}
-          >
-            자세히 보기 →
-          </button>
         </div>
       ) : (
         <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>완료됨</span>
@@ -214,10 +206,9 @@ interface CheckinTabProps {
   onDelayReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
   onInProgress: (id: string) => Promise<void>
   onDeadlineExtension: (m: Milestone) => void
-  onGoToWBS: (m: Milestone) => void
 }
 
-function CheckinTab({ milestones, requests, onComplete, onDelayReport, onInProgress, onDeadlineExtension, onGoToWBS }: CheckinTabProps) {
+function CheckinTab({ milestones, requests, onComplete, onDelayReport, onInProgress, onDeadlineExtension }: CheckinTabProps) {
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null)
   const [delayMilestone, setDelayMilestone] = useState<Milestone | null>(null)
   const [delayForm, setDelayForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })
@@ -313,7 +304,6 @@ function CheckinTab({ milestones, requests, onComplete, onDelayReport, onInProgr
                     onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
                     onDeadlineExtension={onDeadlineExtension}
                     onInProgress={onInProgress}
-                    onGoToWBS={onGoToWBS}
                   />
                 ))}
               </div>
@@ -333,7 +323,6 @@ function CheckinTab({ milestones, requests, onComplete, onDelayReport, onInProgr
                     onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
                     onDeadlineExtension={onDeadlineExtension}
                     onInProgress={onInProgress}
-                    onGoToWBS={onGoToWBS}
                   />
                 ))}
               </div>
@@ -353,7 +342,6 @@ function CheckinTab({ milestones, requests, onComplete, onDelayReport, onInProgr
                     onDelayClick={() => {}}
                     onDeadlineExtension={() => {}}
                     onInProgress={() => {}}
-                    onGoToWBS={() => {}}
                   />
                 ))}
               </div>
@@ -623,11 +611,6 @@ export default function MilestonesPage() {
     setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
   }
 
-  function goToWBSDetail(m: Milestone) {
-    setActiveTab('wbs')
-    openEdit(m)
-  }
-
   async function handleDeadlineRequest(e: React.FormEvent) {
     e.preventDefault()
     if (!deadlineModal) return
@@ -787,7 +770,6 @@ export default function MilestonesPage() {
           onDelayReport={handleCheckinDelayReport}
           onInProgress={handleCheckinInProgress}
           onDeadlineExtension={openDeadlineForCheckin}
-          onGoToWBS={goToWBSDetail}
         />
       ) : milestones.length === 0 ? (
         <EmptyState
