@@ -114,6 +114,15 @@ function SectionEditor({ label, required, tooltip, content, onBlur, onDirty }: {
     onBlur: ({ editor }) => onBlur(editor.getHTML()),
     onUpdate: () => onDirty?.(),
   })
+
+  // TipTap v3 initialises content asynchronously; imperatively sync whenever
+  // the editor instance becomes available or the content prop changes.
+  // false = suppress onUpdate so onDirty isn't triggered spuriously.
+  useEffect(() => {
+    if (!editor) return
+    editor.commands.setContent(content, { emitUpdate: false })
+  }, [editor, content])
+
   return (
     <div className="rounded-xl border overflow-hidden focus-within:ring-2 focus-within:ring-blue-accent" style={{ borderColor: 'var(--border-subtle)' }}>
       <div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
@@ -558,7 +567,7 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
           )}
           {SECTIONS.map(s => (
             <SectionEditor
-              key={s.key}
+              key={`${submission?.id ?? mode}-${s.key}`}
               label={s.label}
               required={s.required}
               tooltip={s.tooltip}
