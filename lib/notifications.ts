@@ -130,11 +130,11 @@ export async function notifyNewComment(params: {
 export async function notifyMilestoneCompleted(params: {
   user: User
   milestone: Milestone
-  fileName: string
+  fileName?: string
 }): Promise<void> {
   const to = adminEmail()
   if (!to) return
-  const { user, milestone, fileName } = params
+  const { user, milestone, fileName = '(수동 완료)' } = params
   const weekLabel = milestone.week_number ? `W${String(milestone.week_number).padStart(2, '0')} · ` : ''
   const subject = `[마일스톤 완료] ${user.name} - ${weekLabel}${milestone.title}`
   const link = `${appBaseUrl()}/admin/progress`
@@ -158,5 +158,49 @@ export async function notifyMilestoneCompleted(params: {
     await sendEmail({ to, subject, html })
   } catch (e) {
     console.error('[email] notifyMilestoneCompleted failed:', e)
+  }
+}
+
+const BOTTLENECK_LABEL: Record<string, string> = {
+  technical: '기술적 문제',
+  resource: '리소스 부족',
+  external: '외부 의존성',
+  other: '기타',
+}
+
+export async function notifyBottleneck(params: {
+  user: User
+  milestone: Milestone
+  type: string
+  note: string | null
+}): Promise<void> {
+  const to = adminEmail()
+  if (!to) return
+  const { user, milestone, type, note } = params
+  const weekLabel = milestone.week_number ? `W${String(milestone.week_number).padStart(2, '0')} ` : ''
+  const subject = `[AX] 지연 신고 — ${user.name} · ${weekLabel}${milestone.title}`
+  const link = `${appBaseUrl()}/admin/requests`
+  const typeLabel = BOTTLENECK_LABEL[type] ?? type
+  const html = `
+<div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
+  <div style="border-bottom:2px solid #dc2626;padding-bottom:12px;margin-bottom:20px">
+    <h2 style="margin:0;font-size:18px">⚠️ 지연 신고</h2>
+  </div>
+  <table style="width:100%;font-size:14px;border-collapse:collapse">
+    <tr><td style="padding:8px 0;color:#64748b;width:100px">챔피언</td><td style="padding:8px 0;font-weight:600">${escapeHtml(user.name)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">마일스톤</td><td style="padding:8px 0">${escapeHtml(weekLabel + milestone.title)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">마감일</td><td style="padding:8px 0">${escapeHtml(milestone.due_date)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">지연 유형</td><td style="padding:8px 0;color:#dc2626;font-weight:600">${escapeHtml(typeLabel)}</td></tr>
+    ${note ? `<tr><td style="padding:8px 0;color:#64748b;vertical-align:top">설명</td><td style="padding:8px 0;white-space:pre-wrap">${escapeHtml(note)}</td></tr>` : ''}
+  </table>
+  <div style="margin-top:24px">
+    <a href="${escapeHtml(link)}" style="display:inline-block;background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">요청 검토</a>
+  </div>
+</div>
+`.trim()
+  try {
+    await sendEmail({ to, subject, html })
+  } catch (e) {
+    console.error('[email] notifyBottleneck failed:', e)
   }
 }
