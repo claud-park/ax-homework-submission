@@ -73,6 +73,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   delete (patch as { publish_status?: unknown }).publish_status
   patch.publish_status = nextStatus
 
+  // Reset admin review when champion re-files a delay report
+  if (body.bottleneck_type != null) {
+    patch.bottleneck_admin_comment = null
+    patch.bottleneck_reviewed_at = null
+  }
+
   const { data, error } = await supabase
     .from('milestones')
     .update(patch)
