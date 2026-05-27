@@ -74,6 +74,8 @@ export interface Milestone {
   is_manual_completed: boolean
   bottleneck_type: BottleneckType | null
   bottleneck_note: string | null
+  bottleneck_admin_comment: string | null
+  bottleneck_reviewed_at: string | null
   display_order: number
   created_at: string
   updated_at: string
