@@ -5,7 +5,8 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import { apiFetch } from '@/lib/api-client'
-import type { ProjectCharter, CharterSubmission } from '@/lib/types'
+import type { ProjectCharter, CharterSubmission, Milestone } from '@/lib/types'
+import DateRangePicker from '@/components/DateRangePicker'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 import { toast } from 'sonner'
 import {
@@ -26,7 +27,7 @@ import { PublishStatusFilter, type PublishFilterValue } from '@/components/Publi
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 
-type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build' | 'timeline'
+type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build'
 
 type CharterContent = ProjectCharter['content']
 type SidePanel = null | 'new' | CharterSubmission
@@ -38,7 +39,6 @@ const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: 
   { key: 'goal', label: '03. Goal · Success Metric', tooltip: "목표 한 줄 요약 — 정성/정량 모두 OK ('업무 시간 단축'도 충분해요)" },
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가', tooltip: '핵심 기능과 지표 — 무엇을 만들고 무엇으로 측정할지' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가', tooltip: '어떻게 만들 것인가 — 기술 스택, 구현 접근법' },
-  { key: 'timeline', label: '06. Timeline · Milestones', tooltip: '주별 마일스톤 — WBS 탭과 연동됩니다' },
 ]
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
@@ -130,6 +130,143 @@ function SectionEditor({ label, required, tooltip, content, onBlur, onDirty }: {
   )
 }
 
+const TIMELINE_INPUT: React.CSSProperties = {
+  background: 'var(--surface-primary)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: '6px',
+  color: 'var(--text-primary)',
+  padding: '6px 10px',
+  fontSize: '13px',
+  width: '100%',
+}
+
+function TimelineSection({ milestones, onAdded }: { milestones: Milestone[]; onAdded: (m: Milestone) => void }) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '' })
+  const [saving, setSaving] = useState(false)
+
+  const sorted = [...milestones].sort((a, b) =>
+    a.week_number - b.week_number || a.start_date.localeCompare(b.start_date)
+  )
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const created = await apiFetch<Milestone>('/api/milestones', {
+        method: 'POST',
+        body: JSON.stringify({
+          week_number: parseInt(form.week_number) || null,
+          title: form.title,
+          start_date: form.start_date || null,
+          due_date: form.due_date || null,
+          publish_status: 'published',
+        }),
+      })
+      onAdded(created)
+      setForm({ week_number: '1', title: '', start_date: '', due_date: '' })
+      setShowForm(false)
+      toast.success('마일스톤이 추가되었습니다.')
+    } catch (e: unknown) {
+      toast.error('마일스톤 저장 실패: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>06. Timeline · Milestones</span>
+          <InfoTooltip text="주별 마일스톤 — WBS 탭과 연동됩니다" />
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowForm(v => !v)}
+          className="text-xs px-2.5 py-1 rounded font-semibold"
+          style={{
+            background: showForm ? 'var(--surface-secondary)' : 'var(--blue-600)',
+            color: showForm ? 'var(--text-secondary)' : '#fff',
+            border: showForm ? '1px solid var(--border-subtle)' : 'none',
+          }}
+        >
+          {showForm ? '취소' : '+ 추가'}
+        </button>
+      </div>
+
+      {/* Inline add form */}
+      {showForm && (
+        <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}>
+          <form onSubmit={handleAdd} className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
+                <input
+                  type="number"
+                  value={form.week_number}
+                  onChange={e => setForm(f => ({ ...f, week_number: e.target.value }))}
+                  min="1"
+                  required
+                  style={TIMELINE_INPUT}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="예: API 설계 완료"
+                  required
+                  style={TIMELINE_INPUT}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</label>
+              <DateRangePicker
+                startDate={form.start_date}
+                endDate={form.due_date}
+                onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))}
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={saving || !form.title || !form.start_date || !form.due_date}
+                className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
+                style={{ background: 'var(--blue-600)', color: '#fff' }}
+              >
+                {saving ? '저장 중...' : '추가'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Milestone bulleted list */}
+      <div style={{ background: 'var(--surface-secondary)', minHeight: 56 }}>
+        {sorted.length === 0 ? (
+          <p className="px-4 py-4 text-xs" style={{ color: 'var(--text-disabled)' }}>아직 마일스톤이 없습니다. 위에서 추가해보세요.</p>
+        ) : (
+          <ul className="py-2">
+            {sorted.map(m => (
+              <li key={m.id} className="flex items-center gap-2 px-4 py-1.5">
+                <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>·</span>
+                <span className="text-xs font-bold flex-shrink-0" style={{ color: 'var(--blue-600)' }}>W{m.week_number}</span>
+                <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
+                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{m.start_date} – {m.due_date}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Keyed by submission id or 'new' — remounts when switching between items
 function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
   mode: 'new' | 'edit'
@@ -144,6 +281,13 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
   const contentRef = useRef<CharterContent>(submission?.content ?? {})
   const dirtyRef = useRef<boolean>(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  const [milestones, setMilestones] = useState<Milestone[]>([])
+
+  useEffect(() => {
+    apiFetch<Milestone[]>('/api/milestones')
+      .then(data => setMilestones(data.filter(m => m.publish_status === 'published')))
+      .catch(() => {})
+  }, [])
 
   function handleSectionBlur(key: SectionKey, html: string) {
     contentRef.current = { ...contentRef.current, [key]: html }
@@ -230,8 +374,23 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
         new Paragraph({ text: '' }),
       ])
 
+      const sortedMs = [...milestones].sort((a, b) =>
+        a.week_number - b.week_number || a.start_date.localeCompare(b.start_date)
+      )
+      const timelineChildren = [
+        new Paragraph({ text: '06. Timeline · Milestones', heading: HeadingLevel.HEADING_2 }),
+        ...(sortedMs.length === 0
+          ? [new Paragraph({ children: [new TextRun({ text: '(마일스톤 없음)', size: 22, color: '888888' })] })]
+          : sortedMs.map(m => new Paragraph({
+              children: [new TextRun({ text: `W${m.week_number}  ${m.title}  ${m.start_date} – ${m.due_date}`, size: 22 })],
+              bullet: { level: 0 },
+            }))
+        ),
+        new Paragraph({ text: '' }),
+      ]
+
       const doc = new Document({
-        sections: [{ children: [...coverChildren, ...bodyChildren] }],
+        sections: [{ children: [...coverChildren, ...bodyChildren, ...timelineChildren] }],
       })
       const blob = await Packer.toBlob(doc)
       saveAs(blob, `과제정의서_${projectName || 'charter'}.docx`)
@@ -301,6 +460,10 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
               onDirty={() => { dirtyRef.current = true }}
             />
           ))}
+          <TimelineSection
+            milestones={milestones}
+            onAdded={m => setMilestones(prev => [...prev, m])}
+          />
         </div>
       </div>
 
