@@ -361,7 +361,7 @@ export default function MilestonesPage() {
                             <div className="flex flex-col gap-1">
                               {toShow.map(r => (
                                 <div key={r.id} className="flex items-center gap-1.5">
-                                  <span className="text-xs font-semibold" style={{ color: REQ_COLOR[r.status] }}>
+                                  <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ color: REQ_COLOR[r.status], background: `${REQ_COLOR[r.status]}18`, border: `1px solid ${REQ_COLOR[r.status]}40` }}>
                                     {REQ_LABEL[r.status]}
                                   </span>
                                   <span style={{ color: 'var(--text-disabled)' }}>→ {r.requested_due_date}</span>

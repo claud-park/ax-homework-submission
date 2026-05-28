@@ -72,7 +72,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
 
   const delayPendingPill = (
     <span
-      className="text-xs px-3 py-1.5 rounded-full font-semibold"
+      className="text-xs px-3 py-1 rounded-full font-semibold"
       style={{
         background: 'rgba(248,113,113,0.1)',
         color: 'var(--error)',
@@ -86,7 +86,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
 
   const deadlinePendingPill = (
     <span
-      className="text-xs px-3 py-1.5 rounded-full font-semibold"
+      className="text-xs px-3 py-1 rounded-full font-semibold"
       style={{
         background: 'rgba(251,191,36,0.12)',
         color: 'var(--amber)',
