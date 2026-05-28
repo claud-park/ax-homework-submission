@@ -7,6 +7,12 @@ import { parseName } from '@/lib/utils'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
+function fmtMD(s: string): string {
+  if (!s) return ''
+  const [, m, d] = s.split('-').map(Number)
+  return `${m}/${d}`
+}
+
 const MS_STATUS_LABEL: Record<MilestoneStatus, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
 }
@@ -215,7 +221,7 @@ export default function AdminChampionPage() {
               >
                 <div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.start_date} ~ {m.due_date}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtMD(m.start_date)} – {fmtMD(m.due_date)}</p>
                 </div>
                 <span
                   className="text-xs font-semibold px-2 py-1 rounded-md"
