@@ -150,3 +150,9 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
 ._1KJ6x ~ ._3zRJQ {
   fill: #1e293b;
 }
+
+/* Gantt task bar label: hide name on bar */
+._KxSXS ~ ._3zRJQ,
+._KxSXS ~ ._3KcaM {
+  display: none;
+}
