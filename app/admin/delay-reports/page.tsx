@@ -36,7 +36,7 @@ const INPUT_STYLE: React.CSSProperties = {
 type Tab = 'pending' | 'reviewed'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'pending', label: '대기중인 신고' },
+  { id: 'pending', label: '답변 대기중' },
   { id: 'reviewed', label: '확인 완료' },
 ]
 
@@ -215,7 +215,7 @@ export default function AdminDelayReportsPage() {
       {/* 탭 콘텐츠 */}
       {activeTab === 'pending' && (
         pending.length === 0 ? (
-          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>대기중인 신고가 없습니다.</p>
+          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>답변 대기중인 신고가 없습니다.</p>
         ) : (
           <div className="flex flex-col gap-3">
             {pending.map(report => (
