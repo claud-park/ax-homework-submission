@@ -90,11 +90,9 @@ export default function AdminChampionPage() {
   if (!data) return null
 
   const { displayName, department } = parseName(data.user.name)
-  const weekGroups = new Map<number, typeof data.milestones>()
-  for (const m of data.milestones) {
-    if (!weekGroups.has(m.week_number)) weekGroups.set(m.week_number, [])
-    weekGroups.get(m.week_number)!.push(m)
-  }
+  const sortedMilestones = [...data.milestones].sort((a, b) =>
+    (a.start_date ?? '').localeCompare(b.start_date ?? '')
+  )
 
   return (
     <div>
@@ -205,34 +203,29 @@ export default function AdminChampionPage() {
         </section>
       )}
 
-      {weekGroups.size > 0 && (
+      {sortedMilestones.length > 0 && (
         <section>
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>WBS / 마일스톤</h2>
-          {Array.from(weekGroups.entries()).sort(([a], [b]) => a - b).map(([week, ms]) => (
-            <div key={week} className="mb-4">
-              <h3 className="text-xs font-bold mb-2" style={{ color: 'var(--text-secondary)' }}>W{week}</h3>
-              <div className="flex flex-col gap-2">
-                {ms.map(m => (
-                  <div
-                    key={m.id}
-                    className="flex items-center justify-between p-3 rounded-xl border"
-                    style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
-                  >
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.start_date} ~ {m.due_date}</p>
-                    </div>
-                    <span
-                      className="text-xs font-semibold px-2 py-1 rounded-md"
-                      style={{ color: MS_STATUS_COLOR[m.status], background: `${MS_STATUS_COLOR[m.status]}20` }}
-                    >
-                      {MS_STATUS_LABEL[m.status]}
-                    </span>
-                  </div>
-                ))}
+          <div className="flex flex-col gap-2">
+            {sortedMilestones.map(m => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between p-3 rounded-xl border"
+                style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
+              >
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.start_date} ~ {m.due_date}</p>
+                </div>
+                <span
+                  className="text-xs font-semibold px-2 py-1 rounded-md"
+                  style={{ color: MS_STATUS_COLOR[m.status], background: `${MS_STATUS_COLOR[m.status]}20` }}
+                >
+                  {MS_STATUS_LABEL[m.status]}
+                </span>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
       )}
     </div>

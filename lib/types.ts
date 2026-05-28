@@ -65,7 +65,7 @@ export interface ProjectCharter {
 export interface Milestone {
   id: string
   user_id: string
-  week_number: number
+  week_number: number | null
   title: string
   description: string | null
   start_date: string

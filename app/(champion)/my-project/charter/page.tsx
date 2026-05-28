@@ -156,15 +156,15 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
   onDeleted: (id: string) => void
 }) {
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '' })
+  const [form, setForm] = useState({ title: '', start_date: '', due_date: '' })
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '' })
+  const [editForm, setEditForm] = useState({ title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const sorted = [...milestones].sort((a, b) =>
-    a.week_number - b.week_number || a.start_date.localeCompare(b.start_date)
+    a.start_date.localeCompare(b.start_date)
   )
 
   async function handleAdd(e: React.FormEvent) {
@@ -174,7 +174,6 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
       const created = await apiFetch<Milestone>('/api/milestones', {
         method: 'POST',
         body: JSON.stringify({
-          week_number: parseInt(form.week_number) || null,
           title: form.title,
           start_date: form.start_date || null,
           due_date: form.due_date || null,
@@ -182,7 +181,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         }),
       })
       onAdded(created)
-      setForm({ week_number: '1', title: '', start_date: '', due_date: '' })
+      setForm({ title: '', start_date: '', due_date: '' })
       setShowForm(false)
       toast.success('마일스톤이 추가되었습니다.')
     } catch (e: unknown) {
@@ -194,7 +193,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
 
   function openEdit(m: Milestone) {
     setEditingId(m.id)
-    setEditForm({ week_number: String(m.week_number), title: m.title, start_date: m.start_date, due_date: m.due_date })
+    setEditForm({ title: m.title, start_date: m.start_date, due_date: m.due_date })
     setConfirmDeleteId(null)
   }
 
@@ -206,7 +205,6 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
       const updated = await apiFetch<Milestone>(`/api/milestones/${editingId}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          week_number: parseInt(editForm.week_number) || null,
           title: editForm.title,
           start_date: editForm.start_date || null,
           due_date: editForm.due_date || null,
@@ -259,29 +257,16 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
       {showForm && (
         <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}>
           <form onSubmit={handleAdd} className="flex flex-col gap-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
-                <input
-                  type="number"
-                  value={form.week_number}
-                  onChange={e => setForm(f => ({ ...f, week_number: e.target.value }))}
-                  min="1"
-                  required
-                  style={TIMELINE_INPUT}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="예: API 설계 완료"
-                  required
-                  style={TIMELINE_INPUT}
-                />
-              </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="예: API 설계 완료"
+                required
+                style={TIMELINE_INPUT}
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</label>
@@ -316,15 +301,9 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
                 return (
                   <li key={m.id} className="px-4 py-2 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
                     <form onSubmit={handleEditSubmit} className="flex flex-col gap-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
-                          <input type="number" value={editForm.week_number} onChange={e => setEditForm(f => ({ ...f, week_number: e.target.value }))} min="1" required style={TIMELINE_INPUT} />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-                          <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={TIMELINE_INPUT} />
-                        </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+                        <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={TIMELINE_INPUT} />
                       </div>
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</label>
@@ -347,7 +326,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
                 return (
                   <li key={m.id} className="flex items-center gap-2 px-4 py-1.5">
                     <span className="text-xs flex-1" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="font-bold" style={{ color: 'var(--blue-600)' }}>W{m.week_number}</span> {m.title} 삭제할까요?
+                      <span className="font-semibold">{m.title}</span> 삭제할까요?
                     </span>
                     <button type="button" onClick={() => handleDelete(m.id)} className="text-xs px-2.5 py-1 rounded font-semibold" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid rgba(248,113,113,0.4)' }}>
                       확인
@@ -362,7 +341,6 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
               return (
                 <li key={m.id} className="group flex items-center gap-2 px-4 py-1.5">
                   <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>·</span>
-                  <span className="text-xs font-bold flex-shrink-0" style={{ color: 'var(--blue-600)' }}>W{m.week_number}</span>
                   <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
                   <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{m.start_date} – {m.due_date}</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
@@ -490,15 +468,13 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
         new Paragraph({ text: '' }),
       ])
 
-      const sortedMs = [...milestones].sort((a, b) =>
-        a.week_number - b.week_number || a.start_date.localeCompare(b.start_date)
-      )
+      const sortedMs = [...milestones].sort((a, b) => a.start_date.localeCompare(b.start_date))
       const timelineChildren = [
         new Paragraph({ text: '06. Timeline · Milestones', heading: HeadingLevel.HEADING_2 }),
         ...(sortedMs.length === 0
           ? [new Paragraph({ children: [new TextRun({ text: '(마일스톤 없음)', size: 22, color: '888888' })] })]
           : sortedMs.map(m => new Paragraph({
-              children: [new TextRun({ text: `W${m.week_number}  ${m.title}  ${m.start_date} – ${m.due_date}`, size: 22 })],
+              children: [new TextRun({ text: `${m.title}  ${m.start_date} – ${m.due_date}`, size: 22 })],
               bullet: { level: 0 },
             }))
         ),

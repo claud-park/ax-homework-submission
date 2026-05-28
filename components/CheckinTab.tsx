@@ -104,7 +104,6 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
-          <span className="text-xs font-bold mr-2" style={{ color: 'var(--blue-600)' }}>W{m.week_number}</span>
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
         </div>
         <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>~{m.due_date}</span>
@@ -390,7 +389,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
           <DialogHeader>
             <DialogTitle>지연 신고</DialogTitle>
             {delayMilestone && (
-              <DialogDescription>W{delayMilestone.week_number} {delayMilestone.title}</DialogDescription>
+              <DialogDescription>{delayMilestone.title}</DialogDescription>
             )}
           </DialogHeader>
           <form onSubmit={handleDelaySubmit} className="flex flex-col gap-3">

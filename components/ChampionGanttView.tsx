@@ -51,7 +51,7 @@ function toTasks(champions: GanttChampion[]): Task[] {
       tasks.push({
         id: m.id,
         type: 'task',
-        name: `W${m.week_number} ${m.title}`,
+        name: m.title,
         start,
         end,
         progress: STATUS_PROGRESS[m.status],

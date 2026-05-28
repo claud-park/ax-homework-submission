@@ -60,7 +60,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!eff.title) fields.push({ field: 'title', message: '필수 항목입니다.' })
     if (!eff.start_date) fields.push({ field: 'start_date', message: '필수 항목입니다.' })
     if (!eff.due_date) fields.push({ field: 'due_date', message: '필수 항목입니다.' })
-    if (!eff.week_number) fields.push({ field: 'week_number', message: '필수 항목입니다.' })
     if (fields.length > 0)
       return NextResponse.json({ error: 'validation_failed', fields }, { status: 400 })
   }

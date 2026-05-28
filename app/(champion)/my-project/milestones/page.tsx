@@ -32,20 +32,20 @@ const REQ_COLOR: Record<string, string> = {
   pending: 'var(--amber)', approved: 'var(--success)', rejected: 'var(--error)',
 }
 
-interface NewMilestone { week_number: string; title: string; start_date: string; due_date: string; description: string }
+interface NewMilestone { title: string; start_date: string; due_date: string; description: string }
 
 export default function MilestonesPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
   const [charterApproved, setCharterApproved] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<NewMilestone>({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
+  const [form, setForm] = useState<NewMilestone>({ title: '', start_date: '', due_date: '', description: '' })
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; existingReqId?: string } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
   const [error, setError] = useState<string | null>(null)
   const [confirmResubmitId, setConfirmResubmitId] = useState<string | null>(null)
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
-  const [editForm, setEditForm] = useState({ week_number: '1', title: '', start_date: '', due_date: '' })
+  const [editForm, setEditForm] = useState({ title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -103,7 +103,6 @@ export default function MilestonesPage() {
         method: 'POST',
         body: JSON.stringify({
           ...form,
-          week_number: parseInt(form.week_number) || null,
           start_date: form.start_date || null,
           due_date: form.due_date || null,
           publish_status: publishStatus,
@@ -111,7 +110,7 @@ export default function MilestonesPage() {
       })
       setMilestones(prev => [...prev, created])
       setShowForm(false)
-      setForm({ week_number: '1', title: '', start_date: '', due_date: '', description: '' })
+      setForm({ title: '', start_date: '', due_date: '', description: '' })
       toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 추가되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -199,7 +198,7 @@ export default function MilestonesPage() {
 
   function openEdit(m: Milestone) {
     setEditingMilestone(m)
-    setEditForm({ week_number: String(m.week_number), title: m.title, start_date: m.start_date, due_date: m.due_date })
+    setEditForm({ title: m.title, start_date: m.start_date, due_date: m.due_date })
   }
 
   async function submitEdit(publishStatus: 'draft' | 'published') {
@@ -210,7 +209,6 @@ export default function MilestonesPage() {
         method: 'PATCH',
         body: JSON.stringify({
           ...editForm,
-          week_number: parseInt(editForm.week_number) || null,
           start_date: editForm.start_date || null,
           due_date: editForm.due_date || null,
           publish_status: publishStatus,
@@ -252,7 +250,7 @@ export default function MilestonesPage() {
   const inputStyle = { background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
 
   // Fixed column widths shared across all section tables so columns line up
-  const COL_WIDTHS = ['72px', '22%', '30%', '20%', '20%']
+  const COL_WIDTHS = ['30%', '35%', '20%', '15%']
 
   return (
     <div ref={containerRef} className="flex" style={{ height: 'calc(100vh - 48px)', minHeight: 0 }}>
@@ -308,7 +306,7 @@ export default function MilestonesPage() {
             <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
             <thead>
               <tr style={{ background: 'var(--surface-secondary)' }}>
-                {['주차', '마일스톤', '기간', '상태', ''].map(h => (
+                {['마일스톤', '기간', '상태', ''].map(h => (
                   <th key={h} className="text-left px-3 py-2 font-semibold uppercase tracking-wide" style={{ color: 'var(--text-disabled)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
                 ))}
               </tr>
@@ -318,9 +316,10 @@ export default function MilestonesPage() {
                 const milestoneReqs = requests.filter(r => r.milestone_id === m.id)
                 return (
                   <tr key={m.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>
                       <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded font-bold" style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' }}>{m.week_number}주차</span>
+                        <span>{m.title || '(제목 없음)'}</span>
+                        {m.publish_status === 'draft' && <DraftBadge />}
                         <button
                           type="button"
                           onClick={() => openEdit(m)}
@@ -329,12 +328,6 @@ export default function MilestonesPage() {
                         >
                           ✏
                         </button>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      <div className="flex items-center gap-1.5">
-                        <span>{m.title || '(제목 없음)'}</span>
-                        {m.publish_status === 'draft' && <DraftBadge />}
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -465,15 +458,9 @@ export default function MilestonesPage() {
           </div>
           <div className="flex-1 overflow-y-auto p-5">
             <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
-                  <input type="number" value={form.week_number} onChange={e => setForm(f => ({ ...f, week_number: e.target.value }))} min="1" required style={inputStyle} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-                  <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+                <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
@@ -534,15 +521,9 @@ export default function MilestonesPage() {
           </DialogHeader>
           {editingMilestone && (
             <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>주차</label>
-                  <input type="number" value={editForm.week_number} onChange={e => setEditForm(f => ({ ...f, week_number: e.target.value }))} min="1" required style={inputStyle} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-                  <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
-                </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+                <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
