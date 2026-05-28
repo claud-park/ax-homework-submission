@@ -145,3 +145,8 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
   stroke: #2563eb;
   stroke-width: 1.5;
 }
+
+/* Gantt project bar label: dark text (light blue fill needs dark text) */
+._1KJ6x ~ ._3zRJQ {
+  fill: #1e293b;
+}
