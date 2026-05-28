@@ -195,7 +195,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold"
                 style={{ background: 'var(--surface-secondary)', color: 'var(--text-disabled)', border: '1px solid var(--border-subtle)', cursor: 'default' }}
               >
-                검토 중입니다
+                과제 정의서 검토중
               </span>
             )
           )}
