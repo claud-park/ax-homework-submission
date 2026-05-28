@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 
 interface BottleneckReport {
@@ -137,7 +136,6 @@ export default function AdminDelayReportsPage() {
   const [reviewed, setReviewed] = useState<BottleneckReport[]>([])
   const [comments, setComments] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState<string | null>(null)
-  const [reviewedOpen, setReviewedOpen] = useState(false)
 
   useEffect(() => {
     apiFetch<BottleneckReport[]>('/api/admin/milestones/bottleneck-pending')
@@ -202,10 +200,7 @@ export default function AdminDelayReportsPage() {
 
       {/* 확인 완료된 지연 신고 */}
       <section>
-        <button
-          onClick={() => setReviewedOpen(o => !o)}
-          className="flex items-center gap-2 w-full text-left mb-1"
-        >
+        <div className="flex items-center gap-2 mb-4">
           <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>확인 완료된 지연 신고</h2>
           {reviewed.length > 0 && (
             <span
@@ -215,26 +210,14 @@ export default function AdminDelayReportsPage() {
               {reviewed.length}건
             </span>
           )}
-          <ChevronDown
-            className="h-4 w-4 ml-auto transition-transform duration-200"
-            style={{
-              color: 'var(--text-disabled)',
-              transform: reviewedOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
-          />
-        </button>
-
-        {reviewedOpen && (
-          <div className="mt-4">
-            {reviewed.length === 0 ? (
-              <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>확인 완료된 지연 신고가 없습니다.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {reviewed.map(report => (
-                  <ReportCard key={report.id} report={report} reviewed={true} />
-                ))}
-              </div>
-            )}
+        </div>
+        {reviewed.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>확인 완료된 지연 신고가 없습니다.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {reviewed.map(report => (
+              <ReportCard key={report.id} report={report} reviewed={true} />
+            ))}
           </div>
         )}
       </section>
