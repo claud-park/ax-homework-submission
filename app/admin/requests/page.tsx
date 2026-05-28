@@ -18,7 +18,15 @@ const DEADLINE_STATUS_LABEL: Record<string, string> = {
   pending: '검토 중', approved: '승인됨', rejected: '반려됨',
 }
 
+type Tab = 'pending' | 'reviewed'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'pending', label: '답변 대기중' },
+  { id: 'reviewed', label: '확인 완료' },
+]
+
 export default function AdminRequestsPage() {
+  const [activeTab, setActiveTab] = useState<Tab>('pending')
   const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
 
   useEffect(() => {
@@ -39,28 +47,58 @@ export default function AdminRequestsPage() {
     }
   }
 
-  // Per milestone: all pending + most recent resolved
-  const displayedDeadlines = (() => {
-    const byMilestone = new Map<string, DeadlineChangeRequest[]>()
-    for (const r of requests) {
-      const list = byMilestone.get(r.milestone_id) ?? []
-      list.push(r)
-      byMilestone.set(r.milestone_id, list)
-    }
-    const result: DeadlineChangeRequest[] = []
-    Array.from(byMilestone.values()).forEach(reqs => {
-      reqs.filter(r => r.status === 'pending').forEach(r => result.push(r))
-      const resolved = reqs.find(r => r.status === 'approved' || r.status === 'rejected')
-      if (resolved) result.push(resolved)
-    })
-    return result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  })()
+  const pendingList = requests
+    .filter(r => r.status === 'pending')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  const reviewedList = requests
+    .filter(r => r.status !== 'pending')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  const displayList = activeTab === 'pending' ? pendingList : reviewedList
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>기한 변경 요청</h1>
+    <div className="flex flex-col gap-0">
+      <h1 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>기한 변경 요청</h1>
+
+      {/* 탭 */}
+      <div className="flex gap-1 border-b mb-6" style={{ borderColor: 'var(--border-subtle)' }}>
+        {TABS.map(tab => {
+          const active = activeTab === tab.id
+          const badge = tab.id === 'pending' ? pendingList.length : reviewedList.length
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-1.5 text-xs px-4 py-2 font-medium transition-colors"
+              style={{
+                color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
+                borderBottom: active ? '2px solid var(--blue-600)' : '2px solid transparent',
+                marginBottom: -1,
+                background: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {tab.label}
+              {badge > 0 && (
+                <span
+                  className="text-xs font-bold px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: tab.id === 'pending' ? 'rgba(248,113,113,0.15)' : 'color-mix(in srgb, var(--success) 12%, transparent)',
+                    color: tab.id === 'pending' ? 'var(--error)' : 'var(--success)',
+                  }}
+                >
+                  {badge}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 탭 콘텐츠 */}
       <div className="flex flex-col gap-3">
-        {displayedDeadlines.map(req => (
+        {displayList.map(req => (
           <div key={req.id} className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
             <div className="flex items-center justify-between mb-2">
               <div>
@@ -83,12 +121,14 @@ export default function AdminRequestsPage() {
                 </p>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>사유: {req.reason}</p>
               </div>
-              <span
-                className="text-xs font-semibold px-2 py-1 rounded"
-                style={{ color: DEADLINE_STATUS_COLOR[req.status], background: `${DEADLINE_STATUS_COLOR[req.status]}20` }}
-              >
-                {DEADLINE_STATUS_LABEL[req.status]}
-              </span>
+              {activeTab === 'reviewed' && (
+                <span
+                  className="text-xs font-semibold px-2 py-1 rounded"
+                  style={{ color: DEADLINE_STATUS_COLOR[req.status], background: `${DEADLINE_STATUS_COLOR[req.status]}20` }}
+                >
+                  {DEADLINE_STATUS_LABEL[req.status]}
+                </span>
+              )}
             </div>
             {req.status === 'pending' && (
               <div className="flex gap-2 mt-3">
@@ -130,7 +170,9 @@ export default function AdminRequestsPage() {
             )}
           </div>
         ))}
-        {displayedDeadlines.length === 0 && <EmptyState icon={Inbox} title="대기 중인 요청이 없습니다" />}
+        {displayList.length === 0 && (
+          <EmptyState icon={Inbox} title={activeTab === 'pending' ? '답변 대기중인 요청이 없습니다' : '확인 완료된 요청이 없습니다'} />
+        )}
       </div>
     </div>
   )
