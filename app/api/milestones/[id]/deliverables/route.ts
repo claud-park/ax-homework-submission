@@ -15,13 +15,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
+  const contentType = req.headers.get('content-type') ?? ''
+  const isJson = contentType.includes('application/json')
 
   const supabase = createServiceClient()
 
-  // Guard: reject deliverable uploads against draft milestones (defense-in-depth for notification gating)
+  // Guard: reject deliverable uploads against draft milestones
   const { data: milestonePub } = await supabase
     .from('milestones')
     .select('publish_status')
@@ -44,72 +43,81 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const isResubmit = (existing ?? []).length > 0
 
   if (isResubmit) {
-    const oldPaths = (existing ?? []).map((d: { file_path: string }) => d.file_path)
-    await supabase.storage.from('milestone-deliverables').remove(oldPaths)
+    const oldPaths = (existing ?? []).map((d: { file_path: string | null }) => d.file_path).filter(Boolean) as string[]
+    if (oldPaths.length > 0) await supabase.storage.from('milestone-deliverables').remove(oldPaths)
     await supabase.from('milestone_deliverables').delete().eq('milestone_id', params.id)
   }
 
-  const safeFileName = sanitizeFileName(file.name)
-  const filePath = `${user.id}/${params.id}/${safeFileName}`
-  const arrayBuffer = await file.arrayBuffer()
+  let deliverableInsert: Record<string, unknown>
+  let notifyFileName: string | undefined
 
-  const { error: uploadError } = await supabase.storage
-    .from('milestone-deliverables')
-    .upload(filePath, arrayBuffer, { contentType: file.type, upsert: true })
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  if (isJson) {
+    const body = await req.json() as { link_url?: string }
+    const linkUrl = body.link_url?.trim()
+    if (!linkUrl) return NextResponse.json({ error: 'Missing link_url' }, { status: 400 })
+    deliverableInsert = { milestone_id: params.id, file_path: null, file_name: null, link_url: linkUrl }
+    notifyFileName = linkUrl
+  } else {
+    const formData = await req.formData()
+    const file = formData.get('file') as File | null
+    if (!file) return NextResponse.json({ error: 'No file' }, { status: 400 })
 
-  await supabase.from('milestone_deliverables').insert({ milestone_id: params.id, file_path: filePath, file_name: file.name })
+    const safeFileName = sanitizeFileName(file.name)
+    const filePath = `${user.id}/${params.id}/${safeFileName}`
+    const arrayBuffer = await file.arrayBuffer()
+    const { error: uploadError } = await supabase.storage
+      .from('milestone-deliverables')
+      .upload(filePath, arrayBuffer, { contentType: file.type, upsert: true })
+    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+
+    deliverableInsert = { milestone_id: params.id, file_path: filePath, file_name: file.name, link_url: null }
+    notifyFileName = file.name
+
+    // On re-submission: also create a homework submission
+    if (isResubmit) {
+      const resubmitHomeworkId = milestone.week_number
+      const { count } = await supabase
+        .from('submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('homework_id', resubmitHomeworkId)
+      const attemptNumber = (count ?? 0) + 1
+      const subFilePath = `${user.id}/${resubmitHomeworkId}/${attemptNumber}/${safeFileName}`
+      await supabase.storage.from('submissions').upload(subFilePath, arrayBuffer, { contentType: file.type, upsert: false })
+      const { data: subRow } = await supabase.from('submissions').insert({
+        user_id: user.id,
+        homework_id: resubmitHomeworkId,
+        file_path: subFilePath,
+        file_name: file.name,
+        link_url: null,
+        status: 'pending',
+        attempt_number: attemptNumber,
+      }).select().single()
+
+      void (async () => {
+        try {
+          const { data: userRow } = await supabase.from('users').select('*').eq('id', user.id).single()
+          if (userRow && subRow) await notifyNewSubmission({ user: userRow, submission: subRow as Submission })
+        } catch (e) { console.error('[email] outer catch:', e) }
+      })()
+    }
+  }
+
+  await supabase.from('milestone_deliverables').insert(deliverableInsert)
   const newStatus = isResubmit ? 'in_progress' : 'completed'
   await supabase.from('milestones').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', params.id).eq('user_id', user.id)
 
-  // On re-submission: also create a homework submission (week_number → homework_id)
-  let createdSubmission: Submission | null = null
-  let resubmitHomeworkId: number | null = null
-  if (isResubmit) {
-    resubmitHomeworkId = milestone.week_number
-    const { count } = await supabase
-      .from('submissions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('homework_id', resubmitHomeworkId)
-    const attemptNumber = (count ?? 0) + 1
-    const subFilePath = `${user.id}/${resubmitHomeworkId}/${attemptNumber}/${safeFileName}`
-    await supabase.storage
-      .from('submissions')
-      .upload(subFilePath, arrayBuffer, { contentType: file.type, upsert: false })
-    const { data: subRow } = await supabase.from('submissions').insert({
-      user_id: user.id,
-      homework_id: resubmitHomeworkId,
-      file_path: subFilePath,
-      file_name: file.name,
-      status: 'pending',
-      attempt_number: attemptNumber,
-    }).select().single()
-    createdSubmission = subRow
-  }
-
-  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
-  void (async () => {
-    try {
-      const { data: userRow } = await supabase.from('users').select('*').eq('id', user.id).single()
-      if (!userRow) {
-        console.warn('[email] skipped milestone deliverable notification: user lookup returned null', { userId: user.id })
-        return
-      }
-      if (isResubmit && createdSubmission) {
-        await notifyNewSubmission({ user: userRow, submission: createdSubmission })
-      } else if (!isResubmit) {
+  if (!isResubmit) {
+    void (async () => {
+      try {
+        const { data: userRow } = await supabase.from('users').select('*').eq('id', user.id).single()
+        if (!userRow) return
         const { data: milestoneFull } = await supabase.from('milestones').select('*').eq('id', params.id).single()
-        if (!milestoneFull) {
-          console.warn('[email] skipped notifyMilestoneCompleted: milestone lookup returned null', { milestoneId: params.id })
-          return
-        }
-        await notifyMilestoneCompleted({ user: userRow, milestone: milestoneFull, fileName: file.name })
-      }
-    } catch (e) {
-      console.error('[email] outer catch:', e)
-    }
-  })()
+        if (!milestoneFull) return
+        await notifyMilestoneCompleted({ user: userRow, milestone: milestoneFull, fileName: notifyFileName })
+      } catch (e) { console.error('[email] outer catch:', e) }
+    })()
+  }
 
   return NextResponse.json({ ok: true }, { status: 201 })
 }

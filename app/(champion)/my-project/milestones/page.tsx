@@ -48,6 +48,8 @@ export default function MilestonesPage() {
   const [editForm, setEditForm] = useState({ title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
   const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  const [linkInputId, setLinkInputId] = useState<string | null>(null)
+  const [linkInputVal, setLinkInputVal] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const { width: listWidth, setWidth: setListWidth, onMouseDown: onResizeList } = useResizableWidth({
     initialWidth: 320,
@@ -139,6 +141,25 @@ export default function MilestonesPage() {
       const msg = e instanceof Error ? e.message : String(e)
       setError('파일 업로드에 실패했습니다.')
       toast.error('파일 업로드 실패: ' + msg)
+    }
+  }
+
+  async function handleLinkUpload(id: string, url: string) {
+    const trimmed = url.trim()
+    if (!trimmed) return
+    setError(null)
+    try {
+      await apiFetch(`/api/milestones/${id}/deliverables`, {
+        method: 'POST',
+        body: JSON.stringify({ link_url: trimmed }),
+      })
+      const updated = await apiFetch<Milestone[]>('/api/milestones')
+      setMilestones(updated)
+      setLinkInputId(null)
+      setLinkInputVal('')
+      toast.success('링크가 제출되었습니다.')
+    } catch (e: unknown) {
+      toast.error('링크 제출 실패: ' + (e instanceof Error ? e.message : String(e)))
     }
   }
 
@@ -388,11 +409,16 @@ export default function MilestonesPage() {
                       <div className="flex flex-col gap-2 items-start">
                         {m.publish_status === 'published' && (() => {
                           const lastDeliverable = m.deliverables?.slice().sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0]
-                          return lastDeliverable ? (
+                          if (!lastDeliverable) return null
+                          return lastDeliverable.link_url ? (
+                            <a href={lastDeliverable.link_url} target="_blank" rel="noopener noreferrer" className="text-xs underline text-left truncate max-w-full" style={{ color: 'var(--blue-600)' }}>
+                              🔗 {lastDeliverable.link_url}
+                            </a>
+                          ) : (
                             <button onClick={() => handleDownload(m.id)} className="text-xs underline text-left" style={{ color: 'var(--blue-600)' }}>
                               ⬇ {lastDeliverable.file_name}
                             </button>
-                          ) : null
+                          )
                         })()}
                         {m.publish_status === 'draft' ? (
                           <span
@@ -409,7 +435,7 @@ export default function MilestonesPage() {
                               className="text-xs underline"
                               style={{ color: 'var(--text-disabled)' }}
                             >
-                              과제 재제출
+                              파일 재제출
                             </button>
                             <input
                               type="file"
@@ -417,12 +443,50 @@ export default function MilestonesPage() {
                               ref={el => { if (el) resubmitInputRefs.current.set(m.id, el) }}
                               onChange={e => { if (e.target.files?.[0]) { handleUpload(m.id, e.target.files[0]); e.target.value = '' } }}
                             />
+                            <button
+                              onClick={() => { setLinkInputId(linkInputId === m.id ? null : m.id); setLinkInputVal('') }}
+                              className="text-xs underline"
+                              style={{ color: 'var(--text-disabled)' }}
+                            >
+                              링크 재제출
+                            </button>
                           </>
                         ) : (
-                          <label className="cursor-pointer px-2 py-1 rounded font-semibold" style={{ background: 'rgba(74,222,128,0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
-                            📤 과제 업로드
-                            <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) handleUpload(m.id, e.target.files[0]) }} />
-                          </label>
+                          <div className="flex flex-col gap-1.5 items-start w-full">
+                            <label className="cursor-pointer px-2 py-1 rounded font-semibold" style={{ background: 'rgba(74,222,128,0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
+                              📤 파일 업로드
+                              <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) handleUpload(m.id, e.target.files[0]) }} />
+                            </label>
+                            <button
+                              onClick={() => { setLinkInputId(linkInputId === m.id ? null : m.id); setLinkInputVal('') }}
+                              className="text-xs px-2 py-1 rounded font-semibold"
+                              style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)' }}
+                            >
+                              🔗 링크 제출
+                            </button>
+                          </div>
+                        )}
+                        {linkInputId === m.id && (
+                          <div className="flex gap-1 w-full mt-1">
+                            <input
+                              type="url"
+                              value={linkInputVal}
+                              onChange={e => setLinkInputVal(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') handleLinkUpload(m.id, linkInputVal) }}
+                              placeholder="https://..."
+                              autoFocus
+                              className="flex-1 text-xs rounded px-2 py-1 outline-none min-w-0"
+                              style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+                            />
+                            <button
+                              onClick={() => handleLinkUpload(m.id, linkInputVal)}
+                              disabled={!linkInputVal.trim()}
+                              className="text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
+                              style={{ background: 'var(--blue-600)', color: '#fff' }}
+                            >
+                              제출
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>

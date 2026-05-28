@@ -88,8 +88,9 @@ export interface Milestone {
 export interface MilestoneDeliverable {
   id: string
   milestone_id: string
-  file_path: string
-  file_name: string
+  file_path: string | null
+  file_name: string | null
+  link_url: string | null
   uploaded_at: string
 }
 
