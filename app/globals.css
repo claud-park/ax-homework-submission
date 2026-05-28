@@ -2,24 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────
+   FLO Design System 1.0 — Custom Tokens
+   Source: Figma node 15785:10
+   ──────────────────────────────────────────── */
 :root {
-  --surface-primary: #ffffff;
-  --surface-secondary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-disabled: #94a3b8;
-  --blue-600: #2563eb;
-  --app-accent: #2563eb;
-  --border-subtle: #e2e8f0;
-  --error: #dc2626;
+  /* Surface */
+  --surface-primary: #ffffff;        /* modal_background / white card */
+  --surface-secondary: #f1f5f9;     /* gray_150 — sidebar, alt panels */
+  --surface-tertiary: #e2e8f0;      /* gray_200 — dividers, inactive */
+  --surface-minimal: #f8fafc;       /* gray_100 — subtle bg tint */
+
+  /* Text */
+  --text-primary: #1e293b;          /* gray_800 */
+  --text-secondary: #475569;        /* gray_600 */
+  --text-tertiary: #64748b;         /* gray_500 */
+  --text-disabled: #94a3b8;         /* gray_400 */
+
+  /* Interactive */
+  --accent: #1e40af;                /* blue_800 — CTA buttons (light mode) */
+  --blue-600: #2563eb;              /* static_accent — links, inline icons */
+  --app-accent: #2563eb;            /* alias: static_accent */
+
+  /* Border */
+  --border-subtle: #e2e8f0;         /* gray_200 */
+  --border-faint: #f1f5f9;          /* gray_150 */
+
+  /* Status */
+  --error: #b91c1c;                 /* red_700 */
   --success: #16a34a;
   --amber: #d97706;
+
+  /* Shadows (from FLO shadow tokens) */
+  --shadow-s: 0px 1px 4px 0px rgba(0, 0, 0, 0.08), 0px 1px 2px -1px rgba(0, 0, 0, 0.10);
+  --shadow-m: 0px 2px 8px 0px rgba(0, 0, 0, 0.12);
+  --shadow-l: 0px 4px 16px 0px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0px 8px 24px 0px rgba(0, 0, 0, 0.16);
 }
 
 * { box-sizing: border-box; }
 html, body { background: hsl(var(--background)); color: var(--text-primary); font-family: Pretendard, 'Apple SD Gothic Neo', system-ui, sans-serif; }
 
-/* Global focus-visible ring — applies to all interactive elements */
 :focus-visible {
   outline: 2px solid var(--blue-600);
   outline-offset: 2px;
@@ -28,68 +51,76 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
+    /* shadcn/ui hsl tokens — aligned with FLO accent (blue_800 = hsl(221 71% 40%)) */
+    --background: 210 20% 98%;       /* gray_100 ≈ #f8fafc */
+    --foreground: 215 25% 17%;       /* gray_800 ≈ #1e293b */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 215 25% 17%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
+    --popover-foreground: 215 25% 17%;
+    --primary: 221 71% 40%;          /* blue_800 = #1e40af (FLO accent light) */
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 215 25% 17%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 20% 96%;
+    --accent-foreground: 215 25% 17%;
+    --destructive: 0 72% 37%;        /* red_700 = #b91c1c */
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --chart-1: 12 76% 61%;
+    --border: 214 32% 88%;           /* gray_200 ≈ #e2e8f0 */
+    --input: 214 32% 88%;
+    --ring: 221 71% 40%;             /* blue_800 */
+    --chart-1: 221 71% 40%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
+    /* shadcn dark tokens */
+    --background: 0 0% 0%;           /* black */
+    --foreground: 0 0% 100%;         /* white */
+    --card: 215 35% 18%;             /* gray_800 */
+    --card-foreground: 0 0% 100%;
+    --popover: 215 35% 18%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 221 83% 53%;          /* blue_600 = #2563eb (FLO accent dark) */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 30% 12%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 215 30% 12%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 215 30% 12%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;        /* red_600 = #dc2626 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 23% 30%;           /* gray_700 ≈ #334155 */
+    --input: 215 23% 30%;
+    --ring: 221 83% 53%;
+    --chart-1: 221 83% 53%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    /* Custom token dark overrides */
-    --surface-primary: #1e293b;
-    --surface-secondary: #0f172a;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-disabled: #475569;
-    --blue-600: #3b82f6;
-    --app-accent: #3b82f6;
-    --border-subtle: #334155;
-    --error: #f87171;
+    /* FLO dark mode custom tokens */
+    --surface-primary: #1e293b;       /* gray_800 — panels */
+    --surface-secondary: #131c2b;     /* gray_850 — deeper bg */
+    --surface-tertiary: #273347;      /* gray_750 */
+    --surface-minimal: #0f172a;       /* gray_900 — deepest */
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;        /* gray_400 */
+    --text-tertiary: #64748b;         /* gray_500 */
+    --text-disabled: #475569;         /* gray_600 */
+    --accent: #2563eb;                /* blue_600 — CTA in dark */
+    --blue-600: #2563eb;
+    --app-accent: #2563eb;
+    --border-subtle: #334155;         /* gray_700 */
+    --border-faint: #1e293b;          /* gray_800 */
+    --error: #dc2626;                 /* red_600 */
     --success: #4ade80;
     --amber: #fbbf24;
   }

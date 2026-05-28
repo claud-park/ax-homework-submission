@@ -7,16 +7,34 @@ const config: Config = {
   	extend: {
   		colors: {
   			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+
+  			/* FLO surface tokens */
   			'surface-primary': 'var(--surface-primary)',
   			'surface-secondary': 'var(--surface-secondary)',
+  			'surface-tertiary': 'var(--surface-tertiary)',
+  			'surface-minimal': 'var(--surface-minimal)',
+
+  			/* FLO text tokens */
   			'text-primary': 'var(--text-primary)',
   			'text-secondary': 'var(--text-secondary)',
+  			'text-tertiary': 'var(--text-tertiary)',
   			'text-disabled': 'var(--text-disabled)',
+
+  			/* FLO interactive tokens */
   			'blue-accent': 'var(--blue-600)',
+  			'flo-accent': 'var(--accent)',
+
+  			/* FLO border tokens */
   			'border-subtle': 'var(--border-subtle)',
+  			'border-faint': 'var(--border-faint)',
+
+  			/* FLO status tokens */
   			error: 'var(--error)',
   			success: 'var(--success)',
-  			foreground: 'hsl(var(--foreground))',
+  			amber: 'var(--amber)',
+
+  			/* shadcn/ui tokens */
   			card: {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
@@ -64,11 +82,33 @@ const config: Config = {
   				'sans-serif'
   			]
   		},
+  		/* FLO Typography Scale
+  		 * h50(40/48) h100(28/36) h200(24/32) h300(20/28) h400(18/24)
+  		 * body1(16/22) body2(14/20) caption1(12/18) caption2(10/12)
+  		 */
+  		fontSize: {
+  			'flo-h50':      ['2.5rem',    { lineHeight: '3rem' }],
+  			'flo-h100':     ['1.75rem',   { lineHeight: '2.25rem' }],
+  			'flo-h200':     ['1.5rem',    { lineHeight: '2rem' }],
+  			'flo-h300':     ['1.25rem',   { lineHeight: '1.75rem' }],
+  			'flo-h400':     ['1.125rem',  { lineHeight: '1.5rem' }],
+  			'flo-body1':    ['1rem',      { lineHeight: '1.375rem' }],
+  			'flo-body2':    ['0.875rem',  { lineHeight: '1.25rem' }],
+  			'flo-caption1': ['0.75rem',   { lineHeight: '1.125rem' }],
+  			'flo-caption2': ['0.625rem',  { lineHeight: '0.75rem' }],
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
-  		}
+  		},
+  		/* FLO Shadow Tokens */
+  		boxShadow: {
+  			'flo-s':  'var(--shadow-s)',
+  			'flo-m':  'var(--shadow-m)',
+  			'flo-l':  'var(--shadow-l)',
+  			'flo-xl': 'var(--shadow-xl)',
+  		},
   	}
   },
   plugins: [require("tailwindcss-animate")],
