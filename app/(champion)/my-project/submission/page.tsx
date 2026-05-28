@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { apiFetch } from '@/lib/api-client'
+import { apiFetch, apiUpload } from '@/lib/api-client'
 import type { Submission } from '@/lib/types'
 import { toast } from 'sonner'
 import { Upload, FileCheck, Link } from 'lucide-react'
@@ -36,11 +36,7 @@ export default function SubmissionPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('/api/submissions', { method: 'POST', body: formData })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? '제출 실패')
-      }
+      await apiUpload('/api/submissions', formData)
       toast.success('제출되었습니다.')
       load()
     } catch (e: unknown) {
@@ -56,15 +52,10 @@ export default function SubmissionPage() {
     if (!trimmed) return
     setSubmittingLink(true)
     try {
-      const res = await fetch('/api/submissions', {
+      await apiFetch('/api/submissions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ link_url: trimmed }),
       })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? '제출 실패')
-      }
       toast.success('제출되었습니다.')
       setLinkUrl('')
       load()
