@@ -33,6 +33,13 @@ const INPUT_STYLE: React.CSSProperties = {
   resize: 'none',
 }
 
+type Tab = 'pending' | 'reviewed'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'pending', label: '대기중인 신고' },
+  { id: 'reviewed', label: '확인 완료' },
+]
+
 function ReportCard({
   report,
   reviewed,
@@ -132,6 +139,7 @@ function ReportCard({
 }
 
 export default function AdminDelayReportsPage() {
+  const [activeTab, setActiveTab] = useState<Tab>('pending')
   const [pending, setPending] = useState<BottleneckReport[]>([])
   const [reviewed, setReviewed] = useState<BottleneckReport[]>([])
   const [comments, setComments] = useState<Record<string, string>>({})
@@ -165,22 +173,49 @@ export default function AdminDelayReportsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-10">
-      {/* 현재 지연 신고 */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>현재 지연 신고</h2>
-          {pending.length > 0 && (
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)' }}
+    <div className="flex flex-col gap-0">
+      {/* 페이지 타이틀 */}
+      <h1 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>지연 신고</h1>
+
+      {/* 탭 */}
+      <div className="flex gap-1 border-b mb-6" style={{ borderColor: 'var(--border-subtle)' }}>
+        {TABS.map(tab => {
+          const active = activeTab === tab.id
+          const badge = tab.id === 'pending' ? pending.length : reviewed.length
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-1.5 text-xs px-4 py-2 font-medium transition-colors"
+              style={{
+                color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
+                borderBottom: active ? '2px solid var(--blue-600)' : '2px solid transparent',
+                marginBottom: -1,
+                background: 'none',
+                cursor: 'pointer',
+              }}
             >
-              {pending.length}건 대기중
-            </span>
-          )}
-        </div>
-        {pending.length === 0 ? (
-          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>대기중인 지연 신고가 없습니다.</p>
+              {tab.label}
+              {badge > 0 && (
+                <span
+                  className="text-xs font-bold px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: tab.id === 'pending' ? 'rgba(248,113,113,0.15)' : 'color-mix(in srgb, var(--success) 12%, transparent)',
+                    color: tab.id === 'pending' ? 'var(--error)' : 'var(--success)',
+                  }}
+                >
+                  {badge}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 탭 콘텐츠 */}
+      {activeTab === 'pending' && (
+        pending.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>대기중인 신고가 없습니다.</p>
         ) : (
           <div className="flex flex-col gap-3">
             {pending.map(report => (
@@ -195,32 +230,20 @@ export default function AdminDelayReportsPage() {
               />
             ))}
           </div>
-        )}
-      </section>
+        )
+      )}
 
-      {/* 확인 완료된 지연 신고 */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>확인 완료된 지연 신고</h2>
-          {reviewed.length > 0 && (
-            <span
-              className="text-xs font-medium px-2 py-0.5 rounded-full"
-              style={{ background: 'color-mix(in srgb, var(--success) 12%, transparent)', color: 'var(--success)' }}
-            >
-              {reviewed.length}건
-            </span>
-          )}
-        </div>
-        {reviewed.length === 0 ? (
-          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>확인 완료된 지연 신고가 없습니다.</p>
+      {activeTab === 'reviewed' && (
+        reviewed.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>확인 완료된 신고가 없습니다.</p>
         ) : (
           <div className="flex flex-col gap-3">
             {reviewed.map(report => (
               <ReportCard key={report.id} report={report} reviewed={true} />
             ))}
           </div>
-        )}
-      </section>
+        )
+      )}
     </div>
   )
 }
