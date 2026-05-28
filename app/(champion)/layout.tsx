@@ -2,12 +2,17 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { Users, FolderOpen, LogOut, Menu, X } from 'lucide-react'
+import { Users, FileText, LayoutList, Upload, LogOut, Menu, X } from 'lucide-react'
 import { parseName } from '@/lib/utils'
 
-const NAV = [
+const NAV_TOP = [
   { icon: Users, label: '전체 현황', href: '/' },
-  { icon: FolderOpen, label: '내 프로젝트', href: '/my-project' },
+]
+
+const NAV_MY_PROJECT = [
+  { icon: FileText, label: '과제정의서', href: '/my-project/charter' },
+  { icon: LayoutList, label: 'WBS / 마일스톤', href: '/my-project/milestones' },
+  { icon: Upload, label: '파일 제출', href: '/my-project/submission' },
 ]
 
 export default function ChampionLayout({ children }: { children: React.ReactNode }) {
@@ -71,10 +76,8 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
 
         {/* Nav */}
         <nav className="flex flex-col gap-0.5">
-          {NAV.map(item => {
-            const active = item.href === '/'
-              ? pathname === '/' || pathname.startsWith('/champions')
-              : pathname.startsWith(item.href)
+          {NAV_TOP.map(item => {
+            const active = pathname === '/' || pathname.startsWith('/champions')
             return (
               <a
                 key={item.href}
@@ -82,18 +85,42 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
                 aria-current={active ? 'page' : undefined}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-flo-body2 font-medium transition-colors relative"
                 style={{
-                  background: active
-                    ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
-                    : 'transparent',
+                  background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent',
                   color: active ? 'var(--accent)' : 'var(--text-secondary)',
                 }}
                 onClick={() => setDrawerOpen(false)}
               >
                 {active && (
-                  <span
-                    className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
-                    style={{ background: 'var(--accent)' }}
-                  />
+                  <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full" style={{ background: 'var(--accent)' }} />
+                )}
+                <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                {item.label}
+              </a>
+            )
+          })}
+
+          {/* 내 프로젝트 섹션 */}
+          <div className="px-3 pt-4 pb-1">
+            <span className="text-flo-caption2 font-semibold uppercase tracking-wider" style={{ color: 'var(--text-disabled)' }}>
+              내 프로젝트
+            </span>
+          </div>
+          {NAV_MY_PROJECT.map(item => {
+            const active = pathname.startsWith(item.href)
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-flo-body2 font-medium transition-colors relative"
+                style={{
+                  background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent',
+                  color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                }}
+                onClick={() => setDrawerOpen(false)}
+              >
+                {active && (
+                  <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full" style={{ background: 'var(--accent)' }} />
                 )}
                 <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                 {item.label}
