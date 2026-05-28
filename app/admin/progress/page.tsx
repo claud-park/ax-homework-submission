@@ -360,14 +360,18 @@ export default function AdminProgressPage() {
   const [charters, setCharters] = useState<CharterWithUser[]>([])
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [selectedCharter, setSelectedCharter] = useState<CharterWithUser | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    apiFetch<MilestoneWithUser[]>('/api/admin/milestones').then(data => {
-      setMilestones(data)
-      setSelectedUsers(new Set(data.map(m => m.user_id)))
-    }).catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
-    apiFetch<CharterWithUser[]>('/api/admin/charters').then(setCharters)
+    Promise.all([
+      apiFetch<MilestoneWithUser[]>('/api/admin/milestones').then(data => {
+        setMilestones(data)
+        setSelectedUsers(new Set(data.map(m => m.user_id)))
+      }),
+      apiFetch<CharterWithUser[]>('/api/admin/charters').then(setCharters),
+    ])
       .catch((e: Error) => toast.error('진행 현황 로드 실패: ' + e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   const users = useMemo(
@@ -393,6 +397,24 @@ export default function AdminProgressPage() {
     })),
     [users, filtered, filteredCharters, selectedUsers],
   )
+
+  if (loading) {
+    return (
+      <div>
+        <div style={{ marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
+            챔피언 진척도 비교
+          </h1>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>오늘: {todayStr}</p>
+        </div>
+        <div className="flex flex-col gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-44 w-full rounded-2xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   function toggleUser(userId: string) {
     setSelectedUsers(prev => {

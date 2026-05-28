@@ -1,26 +1,8 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 
-// ─── 대한민국 공휴일 + 대체공휴일 (2025–2026) ──────────────────────────────
+// ─── 대한민국 공휴일 + 대체공휴일 (2026–2027) ──────────────────────────────
 const HOLIDAYS: Record<string, string> = {
-  // 2025
-  '2025-01-01': '신정',
-  '2025-01-27': '설날 연휴',
-  '2025-01-28': '설날',
-  '2025-01-29': '설날 연휴',
-  '2025-03-01': '삼일절',
-  '2025-03-03': '대체공휴일 (삼일절)',
-  '2025-05-05': '어린이날·부처님오신날',
-  '2025-05-06': '대체공휴일 (어린이날)',
-  '2025-06-06': '현충일',
-  '2025-08-15': '광복절',
-  '2025-10-03': '개천절',
-  '2025-10-05': '추석 연휴',
-  '2025-10-06': '추석',
-  '2025-10-07': '추석 연휴',
-  '2025-10-08': '대체공휴일 (추석)',
-  '2025-10-09': '한글날',
-  '2025-12-25': '성탄절',
   // 2026
   '2026-01-01': '신정',
   '2026-02-16': '설날 연휴',
@@ -43,6 +25,29 @@ const HOLIDAYS: Record<string, string> = {
   '2026-10-05': '대체공휴일 (개천절)',
   '2026-10-09': '한글날',
   '2026-12-25': '성탄절',
+  // 2027
+  '2027-01-01': '신정',
+  '2027-02-05': '설날 연휴',
+  '2027-02-06': '설날',
+  '2027-02-07': '설날 연휴',
+  '2027-02-08': '대체공휴일 (설날)',
+  '2027-02-09': '대체공휴일 (설날 연휴)',
+  '2027-03-01': '삼일절',
+  '2027-05-05': '어린이날',
+  '2027-05-13': '부처님오신날',
+  '2027-06-06': '현충일',
+  '2027-06-07': '대체공휴일 (현충일)',
+  '2027-08-15': '광복절',
+  '2027-08-16': '대체공휴일 (광복절)',
+  '2027-09-14': '추석 연휴',
+  '2027-09-15': '추석',
+  '2027-09-16': '추석 연휴',
+  '2027-10-03': '개천절',
+  '2027-10-04': '대체공휴일 (개천절)',
+  '2027-10-09': '한글날',
+  '2027-10-11': '대체공휴일 (한글날)',
+  '2027-12-25': '성탄절',
+  '2027-12-27': '대체공휴일 (성탄절)',
 }
 
 function toKey(d: Date): string {
@@ -89,7 +94,6 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
   const [open, setOpen] = useState(false)
   const [viewYear, setViewYear] = useState(() => (startDate ? parseKey(startDate) : new Date()).getFullYear())
   const [viewMonth, setViewMonth] = useState(() => (startDate ? parseKey(startDate) : new Date()).getMonth())
-  // step: 'idle' → waiting for first click, 'end' → waiting for second click
   const [step, setStep] = useState<'idle' | 'end'>('idle')
   const [firstKey, setFirstKey] = useState<string | null>(null)
   const [hoverKey, setHoverKey] = useState<string | null>(null)
@@ -115,7 +119,6 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
     else setViewMonth(m => m + 1)
   }
 
-  // Effective range for visual highlight (preview while hovering)
   function getRange(): [string, string] | null {
     if (step === 'end' && firstKey && hoverKey) {
       return firstKey <= hoverKey ? [firstKey, hoverKey] : [hoverKey, firstKey]
@@ -150,7 +153,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
     : '작업 기간을 선택하세요'
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef}>
       {/* ── Trigger ── */}
       <button
         type="button"
@@ -166,10 +169,10 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
           padding: '10px 14px',
           background: 'var(--surface-secondary)',
           border: `1px solid ${open ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
-          borderRadius: '8px',
+          borderRadius: open ? '8px 8px 0 0' : '8px',
           cursor: 'pointer',
           textAlign: 'left',
-          transition: 'border-color 0.15s',
+          transition: 'border-color 0.15s, border-radius 0.15s',
         }}
       >
         <span style={{ fontSize: '18px', flexShrink: 0 }}>📅</span>
@@ -188,37 +191,20 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
         </div>
         {workingDays !== null && (
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--blue-600)', flexShrink: 0, background: 'rgba(37,99,235,0.1)', padding: '2px 8px', borderRadius: '999px' }}>
-            {workingDays}일
+            워킹데이 {workingDays}일
           </span>
         )}
       </button>
 
-      {/* ── Calendar Popover ── */}
+      {/* ── Calendar (inline expand, same stacking context) ── */}
       {open && (
         <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 4px)',
-          left: 0,
-          right: 0,
-          zIndex: 300,
           background: 'var(--surface-primary)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: '14px',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+          border: '1px solid var(--blue-600)',
+          borderTop: 'none',
+          borderRadius: '0 0 14px 14px',
           overflow: 'hidden',
         }}>
-          {/* Tab header */}
-          <div style={{
-            textAlign: 'center',
-            padding: '9px',
-            fontSize: '13px',
-            fontWeight: 700,
-            color: 'var(--blue-600)',
-            borderBottom: '2px solid var(--blue-600)',
-            background: 'var(--surface-secondary)',
-            letterSpacing: '0.04em',
-          }}>달력</div>
-
           {/* Hint */}
           <div style={{
             padding: '5px 16px',
@@ -286,7 +272,6 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
               else if (holiday || isSun) textColor = '#ef4444'
               else if (isSat) textColor = '#3b82f6'
 
-              // Range background: half-gradient on start/end, full on between
               let cellBg = 'transparent'
               if (hasBothEnds) {
                 if (isBetween) cellBg = 'rgba(37,99,235,0.1)'
@@ -330,7 +315,6 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
                     transition: 'background 0.1s',
                   }}>
                     {day}
-                    {/* Holiday dot */}
                     {holiday && !isSelected && (
                       <div style={{
                         position: 'absolute',

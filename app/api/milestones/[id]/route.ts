@@ -30,6 +30,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .from('milestones').select('*').eq('id', params.id).eq('user_id', user.id).single()
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  // Charter approval guard — block is_manual_progress unless champion has an approved charter
+  if (body.is_manual_progress === true && !existing.is_manual_progress) {
+    const { count } = await supabase
+      .from('charter_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('admin_approved_at', 'is', null)
+    if (!count || count === 0) {
+      return NextResponse.json({ error: 'charter_not_approved' }, { status: 403 })
+    }
+  }
+
   // Status transition guard
   if (existing.publish_status === 'published' && body.publish_status === 'draft') {
     return NextResponse.json(

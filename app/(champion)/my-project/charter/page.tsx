@@ -647,8 +647,10 @@ function SubmissionCard({ sub, compressed, active, onClick }: {
   )
 }
 
+
 export default function CharterPage() {
   const [submissions, setSubmissions] = useState<CharterSubmission[]>([])
+  const [loading, setLoading] = useState(true)
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const { width: listWidth, setWidth: setListWidth, onMouseDown: onResizeList } = useResizableWidth({
@@ -679,7 +681,10 @@ export default function CharterPage() {
   }, [filter])
 
   useEffect(() => {
-    apiFetch<CharterSubmission[]>('/api/charter/submissions').then(setSubmissions).catch((e: Error) => toast.error('과제정의서 목록 로드 실패: ' + e.message))
+    apiFetch<CharterSubmission[]>('/api/charter/submissions')
+      .then(setSubmissions)
+      .catch((e: Error) => toast.error('과제정의서 목록 로드 실패: ' + e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   const visibleSubmissions = useMemo(
@@ -718,21 +723,36 @@ export default function CharterPage() {
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</span>
             <PublishStatusFilter value={filter} onChange={setFilter} />
           </div>
-          <button
-            onClick={() => openSidePanel('new')}
-            className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-            style={{
-              background: sidePanel === 'new' ? 'rgba(37,99,235,0.15)' : 'var(--surface-secondary)',
-              color: sidePanel === 'new' ? 'var(--blue-600)' : 'var(--text-secondary)',
-            }}
-          >
-            + 과제정의서 추가
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.open('/charter-guide', 'charter-guide', 'width=780,height=720,resizable=yes,scrollbars=yes')}
+              className="text-xs font-medium underline"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)' }}
+            >
+              과제정의서란?
+            </button>
+            <button
+              onClick={() => openSidePanel('new')}
+              className="text-xs px-2.5 py-1 rounded-lg font-semibold"
+              style={{
+                background: sidePanel === 'new' ? 'rgba(37,99,235,0.15)' : 'var(--surface-secondary)',
+                color: sidePanel === 'new' ? 'var(--blue-600)' : 'var(--text-secondary)',
+              }}
+            >
+              + 과제정의서 추가
+            </button>
+          </div>
         </div>
 
         {/* List body */}
         <div className="flex-1 overflow-y-auto">
-          {submissions.length === 0 ? (
+          {loading ? (
+            <div className="p-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+              ))}
+            </div>
+          ) : submissions.length === 0 ? (
             <EmptyState
               icon={FileText}
               title="과제정의서가 없습니다"
@@ -790,6 +810,8 @@ export default function CharterPage() {
           )}
         </div>
       )}
+
+
     </div>
   )
 }

@@ -305,7 +305,8 @@ function CharterDetailPanel({ userId, champMap, onClose }: {
 
 export function ChampionGanttView() {
   const [champions, setChampions] = useState<GanttChampion[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  const [selectedChampions, setSelectedChampions] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [panelUserId, setPanelUserId] = useState<string | null>(null)
@@ -314,7 +315,7 @@ export function ChampionGanttView() {
     apiFetch<GanttChampion[]>('/api/champions/gantt')
       .then(data => {
         setChampions(data)
-        setTasks(toTasks(data))
+        setSelectedChampions(new Set(data.map(c => c.userId)))
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -325,6 +326,18 @@ export function ChampionGanttView() {
     for (const c of champions) m.set(c.userId, c)
     return m
   }, [champions])
+
+  const filteredChampions = useMemo(
+    () => champions.filter(c => selectedChampions.has(c.userId)),
+    [champions, selectedChampions],
+  )
+
+  const tasks = useMemo(() => {
+    const raw = toTasks(filteredChampions)
+    return raw.map(t =>
+      t.type === 'project' ? { ...t, hideChildren: collapsedIds.has(t.id) } : t
+    )
+  }, [filteredChampions, collapsedIds])
 
   const handleCharterClick = useCallback((userId: string) => {
     setPanelUserId(prev => prev === userId ? null : userId)
@@ -338,9 +351,21 @@ export function ChampionGanttView() {
   )
 
   function handleExpandChange(task: Task) {
-    setTasks(prev =>
-      prev.map(t => (t.id === task.id ? { ...t, hideChildren: !t.hideChildren } : t))
-    )
+    setCollapsedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(task.id)) next.delete(task.id)
+      else next.add(task.id)
+      return next
+    })
+  }
+
+  function toggleChampion(userId: string) {
+    setSelectedChampions(prev => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
+      return next
+    })
   }
 
   if (loading) {
@@ -353,7 +378,7 @@ export function ChampionGanttView() {
     )
   }
 
-  if (tasks.length === 0) {
+  if (champions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-2">
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>게시된 마일스톤이 없습니다</p>
@@ -365,7 +390,56 @@ export function ChampionGanttView() {
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div className="flex gap-1 mb-3">
+        {/* Champion filter chips */}
+        <div
+          className="chip-scroll"
+          style={{
+            display: 'flex', gap: '6px', flexWrap: 'nowrap',
+            overflowX: 'auto', marginBottom: '12px',
+            paddingBottom: '4px',
+            scrollbarWidth: 'none',
+          }}
+        >
+          {champions.map(c => {
+            const active = selectedChampions.has(c.userId)
+            return (
+              <button
+                key={c.userId}
+                type="button"
+                onClick={() => toggleChampion(c.userId)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '4px 10px', borderRadius: '20px',
+                  border: `1px solid ${active ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
+                  background: active ? 'rgba(37,99,235,0.1)' : 'var(--surface-primary)',
+                  color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
+                  fontSize: '12px', fontWeight: active ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{
+                  width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                  background: active ? 'rgba(37,99,235,0.2)' : 'rgba(148,163,184,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '9px', fontWeight: 700,
+                  color: active ? 'var(--blue-600)' : 'var(--text-disabled)',
+                }}>
+                  {c.name[0]}
+                </span>
+                {c.name}
+              </button>
+            )
+          })}
+        </div>
+
+        {tasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>선택된 챔피언이 없습니다</p>
+            <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>위에서 챔피언을 선택하면 간트 차트가 표시됩니다</p>
+          </div>
+        ) : null}
+
+        <div className="flex gap-1 mb-3" style={{ display: tasks.length === 0 ? 'none' : 'flex' }}>
           {([ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map(m => (
             <button
               key={m}
@@ -383,32 +457,36 @@ export function ChampionGanttView() {
           ))}
         </div>
 
-        <div style={{ fontSize: 12 }}>
-          <Gantt
-            tasks={tasks}
-            viewMode={viewMode}
-            onExpanderClick={handleExpandChange}
-            listCellWidth={`${LIST_WIDTH}px`}
-            columnWidth={viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200}
-            rowHeight={36}
-            barCornerRadius={4}
-            locale="ko-KR"
-            todayColor="rgba(37,99,235,0.08)"
-            TaskListHeader={TaskListHeader}
-            TaskListTable={TaskListTable}
-          />
-        </div>
-
-        <div className="flex gap-4 mt-3">
-          {(Object.entries(STATUS_COLOR) as [MilestoneStatus, string][]).map(([status, color]) => (
-            <div key={status} className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ background: color }} />
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {STATUS_LABEL[status as MilestoneStatus]}
-              </span>
+        {tasks.length > 0 && (
+          <>
+            <div style={{ fontSize: 12 }}>
+              <Gantt
+                tasks={tasks}
+                viewMode={viewMode}
+                onExpanderClick={handleExpandChange}
+                listCellWidth={`${LIST_WIDTH}px`}
+                columnWidth={viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200}
+                rowHeight={36}
+                barCornerRadius={4}
+                locale="ko-KR"
+                todayColor="rgba(37,99,235,0.08)"
+                TaskListHeader={TaskListHeader}
+                TaskListTable={TaskListTable}
+              />
             </div>
-          ))}
-        </div>
+
+            <div className="flex gap-4 mt-3">
+              {(Object.entries(STATUS_COLOR) as [MilestoneStatus, string][]).map(([status, color]) => (
+                <div key={status} className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-sm" style={{ background: color }} />
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {STATUS_LABEL[status as MilestoneStatus]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {panelUserId && (

@@ -36,6 +36,7 @@ export default function AdminChampionPage() {
   const [data, setData] = useState<ChampionProject | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
+  const [approving, setApproving] = useState(false)
 
   function loadSubs() {
     return apiFetch<Submission[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
@@ -50,6 +51,19 @@ export default function AdminChampionPage() {
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
+
+  async function approveCharter(charterId: string) {
+    setApproving(true)
+    try {
+      const updated = await apiFetch<CharterSubmission>(`/api/admin/charters/${charterId}/approve`, { method: 'POST' })
+      setData(prev => prev ? { ...prev, charter: prev.charter ? { ...prev.charter, admin_approved_at: updated.admin_approved_at } : null } : null)
+      toast.success('과제정의서가 승인되었습니다.')
+    } catch {
+      toast.error('승인 처리에 실패했습니다.')
+    } finally {
+      setApproving(false)
+    }
+  }
 
   async function updateStatus(submissionId: string, status: 'accepted' | 'declined') {
     try {
@@ -148,7 +162,26 @@ export default function AdminChampionPage() {
 
       {data.charter && (
         <section id="charter" className="mb-8">
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>과제정의서</h2>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</h2>
+            {data.charter.admin_approved_at ? (
+              <span
+                className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}
+              >
+                ✓ 승인됨 · {new Date(data.charter.admin_approved_at).toLocaleDateString('ko-KR')}
+              </span>
+            ) : (
+              <button
+                onClick={() => approveCharter(data.charter!.id)}
+                disabled={approving}
+                className="text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-50"
+                style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer' }}
+              >
+                {approving ? '처리 중…' : '✓ 승인'}
+              </button>
+            )}
+          </div>
           <div className="flex flex-col gap-3">
             {CHARTER_SECTIONS.map(s => {
               const html = data.charter!.content?.[s.key as keyof CharterSubmission['content']]

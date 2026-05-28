@@ -219,11 +219,15 @@ export default function AdminKanbanPage() {
   const [data, setData] = useState<KanbanDataV2>(EMPTY_DATA)
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null)
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const fetchKanban = useCallback(() => {
-    apiFetch<KanbanDataV2>('/api/admin/kanban').then(setData).catch(() => toast.error('데이터 로드 실패'))
+    apiFetch<KanbanDataV2>('/api/admin/kanban')
+      .then(setData)
+      .catch(() => toast.error('데이터 로드 실패'))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { fetchKanban() }, [fetchKanban])
@@ -288,6 +292,17 @@ export default function AdminKanbanPage() {
         </h1>
       </div>
 
+      {loading ? (
+        <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
+          {COLS.map(col => (
+            <div
+              key={col.key}
+              className="flex-1 rounded-xl animate-pulse"
+              style={{ minWidth: 160, minHeight: 300, background: 'var(--surface-secondary)' }}
+            />
+          ))}
+        </div>
+      ) : (
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
           {COLS.map(col => (
@@ -311,6 +326,7 @@ export default function AdminKanbanPage() {
           )}
         </DragOverlay>
       </DndContext>
+      )}
 
       <SubmissionDetailPanel
         card={selectedCard}

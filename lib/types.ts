@@ -50,6 +50,7 @@ export interface CharterSubmission {
   submitted_at: string
   updated_at: string
   publish_status: PublishStatus
+  admin_approved_at: string | null
 }
 
 export interface ProjectCharter {

@@ -134,3 +134,8 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
     @apply bg-background text-foreground;
   }
 }
+
+/* hide scrollbar on chip scroll rows */
+.chip-scroll::-webkit-scrollbar {
+  display: none;
+}

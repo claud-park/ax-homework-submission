@@ -144,14 +144,15 @@ export default function AdminDelayReportsPage() {
   const [reviewed, setReviewed] = useState<BottleneckReport[]>([])
   const [comments, setComments] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    apiFetch<BottleneckReport[]>('/api/admin/milestones/bottleneck-pending')
-      .then(setPending)
+    Promise.all([
+      apiFetch<BottleneckReport[]>('/api/admin/milestones/bottleneck-pending').then(setPending),
+      apiFetch<BottleneckReport[]>('/api/admin/milestones/bottleneck-reviewed').then(setReviewed),
+    ])
       .catch((e: Error) => toast.error('지연 신고 목록 로드 실패: ' + e.message))
-    apiFetch<BottleneckReport[]>('/api/admin/milestones/bottleneck-reviewed')
-      .then(setReviewed)
-      .catch((e: Error) => toast.error('확인 완료 목록 로드 실패: ' + e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   async function handleReview(id: string) {
@@ -213,7 +214,13 @@ export default function AdminDelayReportsPage() {
       </div>
 
       {/* 탭 콘텐츠 */}
-      {activeTab === 'pending' && (
+      {loading ? (
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+          ))}
+        </div>
+      ) : activeTab === 'pending' && (
         pending.length === 0 ? (
           <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>답변 대기중인 신고가 없습니다.</p>
         ) : (
@@ -233,7 +240,7 @@ export default function AdminDelayReportsPage() {
         )
       )}
 
-      {activeTab === 'reviewed' && (
+      {!loading && activeTab === 'reviewed' && (
         reviewed.length === 0 ? (
           <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>확인 완료된 신고가 없습니다.</p>
         ) : (

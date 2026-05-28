@@ -28,11 +28,13 @@ const TABS: { id: Tab; label: string }[] = [
 export default function AdminRequestsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('pending')
   const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     apiFetch<DeadlineChangeRequest[]>('/api/admin/deadline-requests')
       .then(setRequests)
       .catch((e: Error) => toast.error('기한 변경 요청 로드 실패: ' + e.message))
+      .finally(() => setLoading(false))
   }, [])
 
   async function handleDeadlineReview(id: string, status: 'approved' | 'rejected') {
@@ -98,7 +100,11 @@ export default function AdminRequestsPage() {
 
       {/* 탭 콘텐츠 */}
       <div className="flex flex-col gap-3">
-        {displayList.map(req => (
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+          ))
+        ) : displayList.map(req => (
           <div key={req.id} className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
             <div className="flex items-center justify-between mb-2">
               <div>
@@ -170,7 +176,7 @@ export default function AdminRequestsPage() {
             )}
           </div>
         ))}
-        {displayList.length === 0 && (
+        {!loading && displayList.length === 0 && (
           <EmptyState icon={Inbox} title={activeTab === 'pending' ? '답변 대기중인 요청이 없습니다' : '확인 완료된 요청이 없습니다'} />
         )}
       </div>

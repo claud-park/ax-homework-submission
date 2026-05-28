@@ -2,12 +2,13 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { Users, FolderOpen, LogOut, Menu, X } from 'lucide-react'
+import { Users, FolderOpen, LogOut, Menu, X, CheckSquare } from 'lucide-react'
 import { parseName } from '@/lib/utils'
 
 const NAV = [
   { icon: Users, label: '전체 현황', href: '/' },
   { icon: FolderOpen, label: '내 프로젝트', href: '/my-project' },
+  { icon: CheckSquare, label: '주간 체크인', href: '/checkin' },
 ]
 
 export default function ChampionLayout({ children }: { children: React.ReactNode }) {
