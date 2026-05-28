@@ -246,15 +246,28 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => downloadFile(sub.id)}
-                        disabled={downloadingId === sub.id}
-                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded"
-                        style={{ color: 'var(--blue-600)' }}
-                        aria-label="다운로드"
-                      >
-                        {downloadingId === sub.id ? <Spinner size="sm" /> : <Download className="h-3 w-3" />}
-                      </button>
+                      {sub.link_url ? (
+                        <a
+                          href={sub.link_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded"
+                          style={{ color: 'var(--blue-600)' }}
+                          aria-label="링크 열기"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => downloadFile(sub.id)}
+                          disabled={downloadingId === sub.id}
+                          className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded"
+                          style={{ color: 'var(--blue-600)' }}
+                          aria-label="다운로드"
+                        >
+                          {downloadingId === sub.id ? <Spinner size="sm" /> : <Download className="h-3 w-3" />}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
