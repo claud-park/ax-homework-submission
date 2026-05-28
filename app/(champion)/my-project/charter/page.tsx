@@ -43,6 +43,12 @@ const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: 
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
 
+function fmtMD(s: string): string {
+  if (!s) return ''
+  const [, m, d] = s.split('-').map(Number)
+  return `${m}/${d}`
+}
+
 function InfoTooltip({ text }: { text: string }) {
   const [show, setShow] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
@@ -342,7 +348,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
                 <li key={m.id} className="group flex items-center gap-2 px-4 py-1.5">
                   <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>·</span>
                   <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
-                  <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{m.start_date} – {m.due_date}</span>
+                  <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{fmtMD(m.start_date)} – {fmtMD(m.due_date)}</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                     <button type="button" onClick={() => openEdit(m)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="수정">
                       ✏
