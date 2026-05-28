@@ -33,7 +33,7 @@ const CHARTER_SECTIONS = [
 ] as const
 
 function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: string }) {
-  if (task.type !== 'project') return null
+  if (task.type === 'milestone') return null
   const fmt = (d: Date) => d.toISOString().split('T')[0]
   return (
     <div style={{
