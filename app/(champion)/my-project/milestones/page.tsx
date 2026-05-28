@@ -20,12 +20,6 @@ import { PublishStatusFilter, type PublishFilterValue } from '@/components/Publi
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 
-function fmtMD(s: string): string {
-  if (!s) return ''
-  const [, m, d] = s.split('-').map(Number)
-  return `${m}/${d}`
-}
-
 const STATUS_LABEL: Record<string, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
 }
@@ -338,7 +332,7 @@ export default function MilestonesPage() {
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col gap-1.5">
-                        <span style={{ color: 'var(--text-secondary)' }}>{fmtMD(m.start_date)} – {fmtMD(m.due_date)}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{m.start_date} ~ {m.due_date}</span>
                         {m.publish_status === 'published' && (m.status === 'delayed' || m.status === 'in_progress') && (
                           <button
                             onClick={() => {
