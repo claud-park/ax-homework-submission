@@ -5,6 +5,12 @@ import {
 } from '@/components/ui/dialog'
 import type { Milestone, DeadlineChangeRequest, BottleneckType } from '@/lib/types'
 
+function fmtMD(s: string): string {
+  if (!s) return ''
+  const [, m, d] = s.split('-').map(Number)
+  return `${m}/${d}`
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -106,7 +112,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
         <div>
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
         </div>
-        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>~{m.due_date}</span>
+        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>~{fmtMD(m.due_date)}</span>
       </div>
       <div className="mb-3">
         <span className="text-xs font-semibold" style={{ color: statusColor }}>
