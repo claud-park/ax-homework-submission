@@ -35,7 +35,7 @@ export async function notifyNewSubmission(params: {
   <table style="width:100%;font-size:14px;border-collapse:collapse">
     <tr><td style="padding:8px 0;color:#64748b;width:100px">챔피언</td><td style="padding:8px 0;font-weight:600">${escapeHtml(user.name)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">시도 횟수</td><td style="padding:8px 0">${String(submission.attempt_number)}회</td></tr>
-    <tr><td style="padding:8px 0;color:#64748b">파일명</td><td style="padding:8px 0">${escapeHtml(submission.file_name)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">제출물</td><td style="padding:8px 0">${submission.link_url ? escapeHtml(submission.link_url) : escapeHtml(submission.file_name ?? '')}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">제출 시각</td><td style="padding:8px 0">${escapeHtml(submission.submitted_at)}</td></tr>
   </table>
   <div style="margin-top:24px">

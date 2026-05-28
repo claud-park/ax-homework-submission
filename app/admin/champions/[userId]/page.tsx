@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission } from '@/lib/types'
 import { parseName } from '@/lib/utils'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Link } from 'lucide-react'
 import { toast } from 'sonner'
 
 function fmtMD(s: string): string {
@@ -119,7 +119,7 @@ export default function AdminChampionPage() {
       </div>
 
       <section className="mb-8">
-        <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>파일 제출 이력</h2>
+        <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>과제 제출 이력</h2>
         {submissions.length === 0 ? (
           <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>아직 제출 없음</p>
         ) : (
@@ -130,8 +130,21 @@ export default function AdminChampionPage() {
                 className="flex items-center justify-between p-3 rounded-xl border"
                 style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
               >
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{sub.file_name}</p>
+                <div className="min-w-0">
+                  {sub.link_url ? (
+                    <a
+                      href={sub.link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium truncate flex items-center gap-1"
+                      style={{ color: 'var(--blue-600)' }}
+                    >
+                      <Link className="h-3 w-3 shrink-0" />
+                      {sub.link_url}
+                    </a>
+                  ) : (
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{sub.file_name}</p>
+                  )}
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                     시도 {sub.attempt_number}회 · {new Date(sub.submitted_at).toLocaleDateString('ko-KR')}
                   </p>

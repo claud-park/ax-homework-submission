@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 const TABS = [
   { label: '과제정의서', href: '/my-project/charter' },
   { label: 'WBS / 마일스톤', href: '/my-project/milestones' },
-  { label: '파일 제출', href: '/my-project/submission' },
+  { label: '과제 제출', href: '/my-project/submission' },
 ]
 
 export default function MyProjectLayout({ children }: { children: React.ReactNode }) {

@@ -1,0 +1,3 @@
+ALTER TABLE submissions ALTER COLUMN file_path DROP NOT NULL;
+ALTER TABLE submissions ALTER COLUMN file_name DROP NOT NULL;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS link_url TEXT;

@@ -15,8 +15,9 @@ export interface User {
 export interface Submission {
   id: string
   user_id: string
-  file_path: string
-  file_name: string
+  file_path: string | null
+  file_name: string | null
+  link_url: string | null
   status: SubmissionStatus
   attempt_number: number
   submitted_at: string

@@ -191,20 +191,33 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
                   style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)' }}
                 >
                   <div className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                    {latest.file_name}
+                    {latest.link_url ? latest.link_url : latest.file_name}
                   </div>
                   <div className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>
                     {new Date(latest.submitted_at).toLocaleString('ko-KR')} · {relativeTime(latest.submitted_at)}
                   </div>
-                  <button
-                    onClick={() => downloadFile(latest.id)}
-                    disabled={downloadingId === latest.id}
-                    className="mt-3 text-xs inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-semibold"
-                    style={{ background: 'var(--blue-600)', color: '#fff', opacity: downloadingId === latest.id ? 0.6 : 1 }}
-                  >
-                    {downloadingId === latest.id ? <Spinner size="sm" /> : <Download className="h-3 w-3" />}
-                    다운로드
-                  </button>
+                  {latest.link_url ? (
+                    <a
+                      href={latest.link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 text-xs inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-semibold"
+                      style={{ background: 'var(--blue-600)', color: '#fff', display: 'inline-flex' }}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      링크 열기
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => downloadFile(latest.id)}
+                      disabled={downloadingId === latest.id}
+                      className="mt-3 text-xs inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-semibold"
+                      style={{ background: 'var(--blue-600)', color: '#fff', opacity: downloadingId === latest.id ? 0.6 : 1 }}
+                    >
+                      {downloadingId === latest.id ? <Spinner size="sm" /> : <Download className="h-3 w-3" />}
+                      다운로드
+                    </button>
+                  )}
                 </div>
               </section>
             )}
@@ -224,7 +237,7 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
                     >
                       <div className="flex-1 min-w-0">
                         <div className="truncate" style={{ color: 'var(--text-primary)' }}>
-                          시도 {sub.attempt_number}회 · {sub.file_name}
+                          시도 {sub.attempt_number}회 · {sub.link_url ?? sub.file_name}
                         </div>
                         <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-disabled)' }}>
                           {new Date(sub.submitted_at).toLocaleString('ko-KR')}

@@ -14,9 +14,8 @@ export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  if (!file) return NextResponse.json({ error: 'Missing file' }, { status: 400 })
+  const contentType = req.headers.get('content-type') ?? ''
+  const isJson = contentType.includes('application/json')
 
   const supabase = createServiceClient()
 
@@ -26,23 +25,46 @@ export async function POST(req: NextRequest) {
     .eq('user_id', user.id)
   const attemptNumber = (count ?? 0) + 1
 
-  const safeFileName = sanitizeFileName(file.name)
-  const filePath = `${user.id}/${attemptNumber}/${safeFileName}`
-  const arrayBuffer = await file.arrayBuffer()
-  const { error: uploadError } = await supabase.storage
-    .from('submissions')
-    .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  let insertPayload: Record<string, unknown>
 
-  const { data, error } = await supabase
-    .from('submissions')
-    .insert({
+  if (isJson) {
+    const body = await req.json() as { link_url?: string }
+    const linkUrl = body.link_url?.trim()
+    if (!linkUrl) return NextResponse.json({ error: 'Missing link_url' }, { status: 400 })
+    insertPayload = {
+      user_id: user.id,
+      file_path: null,
+      file_name: null,
+      link_url: linkUrl,
+      status: 'pending',
+      attempt_number: attemptNumber,
+    }
+  } else {
+    const formData = await req.formData()
+    const file = formData.get('file') as File | null
+    if (!file) return NextResponse.json({ error: 'Missing file' }, { status: 400 })
+
+    const safeFileName = sanitizeFileName(file.name)
+    const filePath = `${user.id}/${attemptNumber}/${safeFileName}`
+    const arrayBuffer = await file.arrayBuffer()
+    const { error: uploadError } = await supabase.storage
+      .from('submissions')
+      .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
+    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+
+    insertPayload = {
       user_id: user.id,
       file_path: filePath,
       file_name: file.name,
+      link_url: null,
       status: 'pending',
       attempt_number: attemptNumber,
-    })
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('submissions')
+    .insert(insertPayload)
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
