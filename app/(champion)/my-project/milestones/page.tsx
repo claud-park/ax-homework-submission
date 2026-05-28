@@ -383,8 +383,8 @@ export default function MilestonesPage() {
                               ▶ 과제 시작
                             </button>
                           ) : (
-                            <span className="px-2 py-1 rounded text-xs font-semibold self-start" style={{ color: 'var(--text-disabled)', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
-                              검토 중입니다
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold self-start" style={{ color: 'var(--text-disabled)', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
+                              과제 정의서 검토중
                             </span>
                           )
                         )}
