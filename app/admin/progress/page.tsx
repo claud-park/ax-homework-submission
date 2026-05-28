@@ -23,6 +23,7 @@ type CharterWithUser = {
   content: CharterContent
   submitted_at: string
   updated_at: string
+  admin_approved_at: string | null
   users: User
 }
 
@@ -199,8 +200,24 @@ function CharterCard({ charter, onClick }: { charter: CharterWithUser; onClick: 
 
 // ─── Charter side panel ───────────────────────────────────────────────────────
 
-function CharterPanel({ charter, onClose }: { charter: CharterWithUser; onClose: () => void }) {
+function CharterPanel({ charter, onClose, onApprove }: { charter: CharterWithUser; onClose: () => void; onApprove: (approvedAt: string) => void }) {
   const ref = useRef<HTMLDivElement>(null)
+  const [approving, setApproving] = useState(false)
+  const [approvedAt, setApprovedAt] = useState<string | null>(charter.admin_approved_at)
+
+  async function handleApprove() {
+    setApproving(true)
+    try {
+      const updated = await apiFetch<{ admin_approved_at: string }>(`/api/admin/charters/${charter.id}/approve`, { method: 'POST' })
+      setApprovedAt(updated.admin_approved_at)
+      onApprove(updated.admin_approved_at)
+      toast.success('과제정의서가 승인되었습니다.')
+    } catch {
+      toast.error('승인 처리에 실패했습니다.')
+    } finally {
+      setApproving(false)
+    }
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -256,7 +273,20 @@ function CharterPanel({ charter, onClose }: { charter: CharterWithUser; onClose:
               {charter.project_name || '(제목 없음)'}
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {approvedAt ? (
+              <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '999px', background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}>
+                ✓ 승인됨
+              </span>
+            ) : (
+              <button
+                onClick={handleApprove}
+                disabled={approving}
+                style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '999px', background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer', opacity: approving ? 0.6 : 1 }}
+              >
+                {approving ? '처리 중…' : '✓ 승인'}
+              </button>
+            )}
             <UserAvatar user={charter.users} size={24} />
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{charter.users.name}</span>
           </div>
@@ -474,7 +504,11 @@ export default function AdminProgressPage() {
 
       {/* Charter side panel */}
       {selectedCharter && (
-        <CharterPanel charter={selectedCharter} onClose={() => setSelectedCharter(null)} />
+        <CharterPanel
+          charter={selectedCharter}
+          onClose={() => setSelectedCharter(null)}
+          onApprove={approvedAt => setSelectedCharter(prev => prev ? { ...prev, admin_approved_at: approvedAt } : null)}
+        />
       )}
     </div>
   )
