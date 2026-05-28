@@ -32,17 +32,40 @@ const CHARTER_SECTIONS = [
   { key: 'timeline', label: '06. Timeline' },
 ] as const
 
+function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: string }) {
+  if (task.type !== 'project') return null
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  return (
+    <div style={{
+      padding: '6px 10px', borderRadius: 6,
+      background: 'var(--surface-primary)',
+      border: '1px solid var(--border-subtle)',
+      fontSize: 12, color: 'var(--text-primary)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      whiteSpace: 'nowrap',
+    }}>
+      {fmt(task.start)} ~ {fmt(task.end)}
+    </div>
+  )
+}
+
 function toTasks(champions: GanttChampion[]): Task[] {
   const tasks: Task[] = []
   for (const c of champions) {
     tasks.push({
       id: c.userId,
       type: 'project',
-      name: c.name,
+      name: c.projectName || c.name,
       start: new Date(c.milestones[0].start_date),
       end: new Date(c.milestones[c.milestones.length - 1].due_date),
       progress: 0,
       hideChildren: false,
+      styles: {
+        backgroundColor: '#dbeafe',
+        backgroundSelectedColor: '#bfdbfe',
+        progressColor: '#dbeafe',
+        progressSelectedColor: '#bfdbfe',
+      },
     })
     for (const m of c.milestones) {
       const start = new Date(m.start_date)
@@ -472,6 +495,7 @@ export function ChampionGanttView() {
                 todayColor="rgba(37,99,235,0.08)"
                 TaskListHeader={TaskListHeader}
                 TaskListTable={TaskListTable}
+                TooltipContent={GanttTooltip}
               />
             </div>
 

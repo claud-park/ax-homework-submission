@@ -139,3 +139,9 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
 .chip-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* Gantt project bar: accent blue outlined */
+._2RbVy {
+  stroke: #2563eb;
+  stroke-width: 1.5;
+}
