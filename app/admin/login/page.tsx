@@ -25,22 +25,34 @@ export default function AdminLoginPage() {
     router.push('/admin')
   }
 
-  const inputStyle = {
-    background: 'var(--surface-secondary)',
-    border: '1px solid var(--border-subtle)',
-    borderRadius: '10px',
-    color: 'var(--text-primary)',
-    padding: '10px 14px',
-    fontSize: '14px',
-    width: '100%',
-    outline: 'none',
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'hsl(var(--background))' }}>
-      <div className="w-full max-w-sm p-8 rounded-2xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-        <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>관리자 로그인</h1>
-        <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>AX Homework Admin</p>
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: 'hsl(var(--background))' }}
+    >
+      <div
+        className="w-full max-w-[360px] p-10 rounded-3xl border"
+        style={{
+          background: 'var(--surface-primary)',
+          borderColor: 'var(--border-subtle)',
+          boxShadow: 'var(--shadow-l)',
+        }}
+      >
+        {/* Icon mark */}
+        <div
+          className="w-10 h-10 rounded-2xl flex items-center justify-center mb-6"
+          style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}
+        >
+          <span className="text-flo-body1 font-bold" style={{ color: 'var(--accent)' }}>A</span>
+        </div>
+
+        <h1 className="text-flo-h400 font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          관리자 로그인
+        </h1>
+        <p className="text-flo-body2 mb-8" style={{ color: 'var(--text-secondary)' }}>
+          Dreamus 어드민 계정으로 로그인하세요
+        </p>
+
         <form onSubmit={handleLogin} className="flex flex-col gap-3">
           <input
             type="email"
@@ -48,7 +60,13 @@ export default function AdminLoginPage() {
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
-            style={inputStyle}
+            className="text-flo-body2 outline-none"
+            style={{
+              height: 44, padding: '0 14px', borderRadius: 12, width: '100%',
+              background: 'var(--surface-secondary)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)',
+            }}
           />
           <input
             type="password"
@@ -56,14 +74,22 @@ export default function AdminLoginPage() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
-            style={inputStyle}
+            className="text-flo-body2 outline-none"
+            style={{
+              height: 44, padding: '0 14px', borderRadius: 12, width: '100%',
+              background: 'var(--surface-secondary)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)',
+            }}
           />
-          {error && <p className="text-sm" style={{ color: 'var(--error)' }}>{error}</p>}
+          {error && (
+            <p className="text-flo-caption1" style={{ color: 'var(--error)' }}>{error}</p>
+          )}
           <button
             type="submit"
             disabled={loading}
-            className="py-3 rounded-xl font-semibold text-sm mt-2 disabled:opacity-50"
-            style={{ background: 'var(--blue-600)', color: '#fff' }}
+            className="w-full rounded-xl text-flo-body2 font-semibold text-white mt-2 transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ height: 48, background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
           >
             {loading ? '로그인 중...' : '로그인'}
           </button>
