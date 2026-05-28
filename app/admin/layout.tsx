@@ -48,14 +48,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside
         className={[
           'fixed inset-y-0 left-0 z-50 md:static md:z-auto',
-          'w-44 flex-shrink-0 flex flex-col gap-1 p-4 border-r',
+          'w-[220px] flex-shrink-0 flex flex-col px-3 py-5 border-r',
           'transition-transform duration-200',
           drawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
-        style={{ background: 'hsl(var(--background))', borderColor: 'var(--border-subtle)' }}
+        style={{
+          background: 'var(--surface-primary)',
+          borderColor: 'var(--border-subtle)',
+          boxShadow: 'var(--shadow-s)',
+        }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>관리자</span>
+        {/* Brand header */}
+        <div className="flex items-center justify-between px-3 pb-4 mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-flo-body1 font-semibold" style={{ color: 'var(--text-primary)' }}>
+              관리자
+            </span>
+            <span
+              className="text-flo-caption2 font-semibold px-1.5 py-0.5 rounded"
+              style={{
+                background: 'var(--surface-secondary)',
+                color: 'var(--text-disabled)',
+                letterSpacing: '0.06em',
+              }}
+            >
+              ADMIN
+            </span>
+          </div>
           <button
             className="md:hidden p-1 rounded"
             onClick={() => setDrawerOpen(false)}
@@ -66,33 +85,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        {NAV.map(item => {
-          const active = item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href)
-          return (
-            <a
-              key={item.href}
-              href={item.href}
-              aria-current={active ? 'page' : undefined}
-              className="flex items-center gap-2 text-xs px-3 py-2.5 rounded-lg font-medium transition-colors"
-              style={{
-                background: active ? 'rgba(37,99,235,0.15)' : 'transparent',
-                color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
-              }}
-              onClick={() => setDrawerOpen(false)}
-            >
-              <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-              {item.label}
-            </a>
-          )
-        })}
+        {/* Nav */}
+        <nav className="flex flex-col gap-0.5">
+          {NAV.map(item => {
+            const active = item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href)
+            return (
+              <a
+                key={item.href}
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-flo-body2 font-medium transition-colors relative"
+                style={{
+                  background: active
+                    ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+                    : 'transparent',
+                  color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                }}
+                onClick={() => setDrawerOpen(false)}
+              >
+                {active && (
+                  <span
+                    className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
+                    style={{ background: 'var(--accent)' }}
+                  />
+                )}
+                <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                {item.label}
+              </a>
+            )
+          })}
+        </nav>
 
-        <div className="mt-auto">
+        <div className="flex-1" />
+
+        {/* Logout */}
+        <div className="px-3">
+          <div className="h-px mb-3" style={{ background: 'var(--border-faint)' }} />
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 text-xs px-3 py-2.5 rounded-lg w-full text-left"
-            style={{ color: 'var(--text-disabled)' }}
+            className="flex items-center gap-2 w-full py-1.5 text-flo-caption1 font-medium hover:opacity-70 transition-opacity"
+            style={{ color: 'var(--text-disabled)', background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            <LogOut className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            <LogOut className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
             로그아웃
           </button>
         </div>
@@ -100,12 +134,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Content area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <div
-          className="flex items-center px-4 py-3 border-b flex-shrink-0"
-          style={{ borderColor: 'var(--border-subtle)', background: 'hsl(var(--background))' }}
+        {/* Topbar */}
+        <header
+          className="flex items-center px-6 flex-shrink-0 border-b"
+          style={{
+            height: 52,
+            background: 'var(--surface-primary)',
+            borderColor: 'var(--border-subtle)',
+            boxShadow: 'var(--shadow-s)',
+          }}
         >
-          {/* Hamburger + title (mobile only) */}
           <div className="flex items-center gap-3 md:hidden">
             <button
               onClick={() => setDrawerOpen(true)}
@@ -115,16 +153,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
-            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>관리자</span>
+            <span className="text-flo-body2 font-semibold" style={{ color: 'var(--text-primary)' }}>
+              관리자
+            </span>
           </div>
 
-          {/* User name (right-aligned, always visible) */}
           {userName && (
-            <span className="ml-auto text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-              {userName}
-            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <div
+                className="flex items-center justify-center rounded-full text-flo-caption2 font-semibold flex-shrink-0"
+                style={{ width: 24, height: 24, background: 'var(--surface-secondary)', color: 'var(--text-tertiary)' }}
+              >
+                {userName[0]}
+              </div>
+              <span className="text-flo-caption1 font-medium" style={{ color: 'var(--text-secondary)' }}>
+                {userName}
+              </span>
+            </div>
           )}
-        </div>
+        </header>
 
         <main className="flex-1 p-6 overflow-auto">{children}</main>
       </div>
