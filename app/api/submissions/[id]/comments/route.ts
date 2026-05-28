@@ -37,8 +37,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
       const hw = submission.homeworks as { title: string } | { title: string }[] | null
       const hwTitle = Array.isArray(hw) ? hw[0]?.title : hw?.title
-      const contextTitle = `#${String(submission.homework_id).padStart(2, '0')} ${hwTitle ?? ''}`
-      const link = `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/admin/homework/${submission.homework_id}`
+      const contextTitle = submission.homework_id != null
+        ? `#${String(submission.homework_id).padStart(2, '0')} ${hwTitle ?? ''}`
+        : '과제 제출'
+      const link = submission.homework_id != null
+        ? `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/admin/homework/${submission.homework_id}`
+        : `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/admin/kanban`
       await notifyNewComment({
         recipientEmail,
         recipientName: '관리자',

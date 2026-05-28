@@ -37,8 +37,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
       const hw = subRow.homeworks as { title: string } | { title: string }[] | null
       const hwTitle = Array.isArray(hw) ? hw[0]?.title : hw?.title
-      const contextTitle = `#${String(subRow.homework_id).padStart(2, '0')} ${hwTitle ?? ''}`
-      const link = `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/homework/${subRow.homework_id}`
+      const contextTitle = subRow.homework_id != null
+        ? `#${String(subRow.homework_id).padStart(2, '0')} ${hwTitle ?? ''}`
+        : '과제 제출'
+      const link = subRow.homework_id != null
+        ? `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/homework/${subRow.homework_id}`
+        : `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/my-project/submission`
       await notifyNewComment({
         recipientEmail: champRow.email,
         recipientName: champRow.name,
