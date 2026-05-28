@@ -146,7 +146,7 @@ function KanbanCardView({
 
       {card.latestSubmission && (
         <div className="mt-2 truncate" style={{ color: 'var(--text-disabled)' }}>
-          {card.latestSubmission.fileName} · 시도 {card.latestSubmission.attemptNumber}회
+          {card.latestSubmission.linkUrl ?? card.latestSubmission.fileName} · 시도 {card.latestSubmission.attemptNumber}회
         </div>
       )}
     </div>

@@ -149,7 +149,8 @@ export interface KanbanCard {
     id: string
     status: SubmissionStatus
     attemptNumber: number
-    fileName: string
+    fileName: string | null
+    linkUrl: string | null
     submittedAt: string
   } | null
   milestoneTotal: number

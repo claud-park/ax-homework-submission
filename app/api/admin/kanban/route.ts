@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     supabase.from('users').select('*'),
     supabase
       .from('submissions')
-      .select('id, user_id, file_name, status, attempt_number, submitted_at')
+      .select('id, user_id, file_name, link_url, status, attempt_number, submitted_at')
       .order('submitted_at', { ascending: false }),
     supabase.from('milestones').select('user_id, status').eq('publish_status', 'published'),
     supabase.from('charter_submissions').select('user_id').eq('publish_status', 'published'),
@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
             status: sub.status,
             attemptNumber: sub.attempt_number,
             fileName: sub.file_name,
+            linkUrl: sub.link_url,
             submittedAt: sub.submitted_at,
           }
         : null,
