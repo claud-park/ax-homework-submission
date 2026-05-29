@@ -223,10 +223,9 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
   const [delayForm, setDelayForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })
   const [submitting, setSubmitting] = useState(false)
 
-  const today = useMemo(() => {
+  const todayStr = useMemo(() => {
     const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    return d
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }, [])
 
   const published = useMemo(
@@ -236,27 +235,27 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
 
   const thisWeek = useMemo(
     () => published.filter(m =>
-      new Date(m.start_date) <= today &&
-      today <= new Date(m.due_date) &&
+      m.start_date <= todayStr &&
+      todayStr <= m.due_date &&
       m.status !== 'completed'
     ),
-    [published, today]
+    [published, todayStr]
   )
 
   const overdue = useMemo(
     () => published.filter(m =>
-      new Date(m.due_date) < today &&
+      m.due_date < todayStr &&
       m.status !== 'completed'
     ),
-    [published, today]
+    [published, todayStr]
   )
 
   const completedInRange = useMemo(
     () => published.filter(m =>
       m.status === 'completed' &&
-      new Date(m.start_date) <= today
+      m.start_date <= todayStr
     ),
-    [published, today]
+    [published, todayStr]
   )
 
   const pendingDeadlineIds = useMemo(

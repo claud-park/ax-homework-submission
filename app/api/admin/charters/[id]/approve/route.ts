@@ -8,14 +8,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const supabase = createServiceClient()
 
-  const { data: existing } = await supabase
-    .from('charter_submissions')
-    .select('id, admin_approved_at')
-    .eq('id', params.id)
-    .single()
-
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
   const { data, error } = await supabase
     .from('charter_submissions')
     .update({ admin_approved_at: new Date().toISOString() })
@@ -23,6 +15,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('[approve] supabase error:', error)
+    if (error.code === 'PGRST116') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(data)
 }
