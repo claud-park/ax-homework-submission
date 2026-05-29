@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ListTodo, ChevronDown, ChevronRight, Plus, Pencil } from 'lucide-react'
+import { CheckinTab } from '@/components/CheckinTab'
+import type { BottleneckType } from '@/lib/types'
 import { DraftBadge } from '@/components/DraftBadge'
 import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
@@ -34,7 +36,7 @@ const REQ_COLOR: Record<string, string> = {
 
 interface NewMilestone { title: string; start_date: string; due_date: string; description: string; parent_milestone_id: string }
 
-export default function MilestonesPage() {
+export default function WorkStatusPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
   const [charterApproved, setCharterApproved] = useState(false)
@@ -55,6 +57,8 @@ export default function MilestonesPage() {
   })
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [collapsedCheckinGroups, setCollapsedCheckinGroups] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<'wbs' | 'checkin'>('wbs')
 
   const [loading, setLoading] = useState(true)
 
@@ -157,6 +161,51 @@ export default function MilestonesPage() {
       setError('상태 변경에 실패했습니다.')
       toast.error('상태 변경 실패: ' + msg)
     }
+  }
+
+  async function handleCheckinComplete(id: string) {
+    try {
+      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_manual_completed: true, bottleneck_type: null, bottleneck_note: null }),
+      })
+      setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+      toast.success('완료로 표시되었습니다.')
+    } catch (e: unknown) {
+      toast.error('완료 처리에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
+  async function handleCheckinDelayReport(id: string, type: BottleneckType, note: string | null) {
+    try {
+      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ bottleneck_type: type, bottleneck_note: note, is_manual_completed: false, is_manual_progress: false }),
+      })
+      setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+      toast.success('지연 신고가 완료되었습니다. 관리자에게 알림이 전송되었습니다.')
+    } catch (e: unknown) {
+      toast.error('지연 신고에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
+  async function handleCheckinInProgress(id: string) {
+    try {
+      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_manual_progress: true, bottleneck_type: null, bottleneck_note: null, is_manual_completed: false }),
+      })
+      setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+      toast.success('진행 중으로 표시되었습니다.')
+    } catch (e: unknown) {
+      toast.error('상태 변경에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
+  function openDeadlineForCheckin(m: Milestone) {
+    const existing = requests.find(r => r.milestone_id === m.id)
+    setDeadlineModal({ id: m.id, due_date: m.due_date, existingReqId: existing?.id })
+    setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
   }
 
   async function handleDeadlineRequest(e: React.FormEvent) {
@@ -319,8 +368,105 @@ export default function MilestonesPage() {
     )
   }
 
+  // Checkin groups (all milestones, no publish filter)
+  const checkinGroups = useMemo(() => {
+    const depth0 = milestones.filter(m => !m.parent_milestone_id)
+    const byParent = new Map<string, Milestone[]>()
+    for (const g of depth0) byParent.set(g.id, [])
+    for (const m of milestones) {
+      if (m.parent_milestone_id && byParent.has(m.parent_milestone_id)) {
+        byParent.get(m.parent_milestone_id)!.push(m)
+      }
+    }
+    return { depth0, byParent }
+  }, [milestones])
+
   return (
-    <div ref={containerRef} className="flex" style={{ height: 'calc(100vh - 48px)', minHeight: 0 }}>
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 100px)', minHeight: 0 }}>
+      {/* Internal tab bar */}
+      <div className="flex gap-1 border-b flex-shrink-0 mb-4" style={{ borderColor: 'var(--border-subtle)' }}>
+        {(['wbs', 'checkin'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="text-xs px-4 py-2 font-medium transition-colors"
+            style={{
+              color: activeTab === tab ? 'var(--blue-600)' : 'var(--text-secondary)',
+              borderBottom: activeTab === tab ? '2px solid var(--blue-600)' : '2px solid transparent',
+              marginBottom: -1,
+            }}
+          >
+            {tab === 'wbs' ? '마일스톤 관리' : '체크인'}
+          </button>
+        ))}
+      </div>
+
+      {/* Checkin tab */}
+      {activeTab === 'checkin' && (
+        <div className="flex-1 overflow-y-auto pb-8">
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+              ))}
+            </div>
+          ) : (
+            <>
+              {milestones.some(m => !m.parent_milestone_id) && (
+                <CheckinTab
+                  milestones={milestones.filter(m => !m.parent_milestone_id)}
+                  requests={requests}
+                  charterApproved={charterApproved}
+                  onComplete={handleCheckinComplete}
+                  onDelayReport={handleCheckinDelayReport}
+                  onInProgress={handleCheckinInProgress}
+                  onDeadlineExtension={openDeadlineForCheckin}
+                />
+              )}
+              {checkinGroups.depth0.map(g => {
+                const gMilestones = checkinGroups.byParent.get(g.id) ?? []
+                if (gMilestones.length === 0) return null
+                const isCollapsed = collapsedCheckinGroups.has(g.id)
+                return (
+                  <div key={g.id} style={{ marginTop: 16 }}>
+                    <button
+                      onClick={() => setCollapsedCheckinGroups(prev => {
+                        const next = new Set(prev)
+                        if (next.has(g.id)) next.delete(g.id)
+                        else next.add(g.id)
+                        return next
+                      })}
+                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg mb-2"
+                      style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}
+                    >
+                      {isCollapsed
+                        ? <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
+                        : <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />}
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</span>
+                      <span className="text-xs ml-auto" style={{ color: 'var(--text-disabled)' }}>{gMilestones.length}개</span>
+                    </button>
+                    {!isCollapsed && (
+                      <CheckinTab
+                        milestones={gMilestones}
+                        requests={requests}
+                        charterApproved={charterApproved}
+                        onComplete={handleCheckinComplete}
+                        onDelayReport={handleCheckinDelayReport}
+                        onInProgress={handleCheckinInProgress}
+                        onDeadlineExtension={openDeadlineForCheckin}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* WBS tab */}
+      {activeTab === 'wbs' && (
+      <div ref={containerRef} className="flex flex-1 min-h-0">
       {/* Left: header + filter + list */}
       <div
         className="relative flex flex-col flex-shrink-0 overflow-hidden"
@@ -584,6 +730,8 @@ export default function MilestonesPage() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
+      )}
     </div>
   )
 }
