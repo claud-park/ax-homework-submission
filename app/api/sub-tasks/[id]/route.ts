@@ -19,13 +19,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (body.title !== undefined) {
-    if (!body.title?.trim()) {
+    const trimmedTitle = String(body.title).trim()
+    if (!trimmedTitle) {
       return NextResponse.json(
         { error: 'validation_failed', fields: [{ field: 'title', message: '필수 항목입니다.' }] },
         { status: 400 }
       )
     }
-    patch.title = body.title.trim()
+    patch.title = trimmedTitle
   }
   if (body.description !== undefined) patch.description = body.description?.trim() ?? null
   if (body.display_order !== undefined) patch.display_order = body.display_order
