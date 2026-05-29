@@ -140,13 +140,22 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
   display: none;
 }
 
-/* Gantt project bar: accent blue outlined */
+/* Gantt project bar: thin pink bar (~35% of row height, vertically centered) */
 ._2RbVy {
-  stroke: #2563eb;
-  stroke-width: 1.5;
+  opacity: 1;
+  transform: scaleY(0.35);
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
 }
 
-/* Gantt project bar label: dark text (light blue fill needs dark text) */
+/* Gantt project bar progress fill: same thinning as background */
+._2pZMF {
+  transform: scaleY(0.35);
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+/* Gantt project bar label: dark text */
 ._1KJ6x ~ ._3zRJQ {
   fill: #1e293b;
 }

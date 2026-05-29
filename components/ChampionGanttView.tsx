@@ -50,21 +50,37 @@ function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: stri
 }
 
 function toTasks(champions: GanttChampion[]): Task[] {
+  const now = new Date()
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
   const tasks: Task[] = []
   for (const c of champions) {
+    const startStr = c.milestones[0].start_date
+    const endStr = c.milestones[c.milestones.length - 1].due_date
+
+    let progress = 0
+    if (todayStr >= endStr) {
+      progress = 100
+    } else if (todayStr > startStr) {
+      const startMs = new Date(startStr).getTime()
+      const endMs = new Date(endStr).getTime()
+      const todayMs = new Date(todayStr).getTime()
+      progress = Math.round((todayMs - startMs) / (endMs - startMs) * 100)
+    }
+
     tasks.push({
       id: c.userId,
       type: 'project',
       name: c.projectName || c.name,
-      start: new Date(c.milestones[0].start_date),
-      end: new Date(c.milestones[c.milestones.length - 1].due_date),
-      progress: 0,
+      start: new Date(startStr),
+      end: new Date(endStr),
+      progress,
       hideChildren: false,
       styles: {
-        backgroundColor: '#dbeafe',
-        backgroundSelectedColor: '#bfdbfe',
-        progressColor: '#dbeafe',
-        progressSelectedColor: '#bfdbfe',
+        backgroundColor: 'rgba(236,72,153,0.15)',
+        backgroundSelectedColor: 'rgba(236,72,153,0.28)',
+        progressColor: 'rgba(236,72,153,0.55)',
+        progressSelectedColor: 'rgba(236,72,153,0.7)',
       },
     })
     for (const m of c.milestones) {
