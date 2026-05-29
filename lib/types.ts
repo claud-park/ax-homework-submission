@@ -78,6 +78,7 @@ export interface Milestone {
   bottleneck_note: string | null
   bottleneck_admin_comment: string | null
   bottleneck_reviewed_at: string | null
+  sub_task_id: string | null
   display_order: number
   created_at: string
   updated_at: string
@@ -139,6 +140,7 @@ export interface ChampionSummary {
 export interface ChampionProject {
   user: User
   charter: (CharterSubmission & { comments: CharterComment[] }) | null
+  sub_tasks: SubTask[]
   milestones: Milestone[]
   latestSubmission: Submission | null
 }
@@ -158,6 +160,18 @@ export interface KanbanCard {
   milestoneCompleted: number
   hasCharter: boolean
   pendingDeadlineRequests: number
+}
+
+export interface SubTask {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  display_order: number
+  publish_status: PublishStatus
+  created_at: string
+  updated_at: string
+  milestones?: Milestone[]
 }
 
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
