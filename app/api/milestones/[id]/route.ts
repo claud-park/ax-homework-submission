@@ -84,6 +84,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   delete (patch as { publish_status?: unknown }).publish_status
   patch.publish_status = nextStatus
 
+  // sub_task_id 재배치 허용 — 명시적으로 null 전달하면 최상위로 이동
+  if ('sub_task_id' in body) {
+    patch.sub_task_id = body.sub_task_id ?? null
+  }
+
   // Reset admin review when champion re-files a delay report
   if (body.bottleneck_type != null) {
     patch.bottleneck_admin_comment = null

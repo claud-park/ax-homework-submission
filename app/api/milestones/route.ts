@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const { title, start_date, due_date, description, publish_status } = body
+  const { title, start_date, due_date, description, publish_status, sub_task_id } = body
   const status = publish_status === 'published' ? 'published' : 'draft'
 
   if (status === 'published') {
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       due_date: due_date ?? null,
       description: description ?? null,
       publish_status: status,
+      sub_task_id: sub_task_id ?? null,
     })
     .select()
     .single()
