@@ -49,68 +49,120 @@ function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: stri
   )
 }
 
-// depth-0 milestone → project row; depth-1 milestone → task row under its group
-// Returns tasks and a map of milestone-id → champion (for task list rendering)
-function toTasks(champions: GanttChampion[]): { tasks: Task[]; msToChamp: Map<string, GanttChampion> } {
+// Row hierarchy:
+//   champion row  : id='champ-{userId}',  type='project', no project
+//   group row     : id='group-{msId}',    type='project', project='champ-{userId}'
+//   task row      : id=msId,              type='task',    project='champ-{userId}' or 'group-{msId}'
+function toTasks(champions: GanttChampion[]): Task[] {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   const tasks: Task[] = []
-  const msToChamp = new Map<string, GanttChampion>()
 
   for (const c of champions) {
     if (c.milestones.length === 0) continue
 
-    const topLevelMs = c.milestones.filter(m => !m.parent_milestone_id)
-    const childMs = c.milestones.filter(m => !!m.parent_milestone_id)
+    const depth0 = c.milestones.filter(m => !m.parent_milestone_id)
+    const depth1 = c.milestones.filter(m => !!m.parent_milestone_id)
 
-    for (const g of topLevelMs) {
-      const gChildren = childMs.filter(cm => cm.parent_milestone_id === g.id)
+    // Compute champion row date range from all milestones that have dates
+    const allDated = c.milestones.filter(m => m.start_date && m.due_date)
+    if (allDated.length === 0) continue
 
-      // Determine date range for the group row (fallback to children if depth-0 has no dates)
-      const gStart = g.start_date ?? gChildren.find(c => c.start_date)?.start_date ?? null
-      const gEnd = g.due_date ?? [...gChildren].reverse().find(c => c.due_date)?.due_date ?? null
+    const champStart = allDated.reduce(
+      (min, m) => (m.start_date! < min ? m.start_date! : min), allDated[0].start_date!
+    )
+    const champEnd = allDated.reduce(
+      (max, m) => (m.due_date! > max ? m.due_date! : max), allDated[0].due_date!
+    )
 
+    const champId = `champ-${c.userId}`
+
+    // Champion umbrella row — shows name/dept/과제명/charter in task list
+    tasks.push({
+      id: champId,
+      type: 'project',
+      name: c.name,
+      start: new Date(champStart),
+      end: new Date(champEnd),
+      progress: 0,
+      hideChildren: false,
+      displayOrder: tasks.length + 1,
+      styles: {
+        backgroundColor: 'rgba(236,72,153,0.15)',
+        backgroundSelectedColor: 'rgba(236,72,153,0.28)',
+        progressColor: 'rgba(236,72,153,0.55)',
+        progressSelectedColor: 'rgba(236,72,153,0.7)',
+      },
+    })
+
+    for (const g of depth0) {
+      const children = depth1.filter(m => m.parent_milestone_id === g.id)
+      const hasChildren = children.length > 0
+
+      // Resolve group date range (fallback to children when depth-0 has no dates)
+      const gStart = g.start_date ?? children.find(m => m.start_date)?.start_date ?? null
+      const gEnd = g.due_date ?? [...children].reverse().find(m => m.due_date)?.due_date ?? null
       if (!gStart || !gEnd) continue
 
-      msToChamp.set(g.id, c)
+      const start0 = new Date(gStart)
+      let end0 = new Date(gEnd)
+      if (end0 <= start0) end0 = new Date(start0.getTime() + 86400000)
 
-      tasks.push({
-        id: g.id,
-        name: g.title,
-        type: 'project',
-        start: new Date(gStart),
-        end: new Date(gEnd),
-        progress: 0,
-        hideChildren: false,
-        displayOrder: tasks.length + 1,
-        styles: {
-          backgroundColor: 'rgba(236,72,153,0.15)',
-          backgroundSelectedColor: 'rgba(236,72,153,0.28)',
-          progressColor: 'rgba(236,72,153,0.55)',
-          progressSelectedColor: 'rgba(236,72,153,0.7)',
-        },
-      })
+      const isFuture0 = gStart > todayStr
+      const isPast0 = gEnd < todayStr
 
-      for (const m of gChildren) {
-        if (!m.start_date || !m.due_date) continue
-        const isFuture = m.start_date > todayStr
-        const isPast = m.due_date < todayStr
-        const start = new Date(m.start_date)
-        let end = new Date(m.due_date)
-        if (end <= start) end = new Date(start.getTime() + 86400000)
+      if (hasChildren) {
+        // depth-0 with children → project (toggleable) group row under champion
         tasks.push({
-          id: m.id,
-          name: m.title,
+          id: `group-${g.id}`,
+          name: g.title,
+          type: 'project',
+          project: champId,
+          start: start0,
+          end: end0,
+          progress: 0,
+          hideChildren: false,
+          displayOrder: tasks.length + 1,
+        })
+
+        for (const m of children) {
+          if (!m.start_date || !m.due_date) continue
+          const isFuture = m.start_date > todayStr
+          const isPast = m.due_date < todayStr
+          const start = new Date(m.start_date)
+          let end = new Date(m.due_date)
+          if (end <= start) end = new Date(start.getTime() + 86400000)
+          tasks.push({
+            id: m.id,
+            name: m.title,
+            type: 'task',
+            project: `group-${g.id}`,
+            start,
+            end,
+            progress: STATUS_PROGRESS[m.status],
+            styles: {
+              progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
+              progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
+              backgroundColor: isPast && m.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
+            },
+            displayOrder: tasks.length + 1,
+          })
+        }
+      } else {
+        // depth-0 with no children → task row directly under champion
+        tasks.push({
+          id: g.id,
+          name: g.title,
           type: 'task',
-          project: g.id,
-          start,
-          end,
-          progress: STATUS_PROGRESS[m.status],
+          project: champId,
+          start: start0,
+          end: end0,
+          progress: STATUS_PROGRESS[g.status],
           styles: {
-            progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
-            progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
-            backgroundColor: isPast && m.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
+            progressColor: isFuture0 ? '#cbd5e1' : STATUS_COLOR[g.status],
+            progressSelectedColor: isFuture0 ? '#94a3b8' : STATUS_COLOR[g.status],
+            backgroundColor: isPast0 && g.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
           },
           displayOrder: tasks.length + 1,
         })
@@ -118,42 +170,28 @@ function toTasks(champions: GanttChampion[]): { tasks: Task[]; msToChamp: Map<st
     }
   }
 
-  return { tasks, msToChamp }
+  return tasks
 }
 
 function cell(width: number, extra?: React.CSSProperties): React.CSSProperties {
   return {
-    width,
-    minWidth: width,
-    maxWidth: width,
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 6px',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
+    width, minWidth: width, maxWidth: width,
+    display: 'flex', alignItems: 'center',
+    padding: '0 6px', overflow: 'hidden', whiteSpace: 'nowrap',
     borderRight: '1px solid var(--border-subtle)',
     ...extra,
   }
 }
 
-// TaskListHeader is stable — no runtime data dependency
 function TaskListHeader({ headerHeight, fontFamily, fontSize }: {
   headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: headerHeight,
-        width: LIST_WIDTH,
-        fontFamily,
-        fontSize,
-        fontWeight: 600,
-        color: 'var(--text-secondary)',
-        borderBottom: '2px solid var(--border-subtle)',
-        background: 'var(--surface-primary)',
-      }}
-    >
+    <div style={{
+      display: 'flex', height: headerHeight, width: LIST_WIDTH,
+      fontFamily, fontSize, fontWeight: 600, color: 'var(--text-secondary)',
+      borderBottom: '2px solid var(--border-subtle)', background: 'var(--surface-primary)',
+    }}>
       <div style={cell(W.name)}>이름</div>
       <div style={cell(W.dept)}>부서</div>
       <div style={cell(W.project)}>과제명</div>
@@ -163,7 +201,7 @@ function TaskListHeader({ headerHeight, fontFamily, fontSize }: {
 }
 
 function makeTaskListTable(
-  msToChamp: Map<string, GanttChampion>,
+  champMap: Map<string, GanttChampion>,
   onCharterClick: (userId: string) => void,
   panelUserId: string | null,
 ) {
@@ -174,10 +212,13 @@ function makeTaskListTable(
     return (
       <div style={{ fontFamily, fontSize, width: LIST_WIDTH }}>
         {tasks.map(t => {
-          const isGroup = t.type === 'project'
-          const champ = isGroup ? msToChamp.get(t.id) : null
-          const isPanelOpen = isGroup && champ?.userId === panelUserId
+          const isChampRow = t.id.startsWith('champ-')
+          const isGroupRow = t.id.startsWith('group-')
           const isSelected = t.id === selectedTaskId
+
+          const userId = isChampRow ? t.id.slice(6) : null
+          const champ = userId ? champMap.get(userId) : null
+          const isPanelOpen = isChampRow && userId === panelUserId
 
           return (
             <div
@@ -187,15 +228,14 @@ function makeTaskListTable(
               onClick={() => setSelectedTask(t.id)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTask(t.id) } }}
               style={{
-                display: 'flex',
-                height: rowHeight,
-                alignItems: 'center',
+                display: 'flex', height: rowHeight, alignItems: 'center',
                 background: isSelected ? 'rgba(37,99,235,0.06)' : 'var(--surface-primary)',
                 borderBottom: '1px solid var(--surface-secondary)',
                 cursor: 'pointer',
               }}
             >
-              {isGroup ? (
+              {isChampRow ? (
+                // Champion row: 4 full columns
                 <>
                   <div style={cell(W.name)}>
                     <button
@@ -203,8 +243,8 @@ function makeTaskListTable(
                       aria-label={t.hideChildren ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
-                        marginRight: 4, padding: 0, color: 'var(--text-secondary)', flexShrink: 0,
-                        display: 'flex', alignItems: 'center',
+                        marginRight: 4, padding: 0, color: 'var(--text-secondary)',
+                        flexShrink: 0, display: 'flex', alignItems: 'center',
                       }}
                     >
                       {t.hideChildren
@@ -219,12 +259,12 @@ function makeTaskListTable(
                     {champ?.department || '—'}
                   </div>
                   <div style={cell(W.project, { color: 'var(--text-secondary)' })}>
-                    {t.name}
+                    {champ?.projectName || '—'}
                   </div>
                   <div style={{ ...cell(W.charter), borderRight: 'none', justifyContent: 'center' }}>
                     {champ?.charterSubmissionId ? (
                       <button
-                        onClick={e => { e.stopPropagation(); if (champ) onCharterClick(champ.userId) }}
+                        onClick={e => { e.stopPropagation(); if (userId) onCharterClick(userId) }}
                         aria-pressed={isPanelOpen}
                         style={{
                           fontSize: 10, padding: '2px 6px', borderRadius: 4,
@@ -240,14 +280,27 @@ function makeTaskListTable(
                   </div>
                 </>
               ) : (
+                // Milestone row (group or task): single-width name cell with indent
                 <div style={{
-                  width: LIST_WIDTH,
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 6px 0 23px',
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
+                  width: LIST_WIDTH, display: 'flex', alignItems: 'center',
+                  padding: `0 6px 0 ${isGroupRow ? 16 : 28}px`,
+                  overflow: 'hidden', whiteSpace: 'nowrap',
                 }}>
+                  {isGroupRow && (
+                    <button
+                      onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
+                      aria-label={t.hideChildren ? '펼치기' : '접기'}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        marginRight: 4, padding: 0, color: 'var(--text-secondary)',
+                        flexShrink: 0, display: 'flex', alignItems: 'center',
+                      }}
+                    >
+                      {t.hideChildren
+                        ? <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                        : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
+                    </button>
+                  )}
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-secondary)' }}>
                     {t.name}
                   </span>
@@ -285,20 +338,14 @@ function CharterDetailPanel({ userId, champMap, onClose }: {
 
   return (
     <div style={{
-      width: 320,
-      flexShrink: 0,
+      width: 320, flexShrink: 0,
       borderLeft: '1px solid var(--border-subtle)',
-      display: 'flex',
-      flexDirection: 'column',
+      display: 'flex', flexDirection: 'column',
       background: 'var(--surface-primary)',
     }}>
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '8px 12px',
-        borderBottom: '1px solid var(--border-subtle)',
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0,
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -367,7 +414,7 @@ export function ChampionGanttView() {
       .finally(() => setLoading(false))
   }, [])
 
-  // userId → champion (for filter chips and charter panel)
+  // userId → champion (for charter panel and task list table)
   const champMap = useMemo(() => {
     const m = new Map<string, GanttChampion>()
     for (const c of champions) m.set(c.userId, c)
@@ -379,10 +426,7 @@ export function ChampionGanttView() {
     [champions, selectedChampions],
   )
 
-  const { tasks: rawTasks, msToChamp } = useMemo(
-    () => toTasks(filteredChampions),
-    [filteredChampions],
-  )
+  const rawTasks = useMemo(() => toTasks(filteredChampions), [filteredChampions])
 
   const tasks = useMemo(() =>
     rawTasks.map(t =>
@@ -396,8 +440,8 @@ export function ChampionGanttView() {
   }, [])
 
   const TaskListTable = useMemo(
-    () => makeTaskListTable(msToChamp, handleCharterClick, panelUserId),
-    [msToChamp, handleCharterClick, panelUserId],
+    () => makeTaskListTable(champMap, handleCharterClick, panelUserId),
+    [champMap, handleCharterClick, panelUserId],
   )
 
   function handleExpandChange(task: Task) {
@@ -445,8 +489,7 @@ export function ChampionGanttView() {
           className="chip-scroll"
           style={{
             display: 'flex', gap: '6px', flexWrap: 'nowrap',
-            overflowX: 'auto', marginBottom: '12px',
-            paddingBottom: '4px',
+            overflowX: 'auto', marginBottom: '12px', paddingBottom: '4px',
             scrollbarWidth: 'none',
           }}
         >
@@ -482,12 +525,12 @@ export function ChampionGanttView() {
           })}
         </div>
 
-        {tasks.length === 0 ? (
+        {tasks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>선택된 챔피언이 없습니다</p>
             <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>위에서 챔피언을 선택하면 간트 차트가 표시됩니다</p>
           </div>
-        ) : null}
+        )}
 
         <div className="flex gap-1 mb-3" style={{ display: tasks.length === 0 ? 'none' : 'flex' }}>
           {([ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map(m => (
