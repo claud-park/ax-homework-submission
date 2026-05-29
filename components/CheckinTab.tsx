@@ -250,6 +250,14 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
     [published, todayStr]
   )
 
+  const upcoming = useMemo(
+    () => published.filter(m =>
+      m.start_date > todayStr &&
+      m.status !== 'completed'
+    ),
+    [published, todayStr]
+  )
+
   const completedInRange = useMemo(
     () => published.filter(m =>
       m.status === 'completed' &&
@@ -287,20 +295,40 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
     }
   }
 
-  const isEmpty = thisWeek.length === 0 && overdue.length === 0
+  const isEmpty = thisWeek.length === 0 && overdue.length === 0 && upcoming.length === 0
 
   return (
     <div className="flex flex-col gap-6 pb-8">
       {isEmpty ? (
         <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>이번 주 체크인할 마일스톤이 없습니다.</p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>체크인할 마일스톤이 없습니다.</p>
           <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>WBS 탭에서 마일스톤을 추가해보세요.</p>
         </div>
       ) : (
         <>
+          {overdue.length > 0 && (
+            <section>
+              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--error)' }}>지연 / 미완료</h2>
+              <div className="flex flex-col gap-3">
+                {overdue.map(m => (
+                  <MilestoneCard
+                    key={m.id}
+                    m={m}
+                    showActions
+                    charterApproved={charterApproved}
+                    hasPendingDeadlineRequest={pendingDeadlineIds.has(m.id)}
+                    onCompleteClick={id => setCompleteConfirmId(id)}
+                    onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
+                    onDeadlineExtension={onDeadlineExtension}
+                    onInProgress={onInProgress}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
           {thisWeek.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>이번 주</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>진행 중</h2>
               <div className="flex flex-col gap-3">
                 {thisWeek.map(m => (
                   <MilestoneCard
@@ -318,11 +346,11 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
               </div>
             </section>
           )}
-          {overdue.length > 0 && (
+          {upcoming.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--error)' }}>지연 / 미완료</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>예정</h2>
               <div className="flex flex-col gap-3">
-                {overdue.map(m => (
+                {upcoming.map(m => (
                   <MilestoneCard
                     key={m.id}
                     m={m}
