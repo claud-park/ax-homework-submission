@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { apiFetch } from '@/lib/api-client'
-import type { Milestone, DeadlineChangeRequest, BottleneckType, CharterSubmission, SubTask } from '@/lib/types'
+import type { Milestone, DeadlineChangeRequest, BottleneckType, CharterSubmission } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
 import { toast } from 'sonner'
 import {
@@ -26,8 +26,19 @@ export default function CheckinPage() {
   const [loading, setLoading] = useState(true)
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; existingReqId?: string } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
-  const [subTasks, setSubTasks] = useState<SubTask[]>([])
   const [collapsedSubTasks, setCollapsedSubTasks] = useState<Set<string>>(new Set())
+
+  const groups = useMemo(() => {
+    const depth0 = milestones.filter(m => !m.parent_milestone_id)
+    const byParent = new Map<string, typeof milestones>()
+    for (const g of depth0) byParent.set(g.id, [])
+    for (const m of milestones) {
+      if (m.parent_milestone_id && byParent.has(m.parent_milestone_id)) {
+        byParent.get(m.parent_milestone_id)!.push(m)
+      }
+    }
+    return { depth0, byParent }
+  }, [milestones])
 
   useEffect(() => {
     Promise.all([
@@ -35,7 +46,6 @@ export default function CheckinPage() {
       apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests),
       apiFetch<CharterSubmission[]>('/api/charter/submissions')
         .then(subs => setCharterApproved(subs.some(s => !!s.admin_approved_at))),
-      apiFetch<SubTask[]>('/api/sub-tasks').then(setSubTasks),
     ])
       .catch((e: Error) => toast.error('마일스톤 목록 로드 실패: ' + e.message))
       .finally(() => setLoading(false))
@@ -126,10 +136,10 @@ export default function CheckinPage() {
         </div>
       ) : (
         <>
-          {/* 하위과제 없는 마일스톤 */}
-          {milestones.some(m => !m.sub_task_id) && (
+          {/* 상위 마일스톤 없는 마일스톤 (독립 마일스톤) */}
+          {milestones.some(m => !m.parent_milestone_id) && (
             <CheckinTab
-              milestones={milestones.filter(m => !m.sub_task_id)}
+              milestones={milestones.filter(m => !m.parent_milestone_id)}
               requests={requests}
               charterApproved={charterApproved}
               onComplete={handleCheckinComplete}
@@ -139,18 +149,18 @@ export default function CheckinPage() {
             />
           )}
 
-          {/* 하위과제별 섹션 */}
-          {subTasks.map(st => {
-            const stMilestones = milestones.filter(m => m.sub_task_id === st.id)
-            if (stMilestones.length === 0) return null
-            const isCollapsed = collapsedSubTasks.has(st.id)
+          {/* depth-0 그룹별 섹션 */}
+          {groups.depth0.map(g => {
+            const gMilestones = groups.byParent.get(g.id) ?? []
+            if (gMilestones.length === 0) return null
+            const isCollapsed = collapsedSubTasks.has(g.id)
             return (
-              <div key={st.id} style={{ marginTop: 16 }}>
+              <div key={g.id} style={{ marginTop: 16 }}>
                 <button
                   onClick={() => setCollapsedSubTasks(prev => {
                     const next = new Set(prev)
-                    if (next.has(st.id)) next.delete(st.id)
-                    else next.add(st.id)
+                    if (next.has(g.id)) next.delete(g.id)
+                    else next.add(g.id)
                     return next
                   })}
                   className="flex items-center gap-2 w-full px-3 py-2 rounded-lg mb-2"
@@ -159,12 +169,12 @@ export default function CheckinPage() {
                   {isCollapsed
                     ? <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
                     : <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />}
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{st.title}</span>
-                  <span className="text-xs ml-auto" style={{ color: 'var(--text-disabled)' }}>{stMilestones.length}개</span>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</span>
+                  <span className="text-xs ml-auto" style={{ color: 'var(--text-disabled)' }}>{gMilestones.length}개</span>
                 </button>
                 {!isCollapsed && (
                   <CheckinTab
-                    milestones={stMilestones}
+                    milestones={gMilestones}
                     requests={requests}
                     charterApproved={charterApproved}
                     onComplete={handleCheckinComplete}

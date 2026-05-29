@@ -11,9 +11,8 @@ function computeStatus(
     is_manual_completed: boolean
     bottleneck_type: string | null
   },
-  hasDeliverable: boolean,
 ): MilestoneStatus {
-  if (hasDeliverable || milestone.is_manual_completed) return 'completed'
+  if (milestone.is_manual_completed) return 'completed'
   if (milestone.bottleneck_type) return 'delayed'
   if (milestone.is_manual_progress) return 'in_progress'
   if (milestone.due_date && new Date(milestone.due_date) < new Date()) return 'delayed'
@@ -56,23 +55,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (nextStatus === 'published') {
     const eff = { ...existing, ...body }
-    const fields: { field: string; message: string }[] = []
-    if (!eff.title) fields.push({ field: 'title', message: '필수 항목입니다.' })
-    if (!eff.start_date) fields.push({ field: 'start_date', message: '필수 항목입니다.' })
-    if (!eff.due_date) fields.push({ field: 'due_date', message: '필수 항목입니다.' })
-    if (fields.length > 0)
-      return NextResponse.json({ error: 'validation_failed', fields }, { status: 400 })
+    if (!eff.title)
+      return NextResponse.json({ error: 'validation_failed', fields: [{ field: 'title', message: '필수 항목입니다.' }] }, { status: 400 })
   }
 
-  const { count: deliverableCount } = await supabase
-    .from('milestone_deliverables')
-    .select('*', { count: 'exact', head: true })
-    .eq('milestone_id', params.id)
-
   const merged = { ...existing, ...body }
-  // Compute milestone progress status only for published rows
-  const computedStatus = nextStatus === 'published'
-    ? computeStatus(merged, (deliverableCount ?? 0) > 0)
+  // Compute status only for published rows that have a due_date
+  const computedStatus = nextStatus === 'published' && merged.due_date
+    ? computeStatus(merged)
     : existing.status
 
   const patch: Record<string, unknown> = {
@@ -84,9 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   delete (patch as { publish_status?: unknown }).publish_status
   patch.publish_status = nextStatus
 
-  // sub_task_id 재배치 허용 — 명시적으로 null 전달하면 최상위로 이동
-  if ('sub_task_id' in body) {
-    patch.sub_task_id = body.sub_task_id ?? null
+  if ('parent_milestone_id' in body) {
+    patch.parent_milestone_id = body.parent_milestone_id ?? null
   }
 
   // Reset admin review when champion re-files a delay report

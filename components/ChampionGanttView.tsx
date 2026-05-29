@@ -88,52 +88,26 @@ function toTasks(champions: GanttChampion[]): Task[] {
       },
     })
 
-    // sub_task 없는 마일스톤 먼저
-    const topLevelMs = c.milestones.filter(m => !m.sub_task_id)
-    for (const m of topLevelMs) {
-      const start = new Date(m.start_date)
-      const end = new Date(m.due_date)
-      if (end <= start) end.setDate(start.getDate() + 1)
-      const isFuture = m.start_date > todayStr
-      const isPast = m.due_date < todayStr
-      tasks.push({
-        id: m.id,
-        type: 'task',
-        name: m.title,
-        start,
-        end,
-        progress: STATUS_PROGRESS[m.status],
-        project: champId,
-        displayOrder: tasks.length + 1,
-        styles: {
-          progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
-          progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
-          backgroundColor: isPast && m.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
-        },
-      })
-    }
+    // depth-0 milestones (parent=null) → project rows under champId
+    const topLevelMs = c.milestones.filter(m => !m.parent_milestone_id)
+    const childMs = c.milestones.filter(m => !!m.parent_milestone_id)
 
-    // sub_task별 그룹 행 + 소속 마일스톤
-    const subTaskIds = [...new Set(c.milestones.map(m => m.sub_task_id).filter(Boolean))] as string[]
-    const subTaskTitles = new Map<string, string>()
-    for (const m of c.milestones) {
-      if (m.sub_task_id && m.sub_task_title) subTaskTitles.set(m.sub_task_id, m.sub_task_title)
-    }
+    // Render each depth-0 as a project group row, then its children
+    for (const g of topLevelMs) {
+      const gRowId = `group-${g.id}`
+      const gChildren = childMs.filter(cm => cm.parent_milestone_id === g.id)
 
-    for (const stId of subTaskIds) {
-      const stTitle = subTaskTitles.get(stId) ?? '하위과제'
-      const stMs = c.milestones.filter(m => m.sub_task_id === stId)
-      if (stMs.length === 0) continue
+      // Determine start/end for the group row
+      const gStart = g.start_date ?? gChildren[0]?.start_date ?? g.due_date ?? gChildren[0]?.due_date
+      const gEnd = g.due_date ?? gChildren[gChildren.length - 1]?.due_date ?? g.start_date ?? gChildren[0]?.start_date
 
-      const stStart = stMs[0].start_date
-      const stEnd = stMs[stMs.length - 1].due_date
-      const stRowId = `subtask-${stId}`
+      if (!gStart || !gEnd) continue  // skip if no dates at all
 
       tasks.push({
-        id: stRowId,
-        name: stTitle,
-        start: new Date(stStart),
-        end: new Date(stEnd),
+        id: gRowId,
+        name: g.title,
+        start: new Date(gStart),
+        end: new Date(gEnd),
         progress: 0,
         type: 'project',
         project: champId,
@@ -141,12 +115,13 @@ function toTasks(champions: GanttChampion[]): Task[] {
         displayOrder: tasks.length + 1,
       })
 
-      for (const m of stMs) {
-        const start = new Date(m.start_date)
-        const end = new Date(m.due_date)
-        if (end <= start) end.setDate(start.getDate() + 1)
+      for (const m of gChildren) {
+        if (!m.start_date || !m.due_date) continue
         const isFuture = m.start_date > todayStr
         const isPast = m.due_date < todayStr
+        let end = new Date(m.due_date)
+        const start = new Date(m.start_date)
+        if (end <= start) end = new Date(start.getTime() + 86400000)
         tasks.push({
           id: m.id,
           name: m.title,
@@ -154,13 +129,13 @@ function toTasks(champions: GanttChampion[]): Task[] {
           end,
           progress: STATUS_PROGRESS[m.status],
           type: 'task',
-          project: stRowId,
-          displayOrder: tasks.length + 1,
+          project: gRowId,
           styles: {
             progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
             progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
             backgroundColor: isPast && m.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
           },
+          displayOrder: tasks.length + 1,
         })
       }
     }

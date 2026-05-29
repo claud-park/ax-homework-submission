@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { apiFetch, apiUpload } from '@/lib/api-client'
-import type { Milestone, DeadlineChangeRequest, CharterSubmission, SubTask } from '@/lib/types'
+import { apiFetch } from '@/lib/api-client'
+import type { Milestone, DeadlineChangeRequest, CharterSubmission } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
 import DateRangePicker from '@/components/DateRangePicker'
 import { toast } from 'sonner'
@@ -14,7 +14,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ListTodo, ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ListTodo, ChevronDown, ChevronRight, Plus, Pencil } from 'lucide-react'
 import { DraftBadge } from '@/components/DraftBadge'
 import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
@@ -32,24 +32,20 @@ const REQ_COLOR: Record<string, string> = {
   pending: 'var(--amber)', approved: 'var(--success)', rejected: 'var(--error)',
 }
 
-interface NewMilestone { title: string; start_date: string; due_date: string; description: string; sub_task_id: string }
+interface NewMilestone { title: string; start_date: string; due_date: string; description: string; parent_milestone_id: string }
 
 export default function MilestonesPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
   const [charterApproved, setCharterApproved] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<NewMilestone>({ title: '', start_date: '', due_date: '', description: '', sub_task_id: '' })
+  const [form, setForm] = useState<NewMilestone>({ title: '', start_date: '', due_date: '', description: '', parent_milestone_id: '' })
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; existingReqId?: string } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
   const [error, setError] = useState<string | null>(null)
-  const [confirmResubmitId, setConfirmResubmitId] = useState<string | null>(null)
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
   const [editForm, setEditForm] = useState({ title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
-  const resubmitInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
-  const [linkInputId, setLinkInputId] = useState<string | null>(null)
-  const [linkInputVal, setLinkInputVal] = useState('')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const { width: listWidth, setWidth: setListWidth, onMouseDown: onResizeList } = useResizableWidth({
     initialWidth: 320,
@@ -58,13 +54,7 @@ export default function MilestonesPage() {
     side: 'right',
   })
 
-  const [subTasks, setSubTasks] = useState<SubTask[]>([])
-  const [collapsedSubTasks, setCollapsedSubTasks] = useState<Set<string>>(new Set())
-  const [showSubTaskForm, setShowSubTaskForm] = useState(false)
-  const [subTaskForm, setSubTaskForm] = useState({ title: '', description: '' })
-  const [subTaskFormError, setSubTaskFormError] = useState<string | null>(null)
-  const [editingSubTask, setEditingSubTask] = useState<SubTask | null>(null)
-  const [editSubTaskForm, setEditSubTaskForm] = useState({ title: '', description: '' })
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   const [loading, setLoading] = useState(true)
 
@@ -92,21 +82,20 @@ export default function MilestonesPage() {
 
   const groupedMilestones = useMemo(() => {
     const filtered = filter === 'all' ? milestones : milestones.filter(m => m.publish_status === filter)
-    const topLevel = filtered.filter(m => !m.sub_task_id)
-    const bySubTask = new Map<string, Milestone[]>()
-    for (const st of subTasks) bySubTask.set(st.id, [])
+    const depth0 = milestones.filter(m => !m.parent_milestone_id)  // always all, filter-independent
+    const byParent = new Map<string, Milestone[]>()
+    for (const g of depth0) byParent.set(g.id, [])
     for (const m of filtered) {
-      if (m.sub_task_id && bySubTask.has(m.sub_task_id)) {
-        bySubTask.get(m.sub_task_id)!.push(m)
+      if (m.parent_milestone_id && byParent.has(m.parent_milestone_id)) {
+        byParent.get(m.parent_milestone_id)!.push(m)
       }
     }
-    return { topLevel, bySubTask }
-  }, [milestones, subTasks, filter])
+    return { depth0, byParent }
+  }, [milestones, filter])
 
   useEffect(() => {
     Promise.all([
       apiFetch<Milestone[]>('/api/milestones').then(setMilestones),
-      apiFetch<SubTask[]>('/api/sub-tasks').then(setSubTasks),
       apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests),
       apiFetch<CharterSubmission[]>('/api/charter/submissions')
         .then(subs => setCharterApproved(subs.some(s => !!s.admin_approved_at))),
@@ -124,13 +113,13 @@ export default function MilestonesPage() {
           ...form,
           start_date: form.start_date || null,
           due_date: form.due_date || null,
-          sub_task_id: form.sub_task_id || null,
+          parent_milestone_id: form.parent_milestone_id || null,
           publish_status: publishStatus,
         }),
       })
       setMilestones(prev => [...prev, created])
       setShowForm(false)
-      setForm({ title: '', start_date: '', due_date: '', description: '', sub_task_id: '' })
+      setForm({ title: '', start_date: '', due_date: '', description: '', parent_milestone_id: '' })
       toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 추가되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -146,106 +135,13 @@ export default function MilestonesPage() {
     }
   }
 
-  function toggleSubTask(id: string) {
-    setCollapsedSubTasks(prev => {
+  function toggleGroup(id: string) {
+    setCollapsedGroups(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
-
-  async function handleCreateSubTask() {
-    setSubTaskFormError(null)
-    if (!subTaskForm.title.trim()) {
-      setSubTaskFormError('제목을 입력해주세요.')
-      return
-    }
-    try {
-      const created = await apiFetch<SubTask>('/api/sub-tasks', {
-        method: 'POST',
-        body: JSON.stringify(subTaskForm),
-      })
-      setSubTasks(prev => [...prev, created])
-      setShowSubTaskForm(false)
-      setSubTaskForm({ title: '', description: '' })
-      toast.success('하위과제가 추가되었습니다.')
-    } catch {
-      setSubTaskFormError('저장에 실패했습니다.')
-    }
-  }
-
-  async function handleUpdateSubTask() {
-    if (!editingSubTask) return
-    try {
-      const updated = await apiFetch<SubTask>(`/api/sub-tasks/${editingSubTask.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(editSubTaskForm),
-      })
-      setSubTasks(prev => prev.map(st => st.id === updated.id ? { ...updated, milestones: st.milestones } : st))
-      setEditingSubTask(null)
-      toast.success('하위과제가 수정되었습니다.')
-    } catch {
-      toast.error('수정에 실패했습니다.')
-    }
-  }
-
-  async function handleDeleteSubTask(id: string) {
-    if (!confirm('하위과제를 삭제하면 소속 마일스톤은 그룹 없이 이동됩니다. 삭제할까요?')) return
-    try {
-      await apiFetch(`/api/sub-tasks/${id}`, { method: 'DELETE' })
-      setSubTasks(prev => prev.filter(st => st.id !== id))
-      setMilestones(prev => prev.map(m => m.sub_task_id === id ? { ...m, sub_task_id: null } : m))
-      toast.success('하위과제가 삭제되었습니다.')
-    } catch {
-      toast.error('삭제에 실패했습니다.')
-    }
-  }
-
-  async function handleUpload(id: string, file: File) {
-    setError(null)
-    try {
-      const body = new FormData()
-      body.append('file', file)
-      await apiUpload(`/api/milestones/${id}/deliverables`, body)
-      const updated = await apiFetch<Milestone[]>('/api/milestones')
-      setMilestones(updated)
-      toast.success('파일이 업로드되었습니다.')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError('파일 업로드에 실패했습니다.')
-      toast.error('파일 업로드 실패: ' + msg)
-    }
-  }
-
-  async function handleLinkUpload(id: string, url: string) {
-    const trimmed = url.trim()
-    if (!trimmed) return
-    setError(null)
-    try {
-      await apiFetch(`/api/milestones/${id}/deliverables`, {
-        method: 'POST',
-        body: JSON.stringify({ link_url: trimmed }),
-      })
-      const updated = await apiFetch<Milestone[]>('/api/milestones')
-      setMilestones(updated)
-      setLinkInputId(null)
-      setLinkInputVal('')
-      toast.success('링크가 제출되었습니다.')
-    } catch (e: unknown) {
-      toast.error('링크 제출 실패: ' + (e instanceof Error ? e.message : String(e)))
-    }
-  }
-
-  async function handleDownload(milestoneId: string) {
-    try {
-      const { url } = await apiFetch<{ url: string; file_name: string }>(`/api/milestones/${milestoneId}/deliverables/download`)
-      window.open(url, '_blank')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError('다운로드 링크를 가져올 수 없습니다.')
-      toast.error('다운로드 실패: ' + msg)
-    }
   }
 
   async function handleMarkProgress(id: string) {
@@ -345,7 +241,7 @@ export default function MilestonesPage() {
   const inputStyle = { background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
 
   // Fixed column widths shared across all section tables so columns line up
-  const COL_WIDTHS = ['30%', '35%', '20%', '15%']
+  const COL_WIDTHS = ['35%', '40%', '25%']
 
   function renderMilestoneRow(m: Milestone) {
     const milestoneReqs = requests.filter(r => r.milestone_id === m.id)
@@ -419,91 +315,6 @@ export default function MilestonesPage() {
             )}
           </div>
         </td>
-        <td className="px-3 py-3">
-          <div className="flex flex-col gap-2 items-start">
-            {m.publish_status === 'published' && (() => {
-              const lastDeliverable = m.deliverables?.slice().sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0]
-              if (!lastDeliverable) return null
-              return lastDeliverable.link_url ? (
-                <a href={lastDeliverable.link_url} target="_blank" rel="noopener noreferrer" className="text-xs underline text-left truncate max-w-full" style={{ color: 'var(--blue-600)' }}>
-                  🔗 {lastDeliverable.link_url}
-                </a>
-              ) : (
-                <button onClick={() => handleDownload(m.id)} className="text-xs underline text-left" style={{ color: 'var(--blue-600)' }}>
-                  ⬇ {lastDeliverable.file_name}
-                </button>
-              )
-            })()}
-            {m.publish_status === 'draft' ? (
-              <span
-                title="임시저장 마일스톤은 산출물을 업로드할 수 없습니다. 먼저 게시해주세요."
-                className="px-2 py-1 rounded font-semibold opacity-50 cursor-not-allowed"
-                style={{ background: 'var(--surface-secondary)', color: 'var(--text-disabled)', border: '1px solid var(--border-subtle)' }}
-              >
-                📤 업로드 (게시 필요)
-              </span>
-            ) : m.status === 'completed' ? (
-              <>
-                <button
-                  onClick={() => setConfirmResubmitId(m.id)}
-                  className="text-xs underline"
-                  style={{ color: 'var(--text-disabled)' }}
-                >
-                  파일 재제출
-                </button>
-                <input
-                  type="file"
-                  className="hidden"
-                  ref={el => { if (el) resubmitInputRefs.current.set(m.id, el) }}
-                  onChange={e => { if (e.target.files?.[0]) { handleUpload(m.id, e.target.files[0]); e.target.value = '' } }}
-                />
-                <button
-                  onClick={() => { setLinkInputId(linkInputId === m.id ? null : m.id); setLinkInputVal('') }}
-                  className="text-xs underline"
-                  style={{ color: 'var(--text-disabled)' }}
-                >
-                  링크 재제출
-                </button>
-              </>
-            ) : (
-              <div className="flex flex-col gap-1.5 items-start w-full">
-                <label className="cursor-pointer px-2 py-1 rounded font-semibold" style={{ background: 'rgba(74,222,128,0.1)', color: 'var(--success)', border: '1px solid var(--success)' }}>
-                  📤 파일 업로드
-                  <input type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) handleUpload(m.id, e.target.files[0]) }} />
-                </label>
-                <button
-                  onClick={() => { setLinkInputId(linkInputId === m.id ? null : m.id); setLinkInputVal('') }}
-                  className="text-xs px-2 py-1 rounded font-semibold"
-                  style={{ background: 'rgba(37,99,235,0.08)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)' }}
-                >
-                  🔗 링크 제출
-                </button>
-              </div>
-            )}
-            {linkInputId === m.id && (
-              <div className="flex gap-1 w-full mt-1">
-                <input
-                  type="url"
-                  value={linkInputVal}
-                  onChange={e => setLinkInputVal(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleLinkUpload(m.id, linkInputVal) }}
-                  placeholder="https://..."
-                  autoFocus
-                  className="flex-1 text-xs rounded px-2 py-1 outline-none min-w-0"
-                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
-                />
-                <button
-                  onClick={() => handleLinkUpload(m.id, linkInputVal)}
-                  disabled={!linkInputVal.trim()}
-                  className="text-xs px-2 py-1 rounded font-semibold disabled:opacity-50"
-                  style={{ background: 'var(--blue-600)', color: '#fff' }}
-                >
-                  제출
-                </button>
-              </div>
-            )}
-          </div>
-        </td>
       </tr>
     )
   }
@@ -550,83 +361,67 @@ export default function MilestonesPage() {
             <div key={i} className="h-10 w-full rounded-lg animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
           ))}
         </div>
-      ) : milestones.length === 0 ? (
+      ) : groupedMilestones.depth0.length === 0 ? (
         <EmptyState
           icon={ListTodo}
           title="마일스톤이 없습니다"
-          description="아래에서 첫 마일스톤을 추가해보세요."
+          description="+ 마일스톤 추가를 눌러 첫 마일스톤을 만들어보세요."
         />
       ) : (
         <div className="flex flex-col gap-0">
-          {/* Top-level milestones (no sub_task) */}
-          {groupedMilestones.topLevel.length > 0 && (
-            <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
-              <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
-                <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
-                <thead>
-                  <tr style={{ background: 'var(--surface-secondary)' }}>
-                    {['마일스톤', '기간', '상태', ''].map(h => (
-                      <th key={h} className="text-left px-3 py-2 font-semibold uppercase tracking-wide" style={{ color: 'var(--text-disabled)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupedMilestones.topLevel.map(m => renderMilestoneRow(m))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Sub-task groups */}
-          {subTasks.map(st => (
-            <div key={st.id} style={{ marginTop: 12 }}>
-              {/* Sub_task header */}
+          {/* Milestone groups */}
+          {groupedMilestones.depth0.map(g => (
+            <div key={g.id} style={{ marginTop: 12 }}>
+              {/* Group header */}
               <div
                 className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}
               >
-                <button onClick={() => toggleSubTask(st.id)} style={{ color: 'var(--text-secondary)', lineHeight: 1 }}>
-                  {collapsedSubTasks.has(st.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                <button onClick={() => toggleGroup(g.id)} style={{ color: 'var(--text-secondary)', lineHeight: 1 }}>
+                  {collapsedGroups.has(g.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 </button>
                 <span
                   className="text-xs font-semibold flex-1 cursor-pointer"
                   style={{ color: 'var(--text-primary)' }}
-                  onClick={() => toggleSubTask(st.id)}
+                  onClick={() => toggleGroup(g.id)}
                 >
-                  {st.title}
+                  {g.title}
                 </span>
+                {g.start_date && (
+                  <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>{g.start_date} ~ {g.due_date}</span>
+                )}
                 <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>
-                  {(groupedMilestones.bySubTask.get(st.id) ?? []).length}개
+                  {(groupedMilestones.byParent.get(g.id) ?? []).length}개
                 </span>
                 <button
-                  onClick={() => { setEditingSubTask(st); setEditSubTaskForm({ title: st.title, description: st.description ?? '' }) }}
+                  onClick={() => openEdit(g)}
                   style={{ color: 'var(--text-secondary)' }}
-                  title="하위과제 수정"
+                  title="마일스톤 수정"
                 >
                   <Pencil size={12} />
                 </button>
                 <button
-                  onClick={() => handleDeleteSubTask(st.id)}
-                  style={{ color: 'var(--error)' }}
-                  title="하위과제 삭제"
-                >
-                  <Trash2 size={12} />
-                </button>
-                <button
-                  onClick={() => { setForm(f => ({ ...f, sub_task_id: st.id })); openForm() }}
+                  onClick={() => { setForm(f => ({ ...f, parent_milestone_id: g.id })); openForm() }}
                   style={{ color: 'var(--blue-600)' }}
-                  title="이 하위과제에 마일스톤 추가"
+                  title="이 마일스톤에 하위 마일스톤 추가"
                 >
                   <Plus size={12} />
                 </button>
               </div>
-              {/* Sub_task milestones (foldable) */}
-              {!collapsedSubTasks.has(st.id) && (groupedMilestones.bySubTask.get(st.id) ?? []).length > 0 && (
+              {/* Child milestones (foldable) */}
+              {!collapsedGroups.has(g.id) && (groupedMilestones.byParent.get(g.id) ?? []).length > 0 && (
                 <div className="rounded-xl border overflow-hidden mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
                   <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
                     <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+                    <thead>
+                      <tr style={{ background: 'var(--surface-secondary)' }}>
+                        {['마일스톤', '기간', '상태'].map(h => (
+                          <th key={h} className="text-left px-3 py-2 font-semibold uppercase tracking-wide" style={{ color: 'var(--text-disabled)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
                     <tbody>
-                      {(groupedMilestones.bySubTask.get(st.id) ?? []).map(m => renderMilestoneRow(m))}
+                      {(groupedMilestones.byParent.get(g.id) ?? []).map(m => renderMilestoneRow(m))}
                     </tbody>
                   </table>
                 </div>
@@ -634,13 +429,13 @@ export default function MilestonesPage() {
             </div>
           ))}
 
-          {/* 하위과제 추가 버튼 */}
+          {/* 마일스톤 추가 버튼 */}
           <button
-            onClick={() => setShowSubTaskForm(true)}
+            onClick={() => { setForm(f => ({ ...f, parent_milestone_id: '' })); openForm() }}
             className="flex items-center gap-1 text-xs mt-3"
             style={{ color: 'var(--text-secondary)' }}
           >
-            <Plus size={12} /> 하위과제 추가
+            <Plus size={12} /> 마일스톤 추가
           </button>
         </div>
       )}
@@ -674,23 +469,15 @@ export default function MilestonesPage() {
                 <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
               </div>
               <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>하위과제</label>
+                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>상위 마일스톤</label>
                 <select
-                  value={form.sub_task_id}
-                  onChange={e => setForm(f => ({ ...f, sub_task_id: e.target.value }))}
-                  style={{
-                    background: 'var(--surface-secondary)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '8px',
-                    color: 'var(--text-primary)',
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    width: '100%',
-                  }}
+                  value={form.parent_milestone_id}
+                  onChange={e => setForm(f => ({ ...f, parent_milestone_id: e.target.value }))}
+                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px', width: '100%' }}
                 >
-                  <option value="">없음 (최상위)</option>
-                  {subTasks.map(st => (
-                    <option key={st.id} value={st.id}>{st.title}</option>
+                  <option value="">없음 (최상위 마일스톤)</option>
+                  {groupedMilestones.depth0.map(g => (
+                    <option key={g.id} value={g.id}>{g.title}</option>
                   ))}
                 </select>
               </div>
@@ -710,37 +497,6 @@ export default function MilestonesPage() {
           </div>
         </div>
       )}
-
-      {/* Re-submission confirmation dialog */}
-      <Dialog open={!!confirmResubmitId} onOpenChange={open => { if (!open) setConfirmResubmitId(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>과제 재제출</DialogTitle>
-            <DialogDescription>
-              과제 파일을 다시 제출하면 다시 승인을 받아야 합니다. 그래도 재제출 하시겠어요?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button
-              onClick={() => setConfirmResubmitId(null)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold"
-              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
-            >
-              아니요
-            </button>
-            <button
-              onClick={() => {
-                if (confirmResubmitId) resubmitInputRefs.current.get(confirmResubmitId)?.click()
-                setConfirmResubmitId(null)
-              }}
-              className="px-4 py-2 rounded-lg text-xs font-semibold"
-              style={{ background: 'var(--blue-600)', color: '#fff' }}
-            >
-              네
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit milestone modal */}
       <Dialog
@@ -826,107 +582,6 @@ export default function MilestonesPage() {
               </DialogFooter>
             </form>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 하위과제 생성 모달 */}
-      <Dialog open={showSubTaskForm} onOpenChange={setShowSubTaskForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>하위과제 추가</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 py-2">
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>제목 *</label>
-              <input
-                value={subTaskForm.title}
-                onChange={e => setSubTaskForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="하위과제 제목"
-                style={{
-                  background: 'var(--surface-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  color: 'var(--text-primary)',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  width: '100%',
-                }}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>설명</label>
-              <textarea
-                value={subTaskForm.description}
-                onChange={e => setSubTaskForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="선택 입력"
-                rows={3}
-                style={{
-                  background: 'var(--surface-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  color: 'var(--text-primary)',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  width: '100%',
-                  resize: 'vertical',
-                }}
-              />
-            </div>
-            {subTaskFormError && <p className="text-xs" style={{ color: 'var(--error)' }}>{subTaskFormError}</p>}
-          </div>
-          <DialogFooter>
-            <button onClick={() => { setShowSubTaskForm(false); setSubTaskForm({ title: '', description: '' }); setSubTaskFormError(null) }} className="text-xs px-4 py-2" style={{ color: 'var(--text-secondary)' }}>취소</button>
-            <button onClick={handleCreateSubTask} className="text-xs px-4 py-2 rounded-lg font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>추가</button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 하위과제 수정 모달 */}
-      <Dialog open={!!editingSubTask} onOpenChange={open => !open && setEditingSubTask(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>하위과제 수정</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 py-2">
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>제목 *</label>
-              <input
-                value={editSubTaskForm.title}
-                onChange={e => setEditSubTaskForm(f => ({ ...f, title: e.target.value }))}
-                style={{
-                  background: 'var(--surface-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  color: 'var(--text-primary)',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  width: '100%',
-                }}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>설명</label>
-              <textarea
-                value={editSubTaskForm.description}
-                onChange={e => setEditSubTaskForm(f => ({ ...f, description: e.target.value }))}
-                rows={3}
-                style={{
-                  background: 'var(--surface-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '8px',
-                  color: 'var(--text-primary)',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  width: '100%',
-                  resize: 'vertical',
-                }}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <button onClick={() => setEditingSubTask(null)} className="text-xs px-4 py-2" style={{ color: 'var(--text-secondary)' }}>취소</button>
-            <button onClick={handleUpdateSubTask} className="text-xs px-4 py-2 rounded-lg font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>저장</button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

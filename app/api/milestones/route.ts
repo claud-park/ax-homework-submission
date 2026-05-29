@@ -13,36 +13,30 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   let query = supabase
     .from('milestones')
-    .select('*, milestone_deliverables(*)')
+    .select('*')
     .eq('user_id', effectiveUserId)
-    .order('start_date', { ascending: true, nullsFirst: false })
     .order('display_order')
+    .order('start_date', { ascending: true, nullsFirst: false })
 
   if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalized = (data ?? []).map(({ milestone_deliverables, ...rest }: any) => ({
-    ...rest,
-    deliverables: milestone_deliverables,
-  }))
-  return NextResponse.json(normalized)
+  return NextResponse.json(data ?? [])
 }
 
 export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const { title, start_date, due_date, description, publish_status, sub_task_id } = body
+  const { title, start_date, due_date, description, publish_status, parent_milestone_id } = body
   const status = publish_status === 'published' ? 'published' : 'draft'
 
-  if (status === 'published') {
-    const fields: { field: string; message: string }[] = []
-    if (!title) fields.push({ field: 'title', message: '필수 항목입니다.' })
-    if (!start_date) fields.push({ field: 'start_date', message: '필수 항목입니다.' })
-    if (!due_date) fields.push({ field: 'due_date', message: '필수 항목입니다.' })
-    if (fields.length > 0) return NextResponse.json({ error: 'validation_failed', fields }, { status: 400 })
+  if (status === 'published' && !title) {
+    return NextResponse.json(
+      { error: 'validation_failed', fields: [{ field: 'title', message: '필수 항목입니다.' }] },
+      { status: 400 }
+    )
   }
 
   const supabase = createServiceClient()
@@ -55,7 +49,7 @@ export async function POST(req: NextRequest) {
       due_date: due_date ?? null,
       description: description ?? null,
       publish_status: status,
-      sub_task_id: sub_task_id ?? null,
+      parent_milestone_id: parent_milestone_id ?? null,
     })
     .select()
     .single()

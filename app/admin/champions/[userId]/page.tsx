@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
-import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission } from '@/lib/types'
+import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission, Milestone } from '@/lib/types'
 import { parseName } from '@/lib/utils'
 import { ArrowLeft, Link } from 'lucide-react'
 import { toast } from 'sonner'
@@ -84,6 +84,13 @@ export default function AdminChampionPage() {
     }
   }
 
+  const allMilestones = useMemo(() => {
+    if (!data) return []
+    return [...(data.milestones ?? [])].sort((a, b) =>
+      (a.start_date ?? '').localeCompare(b.start_date ?? '') || a.display_order - b.display_order
+    )
+  }, [data])
+
   if (loading) {
     return (
       <div className="flex flex-col gap-2">
@@ -96,13 +103,6 @@ export default function AdminChampionPage() {
   if (!data) return null
 
   const { displayName, department } = parseName(data.user.name)
-
-  const allMilestones = useMemo(() => {
-    if (!data) return []
-    const fromSubTasks = (data.sub_tasks ?? []).flatMap(st => st.milestones ?? [])
-    return [...data.milestones, ...fromSubTasks]
-      .sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
-  }, [data])
 
   return (
     <div>
@@ -226,33 +226,33 @@ export default function AdminChampionPage() {
         </section>
       )}
 
-      {/* 하위과제 그룹 (읽기 전용) */}
-      {(data.sub_tasks ?? []).length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>하위과제</h2>
-          <div className="flex flex-col gap-2">
-            {(data.sub_tasks ?? []).map(st => (
-              <div
-                key={st.id}
-                style={{
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 8,
-                  padding: '8px 12px',
-                  background: 'var(--surface-secondary)',
-                }}
-              >
-                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{st.title}</p>
-                {st.description && (
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{st.description}</p>
-                )}
-                <p className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>
-                  마일스톤 {(st.milestones ?? []).length}개
-                </p>
+      {/* 마일스톤 그룹 (읽기 전용) */}
+      {(() => {
+        const depth0 = (data.milestones ?? []).filter((m: Milestone) => !m.parent_milestone_id)
+        if (depth0.length === 0) return null
+        return (
+          <section className="mb-8">
+            <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>마일스톤 그룹</h2>
+            <div style={{ marginBottom: 16 }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>마일스톤 그룹</p>
+              <div className="flex flex-col gap-2">
+                {depth0.map((g: Milestone) => {
+                  const children = (data.milestones ?? []).filter((m: Milestone) => m.parent_milestone_id === g.id)
+                  return (
+                    <div key={g.id} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 12px', background: 'var(--surface-secondary)' }}>
+                      <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</p>
+                      {g.start_date && (
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{g.start_date} ~ {g.due_date}</p>
+                      )}
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>하위 마일스톤 {children.length}개</p>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            </div>
+          </section>
+        )
+      })()}
 
       {allMilestones.length > 0 && (
         <section>

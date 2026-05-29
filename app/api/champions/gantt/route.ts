@@ -11,8 +11,7 @@ export interface GanttMilestone {
   due_date: string
   status: MilestoneStatus
   week_number: number
-  sub_task_id: string | null
-  sub_task_title: string | null
+  parent_milestone_id: string | null
 }
 
 export interface GanttChampion {
@@ -34,7 +33,6 @@ export async function GET(req: NextRequest) {
     { data: users, error: usersErr },
     { data: charters, error: chartersErr },
     { data: milestones, error: msErr },
-    { data: subTasks, error: stErr },
   ] = await Promise.all([
     supabase.from('users').select('id, name'),
     supabase
@@ -42,25 +40,19 @@ export async function GET(req: NextRequest) {
       .select('user_id, id, project_name'),
     supabase
       .from('milestones')
-      .select('id, user_id, title, start_date, due_date, status, week_number, sub_task_id')
+      .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id')
       .eq('publish_status', 'published')
       .not('start_date', 'is', null)
       .not('due_date', 'is', null)
       .order('week_number')
       .order('display_order'),
-    supabase.from('sub_tasks').select('id, title'),
   ])
 
   if (usersErr) return NextResponse.json({ error: usersErr.message }, { status: 500 })
   if (chartersErr) return NextResponse.json({ error: chartersErr.message }, { status: 500 })
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
-  if (stErr) return NextResponse.json({ error: stErr.message }, { status: 500 })
-
   const charterMap = new Map<string, { id: string; project_name: string | null }>()
   for (const c of charters ?? []) charterMap.set(c.user_id, c)
-
-  const subTaskTitleMap = new Map<string, string>()
-  for (const st of subTasks ?? []) subTaskTitleMap.set(st.id, st.title)
 
   const msMap = new Map<string, GanttMilestone[]>()
   for (const m of milestones ?? []) {
@@ -72,8 +64,7 @@ export async function GET(req: NextRequest) {
       due_date: m.due_date,
       status: m.status as MilestoneStatus,
       week_number: m.week_number,
-      sub_task_id: m.sub_task_id ?? null,
-      sub_task_title: m.sub_task_id ? (subTaskTitleMap.get(m.sub_task_id) ?? null) : null,
+      parent_milestone_id: m.parent_milestone_id ?? null,
     })
   }
 

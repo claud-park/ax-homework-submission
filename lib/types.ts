@@ -78,21 +78,12 @@ export interface Milestone {
   bottleneck_note: string | null
   bottleneck_admin_comment: string | null
   bottleneck_reviewed_at: string | null
-  sub_task_id: string | null
+  parent_milestone_id: string | null
   display_order: number
   created_at: string
   updated_at: string
   publish_status: PublishStatus
-  deliverables?: MilestoneDeliverable[]
-}
-
-export interface MilestoneDeliverable {
-  id: string
-  milestone_id: string
-  file_path: string | null
-  file_name: string | null
-  link_url: string | null
-  uploaded_at: string
+  children?: Milestone[]
 }
 
 export interface DeadlineChangeRequest {
@@ -140,7 +131,6 @@ export interface ChampionSummary {
 export interface ChampionProject {
   user: User
   charter: (CharterSubmission & { comments: CharterComment[] }) | null
-  sub_tasks: SubTask[]
   milestones: Milestone[]
   latestSubmission: Submission | null
 }
@@ -162,17 +152,6 @@ export interface KanbanCard {
   pendingDeadlineRequests: number
 }
 
-export interface SubTask {
-  id: string
-  user_id: string
-  title: string
-  description: string | null
-  display_order: number
-  publish_status: PublishStatus
-  created_at: string
-  updated_at: string
-  milestones?: Milestone[]
-}
 
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
 export type KanbanDataV2 = Record<KanbanColumn, KanbanCard[]>

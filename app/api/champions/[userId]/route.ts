@@ -18,7 +18,6 @@ export async function GET(
     { data: charterRows, error: charterErr },
     { data: milestones, error: msErr },
     { data: submissions, error: subErr },
-    { data: subTaskRows, error: stErr },
   ] = await Promise.all([
     supabase.from('users').select('*').eq('id', userId).single(),
     supabase
@@ -29,7 +28,7 @@ export async function GET(
       .limit(1),
     supabase
       .from('milestones')
-      .select('*, milestone_deliverables(*)')
+      .select('*')
       .eq('user_id', userId)
       .eq('publish_status', 'published')
       .order('week_number')
@@ -40,18 +39,12 @@ export async function GET(
       .eq('user_id', userId)
       .order('attempt_number', { ascending: false })
       .limit(1),
-    supabase
-      .from('sub_tasks')
-      .select('*')
-      .eq('user_id', userId)
-      .order('display_order'),
   ])
 
   if (userErr || !userRow) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (charterErr) return NextResponse.json({ error: charterErr.message }, { status: 500 })
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
   if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 })
-  if (stErr) return NextResponse.json({ error: stErr.message }, { status: 500 })
 
   const charter = charterRows?.[0] ?? null
   let charterWithComments = null
@@ -65,33 +58,10 @@ export async function GET(
     charterWithComments = { ...charter, comments: comments ?? [] }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalized = (milestones ?? []).map(({ milestone_deliverables, ...rest }: any) => ({
-    ...rest,
-    deliverables: milestone_deliverables,
-  }))
-
-  // Group published milestones by sub_task_id
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const msBySubTask = new Map<string, any[]>()
-  for (const m of normalized) {
-    if (m.sub_task_id) {
-      if (!msBySubTask.has(m.sub_task_id)) msBySubTask.set(m.sub_task_id, [])
-      msBySubTask.get(m.sub_task_id)!.push(m)
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalizedSubTasks = (subTaskRows ?? []).map((st: any) => ({
-    ...st,
-    milestones: msBySubTask.get(st.id) ?? [],
-  }))
-
   const result: ChampionProject = {
     user: userRow,
     charter: charterWithComments,
-    sub_tasks: normalizedSubTasks,
-    milestones: normalized.filter((m: { sub_task_id: string | null }) => !m.sub_task_id),
+    milestones: milestones ?? [],
     latestSubmission: submissions?.[0] ?? null,
   }
 
