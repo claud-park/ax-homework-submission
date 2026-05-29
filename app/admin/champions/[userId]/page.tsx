@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission } from '@/lib/types'
@@ -96,9 +96,13 @@ export default function AdminChampionPage() {
   if (!data) return null
 
   const { displayName, department } = parseName(data.user.name)
-  const sortedMilestones = [...data.milestones].sort((a, b) =>
-    (a.start_date ?? '').localeCompare(b.start_date ?? '')
-  )
+
+  const allMilestones = useMemo(() => {
+    if (!data) return []
+    const fromSubTasks = (data.sub_tasks ?? []).flatMap(st => st.milestones ?? [])
+    return [...data.milestones, ...fromSubTasks]
+      .sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
+  }, [data])
 
   return (
     <div>
@@ -222,11 +226,39 @@ export default function AdminChampionPage() {
         </section>
       )}
 
-      {sortedMilestones.length > 0 && (
+      {/* 하위과제 그룹 (읽기 전용) */}
+      {(data.sub_tasks ?? []).length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>하위과제</h2>
+          <div className="flex flex-col gap-2">
+            {(data.sub_tasks ?? []).map(st => (
+              <div
+                key={st.id}
+                style={{
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  background: 'var(--surface-secondary)',
+                }}
+              >
+                <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{st.title}</p>
+                {st.description && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{st.description}</p>
+                )}
+                <p className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>
+                  마일스톤 {(st.milestones ?? []).length}개
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {allMilestones.length > 0 && (
         <section>
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>WBS / 마일스톤</h2>
           <div className="flex flex-col gap-2">
-            {sortedMilestones.map(m => (
+            {allMilestones.map(m => (
               <div
                 key={m.id}
                 className="flex items-center justify-between p-3 rounded-xl border"
