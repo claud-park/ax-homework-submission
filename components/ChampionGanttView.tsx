@@ -49,87 +49,64 @@ function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: stri
   )
 }
 
-function toTasks(champions: GanttChampion[]): Task[] {
+// depth-0 milestone → project row; depth-1 milestone → task row under its group
+// Returns tasks and a map of milestone-id → champion (for task list rendering)
+function toTasks(champions: GanttChampion[]): { tasks: Task[]; msToChamp: Map<string, GanttChampion> } {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   const tasks: Task[] = []
+  const msToChamp = new Map<string, GanttChampion>()
+
   for (const c of champions) {
     if (c.milestones.length === 0) continue
-    const startStr = c.milestones[0].start_date
-    const endStr = c.milestones[c.milestones.length - 1].due_date
-    const champId = `champ-${c.userId}`
 
-    let progress = 0
-    if (todayStr >= endStr) {
-      progress = 100
-    } else if (todayStr > startStr) {
-      const startMs = new Date(startStr).getTime()
-      const endMs = new Date(endStr).getTime()
-      const todayMs = new Date(todayStr).getTime()
-      progress = Math.round((todayMs - startMs) / (endMs - startMs) * 100)
-    }
-
-    // 챔피언 프로젝트 행
-    tasks.push({
-      id: champId,
-      type: 'project',
-      name: c.projectName || c.name,
-      start: new Date(startStr),
-      end: new Date(endStr),
-      progress,
-      hideChildren: false,
-      displayOrder: tasks.length + 1,
-      styles: {
-        backgroundColor: 'rgba(236,72,153,0.15)',
-        backgroundSelectedColor: 'rgba(236,72,153,0.28)',
-        progressColor: 'rgba(236,72,153,0.55)',
-        progressSelectedColor: 'rgba(236,72,153,0.7)',
-      },
-    })
-
-    // depth-0 milestones (parent=null) → project rows under champId
     const topLevelMs = c.milestones.filter(m => !m.parent_milestone_id)
     const childMs = c.milestones.filter(m => !!m.parent_milestone_id)
 
-    // Render each depth-0 as a project group row, then its children
     for (const g of topLevelMs) {
-      const gRowId = `group-${g.id}`
       const gChildren = childMs.filter(cm => cm.parent_milestone_id === g.id)
 
-      // Determine start/end for the group row
-      const gStart = g.start_date ?? gChildren[0]?.start_date ?? g.due_date ?? gChildren[0]?.due_date
-      const gEnd = g.due_date ?? gChildren[gChildren.length - 1]?.due_date ?? g.start_date ?? gChildren[0]?.start_date
+      // Determine date range for the group row (fallback to children if depth-0 has no dates)
+      const gStart = g.start_date ?? gChildren.find(c => c.start_date)?.start_date ?? null
+      const gEnd = g.due_date ?? [...gChildren].reverse().find(c => c.due_date)?.due_date ?? null
 
-      if (!gStart || !gEnd) continue  // skip if no dates at all
+      if (!gStart || !gEnd) continue
+
+      msToChamp.set(g.id, c)
 
       tasks.push({
-        id: gRowId,
+        id: g.id,
         name: g.title,
+        type: 'project',
         start: new Date(gStart),
         end: new Date(gEnd),
         progress: 0,
-        type: 'project',
-        project: champId,
         hideChildren: false,
         displayOrder: tasks.length + 1,
+        styles: {
+          backgroundColor: 'rgba(236,72,153,0.15)',
+          backgroundSelectedColor: 'rgba(236,72,153,0.28)',
+          progressColor: 'rgba(236,72,153,0.55)',
+          progressSelectedColor: 'rgba(236,72,153,0.7)',
+        },
       })
 
       for (const m of gChildren) {
         if (!m.start_date || !m.due_date) continue
         const isFuture = m.start_date > todayStr
         const isPast = m.due_date < todayStr
-        let end = new Date(m.due_date)
         const start = new Date(m.start_date)
+        let end = new Date(m.due_date)
         if (end <= start) end = new Date(start.getTime() + 86400000)
         tasks.push({
           id: m.id,
           name: m.title,
+          type: 'task',
+          project: g.id,
           start,
           end,
           progress: STATUS_PROGRESS[m.status],
-          type: 'task',
-          project: gRowId,
           styles: {
             progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
             progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
@@ -140,7 +117,8 @@ function toTasks(champions: GanttChampion[]): Task[] {
       }
     }
   }
-  return tasks
+
+  return { tasks, msToChamp }
 }
 
 function cell(width: number, extra?: React.CSSProperties): React.CSSProperties {
@@ -158,39 +136,34 @@ function cell(width: number, extra?: React.CSSProperties): React.CSSProperties {
   }
 }
 
-// TaskListHeader does not depend on panelUserId — separate memo keeps it stable
-function makeTaskListHeader(champMap: Map<string, GanttChampion>) {
-  void champMap // ensure dependency is declared for clarity
-  function TaskListHeader({ headerHeight, fontFamily, fontSize }: {
-    headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string
-  }) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          height: headerHeight,
-          width: LIST_WIDTH,
-          fontFamily,
-          fontSize,
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          borderBottom: '2px solid var(--border-subtle)',
-          background: 'var(--surface-primary)',
-        }}
-      >
-        <div style={cell(W.name)}>이름</div>
-        <div style={cell(W.dept)}>부서</div>
-        <div style={cell(W.project)}>과제명</div>
-        <div style={{ ...cell(W.charter), borderRight: 'none' }}>정의서</div>
-      </div>
-    )
-  }
-  return TaskListHeader
+// TaskListHeader is stable — no runtime data dependency
+function TaskListHeader({ headerHeight, fontFamily, fontSize }: {
+  headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        height: headerHeight,
+        width: LIST_WIDTH,
+        fontFamily,
+        fontSize,
+        fontWeight: 600,
+        color: 'var(--text-secondary)',
+        borderBottom: '2px solid var(--border-subtle)',
+        background: 'var(--surface-primary)',
+      }}
+    >
+      <div style={cell(W.name)}>이름</div>
+      <div style={cell(W.dept)}>부서</div>
+      <div style={cell(W.project)}>과제명</div>
+      <div style={{ ...cell(W.charter), borderRight: 'none' }}>정의서</div>
+    </div>
+  )
 }
 
-// TaskListTable depends on panelUserId (for active highlight) and onCharterClick
 function makeTaskListTable(
-  champMap: Map<string, GanttChampion>,
+  msToChamp: Map<string, GanttChampion>,
   onCharterClick: (userId: string) => void,
   panelUserId: string | null,
 ) {
@@ -201,10 +174,10 @@ function makeTaskListTable(
     return (
       <div style={{ fontFamily, fontSize, width: LIST_WIDTH }}>
         {tasks.map(t => {
-          const isProject = t.type === 'project'
-          const champ = champMap.get(t.project ?? t.id)
+          const isGroup = t.type === 'project'
+          const champ = isGroup ? msToChamp.get(t.id) : null
+          const isPanelOpen = isGroup && champ?.userId === panelUserId
           const isSelected = t.id === selectedTaskId
-          const isPanelOpen = isProject && t.id === panelUserId
 
           return (
             <div
@@ -222,8 +195,7 @@ function makeTaskListTable(
                 cursor: 'pointer',
               }}
             >
-              {isProject ? (
-                // Champion row: all 4 columns
+              {isGroup ? (
                 <>
                   <div style={cell(W.name)}>
                     <button
@@ -247,12 +219,12 @@ function makeTaskListTable(
                     {champ?.department || '—'}
                   </div>
                   <div style={cell(W.project, { color: 'var(--text-secondary)' })}>
-                    {champ?.projectName || '—'}
+                    {t.name}
                   </div>
                   <div style={{ ...cell(W.charter), borderRight: 'none', justifyContent: 'center' }}>
                     {champ?.charterSubmissionId ? (
                       <button
-                        onClick={e => { e.stopPropagation(); onCharterClick(t.id) }}
+                        onClick={e => { e.stopPropagation(); if (champ) onCharterClick(champ.userId) }}
                         aria-pressed={isPanelOpen}
                         style={{
                           fontSize: 10, padding: '2px 6px', borderRadius: 4,
@@ -268,7 +240,6 @@ function makeTaskListTable(
                   </div>
                 </>
               ) : (
-                // Milestone row: single full-width name cell (no column dividers)
                 <div style={{
                   width: LIST_WIDTH,
                   display: 'flex',
@@ -396,6 +367,7 @@ export function ChampionGanttView() {
       .finally(() => setLoading(false))
   }, [])
 
+  // userId → champion (for filter chips and charter panel)
   const champMap = useMemo(() => {
     const m = new Map<string, GanttChampion>()
     for (const c of champions) m.set(c.userId, c)
@@ -407,22 +379,25 @@ export function ChampionGanttView() {
     [champions, selectedChampions],
   )
 
-  const tasks = useMemo(() => {
-    const raw = toTasks(filteredChampions)
-    return raw.map(t =>
+  const { tasks: rawTasks, msToChamp } = useMemo(
+    () => toTasks(filteredChampions),
+    [filteredChampions],
+  )
+
+  const tasks = useMemo(() =>
+    rawTasks.map(t =>
       t.type === 'project' ? { ...t, hideChildren: collapsedIds.has(t.id) } : t
-    )
-  }, [filteredChampions, collapsedIds])
+    ),
+    [rawTasks, collapsedIds],
+  )
 
   const handleCharterClick = useCallback((userId: string) => {
     setPanelUserId(prev => prev === userId ? null : userId)
   }, [])
 
-  // Split into two memos: header is stable (no panelUserId dep), table remounts only on panel change
-  const TaskListHeader = useMemo(() => makeTaskListHeader(champMap), [champMap])
   const TaskListTable = useMemo(
-    () => makeTaskListTable(champMap, handleCharterClick, panelUserId),
-    [champMap, handleCharterClick, panelUserId]
+    () => makeTaskListTable(msToChamp, handleCharterClick, panelUserId),
+    [msToChamp, handleCharterClick, panelUserId],
   )
 
   function handleExpandChange(task: Task) {

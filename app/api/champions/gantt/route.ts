@@ -7,10 +7,10 @@ import type { MilestoneStatus } from '@/lib/types'
 export interface GanttMilestone {
   id: string
   title: string
-  start_date: string
-  due_date: string
+  start_date: string | null
+  due_date: string | null
   status: MilestoneStatus
-  week_number: number
+  week_number: number | null
   parent_milestone_id: string | null
 }
 
@@ -42,9 +42,7 @@ export async function GET(req: NextRequest) {
       .from('milestones')
       .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id')
       .eq('publish_status', 'published')
-      .not('start_date', 'is', null)
-      .not('due_date', 'is', null)
-      .order('week_number')
+      .order('week_number', { nullsFirst: false })
       .order('display_order'),
   ])
 
