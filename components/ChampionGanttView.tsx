@@ -55,8 +55,10 @@ function toTasks(champions: GanttChampion[]): Task[] {
 
   const tasks: Task[] = []
   for (const c of champions) {
+    if (c.milestones.length === 0) continue
     const startStr = c.milestones[0].start_date
     const endStr = c.milestones[c.milestones.length - 1].due_date
+    const champId = `champ-${c.userId}`
 
     let progress = 0
     if (todayStr >= endStr) {
@@ -68,14 +70,16 @@ function toTasks(champions: GanttChampion[]): Task[] {
       progress = Math.round((todayMs - startMs) / (endMs - startMs) * 100)
     }
 
+    // 챔피언 프로젝트 행
     tasks.push({
-      id: c.userId,
+      id: champId,
       type: 'project',
       name: c.projectName || c.name,
       start: new Date(startStr),
       end: new Date(endStr),
       progress,
       hideChildren: false,
+      displayOrder: tasks.length + 1,
       styles: {
         backgroundColor: 'rgba(236,72,153,0.15)',
         backgroundSelectedColor: 'rgba(236,72,153,0.28)',
@@ -83,10 +87,15 @@ function toTasks(champions: GanttChampion[]): Task[] {
         progressSelectedColor: 'rgba(236,72,153,0.7)',
       },
     })
-    for (const m of c.milestones) {
+
+    // sub_task 없는 마일스톤 먼저
+    const topLevelMs = c.milestones.filter(m => !m.sub_task_id)
+    for (const m of topLevelMs) {
       const start = new Date(m.start_date)
       const end = new Date(m.due_date)
       if (end <= start) end.setDate(start.getDate() + 1)
+      const isFuture = m.start_date > todayStr
+      const isPast = m.due_date < todayStr
       tasks.push({
         id: m.id,
         type: 'task',
@@ -94,14 +103,66 @@ function toTasks(champions: GanttChampion[]): Task[] {
         start,
         end,
         progress: STATUS_PROGRESS[m.status],
-        project: c.userId,
+        project: champId,
+        displayOrder: tasks.length + 1,
         styles: {
-          backgroundColor: STATUS_COLOR[m.status],
-          backgroundSelectedColor: STATUS_COLOR[m.status],
-          progressColor: STATUS_COLOR[m.status],
-          progressSelectedColor: STATUS_COLOR[m.status],
+          progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
+          progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
+          backgroundColor: isPast && m.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
         },
       })
+    }
+
+    // sub_task별 그룹 행 + 소속 마일스톤
+    const subTaskIds = [...new Set(c.milestones.map(m => m.sub_task_id).filter(Boolean))] as string[]
+    const subTaskTitles = new Map<string, string>()
+    for (const m of c.milestones) {
+      if (m.sub_task_id && m.sub_task_title) subTaskTitles.set(m.sub_task_id, m.sub_task_title)
+    }
+
+    for (const stId of subTaskIds) {
+      const stTitle = subTaskTitles.get(stId) ?? '하위과제'
+      const stMs = c.milestones.filter(m => m.sub_task_id === stId)
+      if (stMs.length === 0) continue
+
+      const stStart = stMs[0].start_date
+      const stEnd = stMs[stMs.length - 1].due_date
+      const stRowId = `subtask-${stId}`
+
+      tasks.push({
+        id: stRowId,
+        name: stTitle,
+        start: new Date(stStart),
+        end: new Date(stEnd),
+        progress: 0,
+        type: 'project',
+        project: champId,
+        hideChildren: false,
+        displayOrder: tasks.length + 1,
+      })
+
+      for (const m of stMs) {
+        const start = new Date(m.start_date)
+        const end = new Date(m.due_date)
+        if (end <= start) end.setDate(start.getDate() + 1)
+        const isFuture = m.start_date > todayStr
+        const isPast = m.due_date < todayStr
+        tasks.push({
+          id: m.id,
+          name: m.title,
+          start,
+          end,
+          progress: STATUS_PROGRESS[m.status],
+          type: 'task',
+          project: stRowId,
+          displayOrder: tasks.length + 1,
+          styles: {
+            progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
+            progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
+            backgroundColor: isPast && m.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
+          },
+        })
+      }
     }
   }
   return tasks
