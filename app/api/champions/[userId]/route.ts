@@ -16,7 +16,6 @@ export async function GET(
   const [
     { data: userRow, error: userErr },
     { data: charterRows, error: charterErr },
-    { data: subTasks, error: subTaskErr },
     { data: milestones, error: msErr },
     { data: submissions, error: subErr },
   ] = await Promise.all([
@@ -27,12 +26,6 @@ export async function GET(
       .eq('user_id', userId)
       .order('submitted_at', { ascending: false })
       .limit(1),
-    supabase
-      .from('sub_tasks')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('publish_status', 'published')
-      .order('display_order'),
     supabase
       .from('milestones')
       .select('*, milestone_deliverables(*)')
@@ -50,7 +43,6 @@ export async function GET(
 
   if (userErr || !userRow) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (charterErr) return NextResponse.json({ error: charterErr.message }, { status: 500 })
-  if (subTaskErr) return NextResponse.json({ error: subTaskErr.message }, { status: 500 })
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
   if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 })
 
@@ -75,7 +67,7 @@ export async function GET(
   const result: ChampionProject = {
     user: userRow,
     charter: charterWithComments,
-    sub_tasks: subTasks ?? [],
+    sub_tasks: [],
     milestones: normalized,
     latestSubmission: submissions?.[0] ?? null,
   }
