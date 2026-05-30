@@ -317,21 +317,6 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
         {dateStr && <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{dateStr}</span>}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          {!isChild && (
-            <button
-              type="button"
-              onClick={() => { setSubFormParentId(v => v === m.id ? null : m.id); setEditingId(null); setConfirmDeleteId(null) }}
-              className="text-xs px-2 py-0.5 rounded font-semibold"
-              style={{
-                color: subFormParentId === m.id ? '#fff' : 'var(--blue-600)',
-                background: subFormParentId === m.id ? 'var(--blue-600)' : 'rgba(37,99,235,0.1)',
-                border: '1px solid rgba(37,99,235,0.25)',
-              }}
-              title="서브 마일스톤 추가"
-            >
-              + 서브
-            </button>
-          )}
           <button type="button" onClick={() => openEdit(m)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="수정">✏</button>
           <button type="button" onClick={() => { setConfirmDeleteId(m.id); setEditingId(null); setSubFormParentId(null) }} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="삭제">✕</button>
         </div>
