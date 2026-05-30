@@ -108,7 +108,7 @@ export default function ChampionDetailPage() {
               >
                 <div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.start_date} ~ {m.due_date}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{m.start_date ?? ''} ~ {m.due_date ?? ''}</p>
                 </div>
                 <span
                   className="text-xs font-semibold px-2 py-1 rounded-md"

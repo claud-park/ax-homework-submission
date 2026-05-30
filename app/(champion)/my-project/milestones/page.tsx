@@ -204,7 +204,7 @@ export default function WorkStatusPage() {
 
   function openDeadlineForCheckin(m: Milestone) {
     const existing = requests.find(r => r.milestone_id === m.id)
-    setDeadlineModal({ id: m.id, due_date: m.due_date, existingReqId: existing?.id })
+    setDeadlineModal({ id: m.id, due_date: m.due_date ?? '', existingReqId: existing?.id })
     setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
   }
 
@@ -238,7 +238,7 @@ export default function WorkStatusPage() {
 
   function openEdit(m: Milestone) {
     setEditingMilestone(m)
-    setEditForm({ title: m.title, start_date: m.start_date, due_date: m.due_date })
+    setEditForm({ title: m.title, start_date: m.start_date ?? '', due_date: m.due_date ?? '' })
   }
 
   async function submitEdit(publishStatus: 'draft' | 'published') {
@@ -312,12 +312,12 @@ export default function WorkStatusPage() {
         </td>
         <td className="px-3 py-3">
           <div className="flex flex-col gap-1.5">
-            <span style={{ color: 'var(--text-secondary)' }}>{m.start_date} ~ {m.due_date}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{m.start_date ?? ''} ~ {m.due_date ?? ''}</span>
             {m.publish_status === 'published' && (m.status === 'delayed' || m.status === 'in_progress') && (
               <button
                 onClick={() => {
                   const existing = milestoneReqs[0]
-                  setDeadlineModal({ id: m.id, due_date: m.due_date, existingReqId: existing?.id })
+                  setDeadlineModal({ id: m.id, due_date: m.due_date ?? '', existingReqId: existing?.id })
                   setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
                 }}
                 className="text-xs self-start underline"
@@ -534,7 +534,7 @@ export default function WorkStatusPage() {
                   {g.title}
                 </span>
                 {g.start_date && (
-                  <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>{g.start_date} ~ {g.due_date}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>{g.start_date} ~ {g.due_date ?? ''}</span>
                 )}
                 <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>
                   {(groupedMilestones.byParent.get(g.id) ?? []).length}개

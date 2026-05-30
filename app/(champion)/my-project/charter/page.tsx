@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -168,10 +168,22 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
   const [editForm, setEditForm] = useState({ title: '', start_date: '', due_date: '' })
   const [editSaving, setEditSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [subFormParentId, setSubFormParentId] = useState<string | null>(null)
+  const [subForm, setSubForm] = useState({ title: '', start_date: '', due_date: '' })
+  const [subSaving, setSubSaving] = useState(false)
 
-  const sorted = [...milestones].sort((a, b) =>
-    a.start_date.localeCompare(b.start_date)
-  )
+  const depth0 = [...milestones]
+    .filter(m => !m.parent_milestone_id)
+    .sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
+
+  const byParent = new Map<string, Milestone[]>()
+  for (const m of milestones) {
+    if (m.parent_milestone_id) {
+      const arr = byParent.get(m.parent_milestone_id) ?? []
+      arr.push(m)
+      byParent.set(m.parent_milestone_id, arr)
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -197,10 +209,36 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
     }
   }
 
+  async function handleAddSub(parentId: string, e: React.FormEvent) {
+    e.preventDefault()
+    setSubSaving(true)
+    try {
+      const created = await apiFetch<Milestone>('/api/milestones', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: subForm.title,
+          parent_milestone_id: parentId,
+          start_date: subForm.start_date || null,
+          due_date: subForm.due_date || null,
+          publish_status: 'published',
+        }),
+      })
+      onAdded(created)
+      setSubForm({ title: '', start_date: '', due_date: '' })
+      setSubFormParentId(null)
+      toast.success('서브 마일스톤이 추가되었습니다.')
+    } catch (e: unknown) {
+      toast.error('서브 마일스톤 저장 실패: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setSubSaving(false)
+    }
+  }
+
   function openEdit(m: Milestone) {
     setEditingId(m.id)
-    setEditForm({ title: m.title, start_date: m.start_date, due_date: m.due_date })
+    setEditForm({ title: m.title, start_date: m.start_date ?? '', due_date: m.due_date ?? '' })
     setConfirmDeleteId(null)
+    setSubFormParentId(null)
   }
 
   async function handleEditSubmit(e: React.FormEvent) {
@@ -237,6 +275,66 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
     }
   }
 
+  function renderRow(m: Milestone, isChild: boolean) {
+    const indent = isChild ? 'pl-8 pr-4' : 'px-4'
+
+    if (editingId === m.id) {
+      return (
+        <li key={m.id} className={`${indent} py-2 border-b`} style={{ borderColor: 'var(--border-subtle)' }}>
+          <form onSubmit={handleEditSubmit} className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
+              <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={TIMELINE_INPUT} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</label>
+              <DateRangePicker startDate={editForm.start_date} endDate={editForm.due_date} onChange={(s, e) => setEditForm(f => ({ ...f, start_date: s, due_date: e }))} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditingId(null)} className="text-xs px-3 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--surface-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>취소</button>
+              <button type="submit" disabled={editSaving || !editForm.title} className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>{editSaving ? '저장 중...' : '저장'}</button>
+            </div>
+          </form>
+        </li>
+      )
+    }
+
+    if (confirmDeleteId === m.id) {
+      return (
+        <li key={m.id} className={`flex items-center gap-2 ${indent} py-1.5`}>
+          <span className="text-xs flex-1" style={{ color: 'var(--text-secondary)' }}><span className="font-semibold">{m.title}</span> 삭제할까요?</span>
+          <button type="button" onClick={() => handleDelete(m.id)} className="text-xs px-2.5 py-1 rounded font-semibold" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid rgba(248,113,113,0.4)' }}>확인</button>
+          <button type="button" onClick={() => setConfirmDeleteId(null)} className="text-xs px-2.5 py-1 rounded font-semibold" style={{ background: 'var(--surface-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>취소</button>
+        </li>
+      )
+    }
+
+    const dateStr = m.start_date ? `${fmtMD(m.start_date)} – ${fmtMD(m.due_date ?? '')}` : ''
+
+    return (
+      <li key={m.id} className={`group flex items-center gap-2 py-1.5 ${indent}`}>
+        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{isChild ? '└' : '·'}</span>
+        <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
+        {dateStr && <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{dateStr}</span>}
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          {!isChild && (
+            <button
+              type="button"
+              onClick={() => { setSubFormParentId(v => v === m.id ? null : m.id); setEditingId(null); setConfirmDeleteId(null) }}
+              className="text-xs px-1.5 py-0.5 rounded font-bold"
+              style={{ color: subFormParentId === m.id ? 'var(--blue-600)' : 'var(--text-disabled)', background: 'none' }}
+              title="서브 마일스톤 추가"
+            >
+              +
+            </button>
+          )}
+          <button type="button" onClick={() => openEdit(m)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="수정">✏</button>
+          <button type="button" onClick={() => { setConfirmDeleteId(m.id); setEditingId(null); setSubFormParentId(null) }} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="삭제">✕</button>
+        </div>
+      </li>
+    )
+  }
+
   return (
     <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-subtle)' }}>
       {/* Header */}
@@ -259,36 +357,20 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         </button>
       </div>
 
-      {/* Inline add form */}
+      {/* Inline add form (depth-0) */}
       {showForm && (
         <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}>
           <form onSubmit={handleAdd} className="flex flex-col gap-2">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="예: API 설계 완료"
-                required
-                style={TIMELINE_INPUT}
-              />
+              <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="예: 1단계 개발" required style={TIMELINE_INPUT} />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</label>
-              <DateRangePicker
-                startDate={form.start_date}
-                endDate={form.due_date}
-                onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))}
-              />
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간 (선택)</label>
+              <DateRangePicker startDate={form.start_date} endDate={form.due_date} onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))} />
             </div>
             <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={saving || !form.title || !form.start_date || !form.due_date}
-                className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
-                style={{ background: 'var(--blue-600)', color: '#fff' }}
-              >
+              <button type="submit" disabled={saving || !form.title} className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
                 {saving ? '저장 중...' : '추가'}
               </button>
             </div>
@@ -296,68 +378,40 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         </div>
       )}
 
-      {/* Milestone bulleted list */}
+      {/* Milestone list */}
       <div style={{ background: 'var(--surface-secondary)', minHeight: 56 }}>
-        {sorted.length === 0 ? (
+        {depth0.length === 0 ? (
           <p className="px-4 py-4 text-xs" style={{ color: 'var(--text-disabled)' }}>아직 마일스톤이 없습니다. 위에서 추가해보세요.</p>
         ) : (
           <ul className="py-1">
-            {sorted.map(m => {
-              if (editingId === m.id) {
-                return (
-                  <li key={m.id} className="px-4 py-2 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-                    <form onSubmit={handleEditSubmit} className="flex flex-col gap-2">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-                        <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={TIMELINE_INPUT} />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</label>
-                        <DateRangePicker startDate={editForm.start_date} endDate={editForm.due_date} onChange={(s, e) => setEditForm(f => ({ ...f, start_date: s, due_date: e }))} />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setEditingId(null)} className="text-xs px-3 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--surface-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
-                          취소
-                        </button>
-                        <button type="submit" disabled={editSaving || !editForm.title || !editForm.start_date || !editForm.due_date} className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
-                          {editSaving ? '저장 중...' : '저장'}
-                        </button>
-                      </div>
-                    </form>
-                  </li>
-                )
-              }
-
-              if (confirmDeleteId === m.id) {
-                return (
-                  <li key={m.id} className="flex items-center gap-2 px-4 py-1.5">
-                    <span className="text-xs flex-1" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="font-semibold">{m.title}</span> 삭제할까요?
-                    </span>
-                    <button type="button" onClick={() => handleDelete(m.id)} className="text-xs px-2.5 py-1 rounded font-semibold" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid rgba(248,113,113,0.4)' }}>
-                      확인
-                    </button>
-                    <button type="button" onClick={() => setConfirmDeleteId(null)} className="text-xs px-2.5 py-1 rounded font-semibold" style={{ background: 'var(--surface-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
-                      취소
-                    </button>
-                  </li>
-                )
-              }
-
+            {depth0.map(m => {
+              const children = (byParent.get(m.id) ?? []).sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
               return (
-                <li key={m.id} className="group flex items-center gap-2 px-4 py-1.5">
-                  <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>·</span>
-                  <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
-                  <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{fmtMD(m.start_date)} – {fmtMD(m.due_date)}</span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <button type="button" onClick={() => openEdit(m)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="수정">
-                      ✏
-                    </button>
-                    <button type="button" onClick={() => { setConfirmDeleteId(m.id); setEditingId(null) }} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="삭제">
-                      ✕
-                    </button>
-                  </div>
-                </li>
+                <Fragment key={m.id}>
+                  {renderRow(m, false)}
+                  {children.map(child => renderRow(child, true))}
+                  {subFormParentId === m.id && (
+                    <li className="pl-8 pr-4 py-2 border-t" style={{ borderColor: 'var(--border-subtle)', background: 'color-mix(in srgb, var(--blue-600) 4%, var(--surface-secondary))' }}>
+                      <form onSubmit={e => handleAddSub(m.id, e)} className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          value={subForm.title}
+                          onChange={e => setSubForm(f => ({ ...f, title: e.target.value }))}
+                          placeholder="서브 마일스톤 이름"
+                          autoFocus
+                          onKeyDown={e => { if (e.key === 'Escape') { setSubFormParentId(null); setSubForm({ title: '', start_date: '', due_date: '' }) } }}
+                          required
+                          style={{ ...TIMELINE_INPUT, fontSize: '12px' }}
+                        />
+                        <DateRangePicker startDate={subForm.start_date} endDate={subForm.due_date} onChange={(s, e) => setSubForm(f => ({ ...f, start_date: s, due_date: e }))} />
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => { setSubFormParentId(null); setSubForm({ title: '', start_date: '', due_date: '' }) }} className="text-xs px-3 py-1 rounded-lg font-semibold" style={{ background: 'var(--surface-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>취소</button>
+                          <button type="submit" disabled={subSaving || !subForm.title} className="text-xs px-3 py-1 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>{subSaving ? '저장 중...' : '추가'}</button>
+                        </div>
+                      </form>
+                    </li>
+                  )}
+                </Fragment>
               )
             })}
           </ul>
@@ -474,13 +528,13 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
         new Paragraph({ text: '' }),
       ])
 
-      const sortedMs = [...milestones].sort((a, b) => a.start_date.localeCompare(b.start_date))
+      const sortedMs = [...milestones].sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
       const timelineChildren = [
         new Paragraph({ text: '06. Timeline · Milestones', heading: HeadingLevel.HEADING_2 }),
         ...(sortedMs.length === 0
           ? [new Paragraph({ children: [new TextRun({ text: '(마일스톤 없음)', size: 22, color: '888888' })] })]
           : sortedMs.map(m => new Paragraph({
-              children: [new TextRun({ text: `${m.title}  ${m.start_date} – ${m.due_date}`, size: 22 })],
+              children: [new TextRun({ text: `${m.title}  ${m.start_date ?? ''} – ${m.due_date ?? ''}`, size: 22 })],
               bullet: { level: 0 },
             }))
         ),

@@ -266,7 +266,7 @@ export default function AdminChampionPage() {
               >
                 <div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtMD(m.start_date)} – {fmtMD(m.due_date)}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtMD(m.start_date ?? '')} – {fmtMD(m.due_date ?? '')}</p>
                 </div>
                 <span
                   className="text-xs font-semibold px-2 py-1 rounded-md"

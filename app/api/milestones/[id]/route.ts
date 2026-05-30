@@ -6,7 +6,7 @@ import type { MilestoneStatus, User } from '@/lib/types'
 
 function computeStatus(
   milestone: {
-    due_date: string
+    due_date: string | null
     is_manual_progress: boolean
     is_manual_completed: boolean
     bottleneck_type: string | null

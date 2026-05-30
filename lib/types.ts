@@ -69,8 +69,8 @@ export interface Milestone {
   week_number: number | null
   title: string
   description: string | null
-  start_date: string
-  due_date: string
+  start_date: string | null
+  due_date: string | null
   status: MilestoneStatus
   is_manual_progress: boolean
   is_manual_completed: boolean

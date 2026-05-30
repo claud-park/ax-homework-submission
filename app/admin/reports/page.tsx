@@ -96,7 +96,7 @@ export default function AdminReportsPage() {
                     {milestones.map(m => (
                       <tr key={m.id}>
                         <td className="py-2" style={{ color: 'var(--text-primary)' }}>{m.title}</td>
-                        <td className="py-2" style={{ color: 'var(--text-secondary)' }}>{m.start_date} – {m.due_date}</td>
+                        <td className="py-2" style={{ color: 'var(--text-secondary)' }}>{m.start_date ?? ''} – {m.due_date ?? ''}</td>
                         <td className="py-2 font-semibold" style={{ color: STATUS_COLOR[m.status] }}>
                           {STATUS_LABEL[m.status]}{m.status === 'delayed' ? ' ⚠️' : ''}
                         </td>

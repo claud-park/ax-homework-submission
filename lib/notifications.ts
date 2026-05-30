@@ -147,7 +147,7 @@ export async function notifyMilestoneCompleted(params: {
     <tr><td style="padding:8px 0;color:#64748b;width:100px">챔피언</td><td style="padding:8px 0;font-weight:600">${escapeHtml(user.name)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">마일스톤</td><td style="padding:8px 0">${escapeHtml(weekLabel + milestone.title)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">산출물</td><td style="padding:8px 0">${escapeHtml(fileName)}</td></tr>
-    <tr><td style="padding:8px 0;color:#64748b">마감일</td><td style="padding:8px 0">${escapeHtml(milestone.due_date)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">마감일</td><td style="padding:8px 0">${escapeHtml(milestone.due_date ?? '')}</td></tr>
   </table>
   <div style="margin-top:24px">
     <a href="${escapeHtml(link)}" style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">진척 현황 보기</a>
@@ -189,7 +189,7 @@ export async function notifyBottleneck(params: {
   <table style="width:100%;font-size:14px;border-collapse:collapse">
     <tr><td style="padding:8px 0;color:#64748b;width:100px">챔피언</td><td style="padding:8px 0;font-weight:600">${escapeHtml(user.name)}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">마일스톤</td><td style="padding:8px 0">${escapeHtml(weekLabel + milestone.title)}</td></tr>
-    <tr><td style="padding:8px 0;color:#64748b">마감일</td><td style="padding:8px 0">${escapeHtml(milestone.due_date)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b">마감일</td><td style="padding:8px 0">${escapeHtml(milestone.due_date ?? '')}</td></tr>
     <tr><td style="padding:8px 0;color:#64748b">지연 유형</td><td style="padding:8px 0;color:#dc2626;font-weight:600">${escapeHtml(typeLabel)}</td></tr>
     ${note ? `<tr><td style="padding:8px 0;color:#64748b;vertical-align:top">설명</td><td style="padding:8px 0;white-space:pre-wrap">${escapeHtml(note)}</td></tr>` : ''}
   </table>

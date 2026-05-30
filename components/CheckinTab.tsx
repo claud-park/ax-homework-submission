@@ -112,7 +112,7 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
         <div>
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
         </div>
-        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>~{fmtMD(m.due_date)}</span>
+        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>~{fmtMD(m.due_date ?? '')}</span>
       </div>
       <div className="mb-3">
         <span className="text-xs font-semibold" style={{ color: statusColor }}>
@@ -235,8 +235,8 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
 
   const thisWeek = useMemo(
     () => published.filter(m =>
-      m.start_date <= todayStr &&
-      todayStr <= m.due_date &&
+      (m.start_date ?? '') <= todayStr &&
+      todayStr <= (m.due_date ?? '') &&
       m.status !== 'completed'
     ),
     [published, todayStr]
@@ -244,7 +244,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
 
   const overdue = useMemo(
     () => published.filter(m =>
-      m.due_date < todayStr &&
+      (m.due_date ?? '') < todayStr &&
       m.status !== 'completed'
     ),
     [published, todayStr]
@@ -252,7 +252,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
 
   const upcoming = useMemo(
     () => published.filter(m =>
-      m.start_date > todayStr &&
+      (m.start_date ?? '') > todayStr &&
       m.status !== 'completed'
     ),
     [published, todayStr]
@@ -261,7 +261,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
   const completedInRange = useMemo(
     () => published.filter(m =>
       m.status === 'completed' &&
-      m.start_date <= todayStr
+      (m.start_date ?? '') <= todayStr
     ),
     [published, todayStr]
   )
