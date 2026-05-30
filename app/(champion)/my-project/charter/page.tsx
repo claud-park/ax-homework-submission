@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { EmptyState } from '@/components/ui/empty-state'
-import { FileText } from 'lucide-react'
+import { ChevronLeft, FileText } from 'lucide-react'
 import { DraftBadge } from '@/components/DraftBadge'
 import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
@@ -316,16 +316,20 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{isChild ? '└' : '·'}</span>
         <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
         {dateStr && <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{dateStr}</span>}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           {!isChild && (
             <button
               type="button"
               onClick={() => { setSubFormParentId(v => v === m.id ? null : m.id); setEditingId(null); setConfirmDeleteId(null) }}
-              className="text-xs px-1.5 py-0.5 rounded font-bold"
-              style={{ color: subFormParentId === m.id ? 'var(--blue-600)' : 'var(--text-disabled)', background: 'none' }}
+              className="text-xs px-2 py-0.5 rounded font-semibold"
+              style={{
+                color: subFormParentId === m.id ? '#fff' : 'var(--blue-600)',
+                background: subFormParentId === m.id ? 'var(--blue-600)' : 'rgba(37,99,235,0.1)',
+                border: '1px solid rgba(37,99,235,0.25)',
+              }}
               title="서브 마일스톤 추가"
             >
-              +
+              + 서브
             </button>
           )}
           <button type="button" onClick={() => openEdit(m)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="수정">✏</button>
@@ -390,6 +394,18 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
                 <Fragment key={m.id}>
                   {renderRow(m, false)}
                   {children.map(child => renderRow(child, true))}
+                  {subFormParentId !== m.id && (
+                    <li className="pl-8 pr-4 py-1">
+                      <button
+                        type="button"
+                        onClick={() => { setSubFormParentId(m.id); setEditingId(null); setConfirmDeleteId(null) }}
+                        className="text-xs hover:opacity-60 transition-opacity"
+                        style={{ color: 'var(--text-disabled)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        + 서브 마일스톤 추가
+                      </button>
+                    </li>
+                  )}
                   {subFormParentId === m.id && (
                     <li className="pl-8 pr-4 py-2 border-t" style={{ borderColor: 'var(--border-subtle)', background: 'color-mix(in srgb, var(--blue-600) 4%, var(--surface-secondary))' }}>
                       <form onSubmit={e => handleAddSub(m.id, e)} className="flex flex-col gap-2">
@@ -595,7 +611,7 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
 
       {/* Section editors */}
       <div className="flex-1 overflow-y-auto p-5">
-        <div className="flex flex-col gap-3 max-w-2xl">
+        <div className="flex flex-col gap-3 max-w-3xl">
           {mode === 'edit' && submission && (
             <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>
               마지막 수정: {new Date(submission.updated_at).toLocaleString('ko-KR')}
@@ -688,6 +704,7 @@ export default function CharterPage() {
   const [submissions, setSubmissions] = useState<CharterSubmission[]>([])
   const [loading, setLoading] = useState(true)
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(true)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const { width: listWidth, setWidth: setListWidth, onMouseDown: onResizeList } = useResizableWidth({
     initialWidth: 272,
@@ -840,8 +857,31 @@ export default function CharterPage() {
             />
           </div>
           {sidePanel !== 'new' && sidePanel.publish_status === 'published' && (
-            <div className="flex flex-col border-l" style={{ width: '300px', minWidth: '280px', borderColor: 'var(--border-subtle)' }}>
-              <CharterCommentPanel key={sidePanel.id} charterId={sidePanel.id} />
+            <div className="flex border-l flex-shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
+              {/* Collapse toggle strip */}
+              <button
+                onClick={() => setFeedbackOpen(v => !v)}
+                className="flex items-center justify-center flex-shrink-0 hover:opacity-60 transition-opacity"
+                style={{
+                  width: 20,
+                  background: 'var(--surface-primary)',
+                  border: 'none',
+                  borderRight: '1px solid var(--border-faint)',
+                  color: 'var(--text-disabled)',
+                  cursor: 'pointer',
+                }}
+                title={feedbackOpen ? '피드백 닫기' : '피드백 열기'}
+              >
+                <ChevronLeft
+                  className="h-3 w-3 flex-shrink-0 transition-transform duration-150"
+                  style={{ transform: feedbackOpen ? 'none' : 'rotate(180deg)' }}
+                />
+              </button>
+              {feedbackOpen && (
+                <div className="flex flex-col" style={{ width: 260, minWidth: 240 }}>
+                  <CharterCommentPanel key={sidePanel.id} charterId={sidePanel.id} />
+                </div>
+              )}
             </div>
           )}
         </div>
