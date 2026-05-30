@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ChevronLeft, FileText } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, FileText } from 'lucide-react'
 import { DraftBadge } from '@/components/DraftBadge'
 import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
@@ -846,21 +846,23 @@ export default function CharterPage() {
               {/* Collapse toggle strip */}
               <button
                 onClick={() => setFeedbackOpen(v => !v)}
-                className="flex items-center justify-center flex-shrink-0 hover:opacity-60 transition-opacity"
+                className="flex items-center justify-center flex-shrink-0 transition-colors"
                 style={{
-                  width: 20,
+                  width: 24,
                   background: 'var(--surface-primary)',
                   border: 'none',
                   borderRight: '1px solid var(--border-faint)',
-                  color: 'var(--text-disabled)',
+                  color: 'var(--text-tertiary)',
                   cursor: 'pointer',
                 }}
                 title={feedbackOpen ? '피드백 닫기' : '피드백 열기'}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
               >
-                <ChevronLeft
-                  className="h-3 w-3 flex-shrink-0 transition-transform duration-150"
-                  style={{ transform: feedbackOpen ? 'none' : 'rotate(180deg)' }}
-                />
+                {feedbackOpen
+                  ? <ChevronsRight className="h-3.5 w-3.5 flex-shrink-0" />
+                  : <ChevronsLeft className="h-3.5 w-3.5 flex-shrink-0" />
+                }
               </button>
               {feedbackOpen && (
                 <div className="flex flex-col" style={{ width: 260, minWidth: 240 }}>
