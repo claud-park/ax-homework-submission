@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Gantt, ViewMode } from 'gantt-task-react'
 import type { Task } from 'gantt-task-react'
 import 'gantt-task-react/dist/index.css'
@@ -8,9 +8,11 @@ import { apiFetch } from '@/lib/api-client'
 import type { GanttChampion } from '@/app/api/champions/gantt/route'
 import type { ChampionProject, MilestoneStatus } from '@/lib/types'
 
-// Column widths for the custom task list (px)
-const W = { name: 130, dept: 72, project: 130, charter: 56 }
-const LIST_WIDTH = W.name + W.dept + W.project + W.charter
+// Fixed column widths for the custom task list (px); project column is resizable via state
+const W = { name: 130, dept: 72, charter: 56 }
+const PROJECT_W_DEFAULT = 130
+const PROJECT_W_MIN = 60
+const PROJECT_W_MAX = 400
 
 const STATUS_PROGRESS: Record<MilestoneStatus, number> = {
   not_started: 0, in_progress: 50, delayed: 25, completed: 100,
@@ -197,34 +199,53 @@ function cell(width: number, extra?: React.CSSProperties): React.CSSProperties {
   }
 }
 
-function TaskListHeader({ headerHeight, fontFamily, fontSize }: {
-  headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string
-}) {
-  return (
-    <div style={{
-      display: 'flex', height: headerHeight, width: LIST_WIDTH,
-      fontFamily, fontSize, fontWeight: 600, color: 'var(--text-secondary)',
-      borderBottom: '2px solid var(--border-subtle)', background: 'var(--surface-primary)',
-    }}>
-      <div style={cell(W.name)}>이름</div>
-      <div style={cell(W.dept)}>부서</div>
-      <div style={cell(W.project)}>과제명</div>
-      <div style={{ ...cell(W.charter), borderRight: 'none' }}>정의서</div>
-    </div>
-  )
+function makeTaskListHeader(projectW: number, listWidth: number, onResizeStart: (e: React.MouseEvent) => void) {
+  function TaskListHeader({ headerHeight, fontFamily, fontSize }: {
+    headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string
+  }) {
+    return (
+      <div style={{
+        display: 'flex', height: headerHeight, width: listWidth,
+        fontFamily, fontSize, fontWeight: 600, color: 'var(--text-secondary)',
+        borderBottom: '2px solid var(--border-subtle)', background: 'var(--surface-primary)',
+      }}>
+        <div style={cell(W.name)}>이름</div>
+        <div style={cell(W.dept)}>부서</div>
+        <div style={{ ...cell(projectW), position: 'relative' }}>
+          과제명
+          {/* drag handle — right edge of project column */}
+          <div
+            onMouseDown={onResizeStart}
+            style={{
+              position: 'absolute', right: 0, top: 0, bottom: 0, width: 4,
+              cursor: 'col-resize', zIndex: 1,
+              background: 'transparent',
+              transition: 'background 0.1s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--accent)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+          />
+        </div>
+        <div style={{ ...cell(W.charter), borderRight: 'none' }}>정의서</div>
+      </div>
+    )
+  }
+  return TaskListHeader
 }
 
 function makeTaskListTable(
   champMap: Map<string, GanttChampion>,
   onCharterClick: (userId: string) => void,
   panelUserId: string | null,
+  projectW: number,
+  listWidth: number,
 ) {
   function TaskListTable({ tasks, rowHeight, onExpanderClick, selectedTaskId, setSelectedTask, fontFamily, fontSize }: {
     rowHeight: number; rowWidth: string; fontFamily: string; fontSize: string; locale: string
     tasks: Task[]; selectedTaskId: string; setSelectedTask: (id: string) => void; onExpanderClick: (t: Task) => void
   }) {
     return (
-      <div style={{ fontFamily, fontSize, width: LIST_WIDTH }}>
+      <div style={{ fontFamily, fontSize, width: listWidth }}>
         {tasks.map(t => {
           const isChampRow = t.id.startsWith('champ-')
           const isGroupRow = t.id.startsWith('group-')
@@ -272,7 +293,7 @@ function makeTaskListTable(
                   <div style={cell(W.dept, { color: 'var(--text-secondary)', fontSize: 11 })}>
                     {champ?.department || '—'}
                   </div>
-                  <div style={cell(W.project, { color: 'var(--text-secondary)' })}>
+                  <div style={cell(projectW, { color: 'var(--text-secondary)' })}>
                     {champ?.projectName || '—'}
                   </div>
                   <div style={{ ...cell(W.charter), borderRight: 'none', justifyContent: 'center' }}>
@@ -296,7 +317,7 @@ function makeTaskListTable(
               ) : (
                 // Milestone row (group or task): single-width name cell with indent
                 <div style={{
-                  width: LIST_WIDTH, display: 'flex', alignItems: 'center',
+                  width: listWidth, display: 'flex', alignItems: 'center',
                   padding: `0 6px 0 ${isGroupRow ? 16 : 28}px`,
                   overflow: 'hidden', whiteSpace: 'nowrap',
                 }}>
@@ -417,6 +438,27 @@ export function ChampionGanttView() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [panelUserId, setPanelUserId] = useState<string | null>(null)
+  const [projectW, setProjectW] = useState(PROJECT_W_DEFAULT)
+  const resizeDragRef = useRef<{ startX: number; startW: number } | null>(null)
+
+  const listWidth = W.name + W.dept + projectW + W.charter
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    resizeDragRef.current = { startX: e.clientX, startW: projectW }
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeDragRef.current) return
+      const delta = ev.clientX - resizeDragRef.current.startX
+      setProjectW(Math.max(PROJECT_W_MIN, Math.min(PROJECT_W_MAX, resizeDragRef.current.startW + delta)))
+    }
+    const onUp = () => {
+      resizeDragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [projectW])
 
   useEffect(() => {
     apiFetch<GanttChampion[]>('/api/champions/gantt')
@@ -453,9 +495,14 @@ export function ChampionGanttView() {
     setPanelUserId(prev => prev === userId ? null : userId)
   }, [])
 
+  const TaskListHeader = useMemo(
+    () => makeTaskListHeader(projectW, listWidth, handleResizeStart),
+    [projectW, listWidth, handleResizeStart],
+  )
+
   const TaskListTable = useMemo(
-    () => makeTaskListTable(champMap, handleCharterClick, panelUserId),
-    [champMap, handleCharterClick, panelUserId],
+    () => makeTaskListTable(champMap, handleCharterClick, panelUserId, projectW, listWidth),
+    [champMap, handleCharterClick, panelUserId, projectW, listWidth],
   )
 
   function handleExpandChange(task: Task) {
@@ -571,7 +618,7 @@ export function ChampionGanttView() {
                 tasks={tasks}
                 viewMode={viewMode}
                 onExpanderClick={handleExpandChange}
-                listCellWidth={`${LIST_WIDTH}px`}
+                listCellWidth={`${listWidth}px`}
                 columnWidth={viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200}
                 rowHeight={36}
                 barCornerRadius={4}
