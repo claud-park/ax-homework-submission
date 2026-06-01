@@ -244,6 +244,8 @@ function makeTaskListTable(
   panelUserId: string | null,
   projectW: number,
   listWidth: number,
+  collapsedIds: Set<string>,
+  onExpand: (t: Task) => void,
 ) {
   function TaskListTable({ tasks, rowHeight, onExpanderClick, selectedTaskId, setSelectedTask, fontFamily, fontSize }: {
     rowHeight: number; rowWidth: string; fontFamily: string; fontSize: string; locale: string
@@ -280,14 +282,14 @@ function makeTaskListTable(
                   <div style={cell(W.name)}>
                     <button
                       onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
-                      aria-label={t.hideChildren ? '펼치기' : '접기'}
+                      aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         marginRight: 4, padding: 0, color: 'var(--text-secondary)',
                         flexShrink: 0, display: 'flex', alignItems: 'center',
                       }}
                     >
-                      {t.hideChildren
+                      {collapsedIds.has(t.id)
                         ? <ChevronRight className="h-3 w-3" aria-hidden="true" />
                         : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                     </button>
@@ -328,15 +330,15 @@ function makeTaskListTable(
                 }}>
                   {isGroupRow && (
                     <button
-                      onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
-                      aria-label={t.hideChildren ? '펼치기' : '접기'}
+                      onClick={e => { e.stopPropagation(); onExpand(t) }}
+                      aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
                         marginRight: 4, padding: 0, color: 'var(--text-secondary)',
                         flexShrink: 0, display: 'flex', alignItems: 'center',
                       }}
                     >
-                      {t.hideChildren
+                      {collapsedIds.has(t.id)
                         ? <ChevronRight className="h-3 w-3" aria-hidden="true" />
                         : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                     </button>
@@ -527,8 +529,9 @@ export function ChampionGanttView() {
   )
 
   const TaskListTable = useMemo(
-    () => makeTaskListTable(champMap, handleCharterClick, panelUserId, projectW, listWidth),
-    [champMap, handleCharterClick, panelUserId, projectW, listWidth],
+    () => makeTaskListTable(champMap, handleCharterClick, panelUserId, projectW, listWidth, collapsedIds, handleExpandChange),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [champMap, handleCharterClick, panelUserId, projectW, listWidth, collapsedIds],
   )
 
   function handleExpandChange(task: Task) {
