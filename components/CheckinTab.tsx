@@ -368,7 +368,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
 
       {/* 이슈 보고/도움 요청 modal */}
       <Dialog open={!!issueMilestone} onOpenChange={open => { if (!open) { setIssueMilestone(null); setIssueForm({ type: '', note: '' }) } }}>
-        <DialogContent>
+        <DialogContent style={{ background: 'rgba(229,23,47,0.06)', borderColor: 'rgba(229,23,47,0.2)' }}>
           <DialogHeader>
             <DialogTitle>이슈 보고/도움 요청</DialogTitle>
             {issueMilestone && (
