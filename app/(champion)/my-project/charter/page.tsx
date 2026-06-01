@@ -624,15 +624,13 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated, onAutoS
         </div>
         <div className="flex gap-2 flex-shrink-0">
           {mode === 'new' && (
-            <button
-              onClick={() => { void triggerAutoSaveRef.current() }}
-              disabled={autoSavingDisplay}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
-              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
-              title={lastAutoSavedAt ? `마지막 저장: ${lastAutoSavedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : '30초마다 자동저장'}
-            >
-              {autoSavingDisplay ? '저장 중...' : lastAutoSavedAt ? `자동저장됨 ${lastAutoSavedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : '자동저장'}
-            </button>
+            <span className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>
+              {autoSavingDisplay
+                ? <><Spinner size="sm" className="inline" /> 저장 중...</>
+                : lastAutoSavedAt
+                  ? `마지막 자동저장 ${lastAutoSavedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                  : null}
+            </span>
           )}
           <button
             onClick={handleExport}
