@@ -11,7 +11,7 @@ import { CheckinTab } from '@/components/CheckinTab'
 import type { BottleneckType } from '@/lib/types'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
-const inputStyle = { background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
+const inputStyle = { background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
 
 export default function WorkStatusPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
@@ -155,7 +155,7 @@ export default function WorkStatusPage() {
                       return next
                     })}
                     className="flex items-center gap-2 w-full px-3 py-2 rounded-lg mb-2"
-                    style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}
+                    style={{ background: 'transparent', border: '1px solid var(--border)' }}
                   >
                     {isCollapsed
                       ? <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
@@ -210,7 +210,7 @@ export default function WorkStatusPage() {
                   type="button"
                   onClick={() => { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) }}
                   className="flex-1 py-2 rounded-lg text-xs font-semibold"
-                  style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+                  style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                 >
                   취소
                 </button>
