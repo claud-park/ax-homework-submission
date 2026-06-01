@@ -829,7 +829,7 @@ export default function CharterPage() {
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</span>
             <PublishStatusFilter value={filter} onChange={setFilter} />
           </div>
-          {!submissions.some(s => s.publish_status === 'published') && (
+          {submissions.length === 0 && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => window.open('/charter-guide', 'charter-guide', 'width=780,height=720,resizable=yes,scrollbars=yes')}
