@@ -829,25 +829,27 @@ export default function CharterPage() {
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</span>
             <PublishStatusFilter value={filter} onChange={setFilter} />
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.open('/charter-guide', 'charter-guide', 'width=780,height=720,resizable=yes,scrollbars=yes')}
-              className="text-xs font-medium underline"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)' }}
-            >
-              과제정의서란?
-            </button>
-            <button
-              onClick={() => openSidePanel('new')}
-              className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-              style={{
-                background: sidePanel === 'new' ? 'rgba(37,99,235,0.15)' : 'var(--surface-secondary)',
-                color: sidePanel === 'new' ? 'var(--blue-600)' : 'var(--text-secondary)',
-              }}
-            >
-              + 과제정의서 추가
-            </button>
-          </div>
+          {!submissions.some(s => s.publish_status === 'published') && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.open('/charter-guide', 'charter-guide', 'width=780,height=720,resizable=yes,scrollbars=yes')}
+                className="text-xs font-medium underline"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)' }}
+              >
+                과제정의서란?
+              </button>
+              <button
+                onClick={() => openSidePanel('new')}
+                className="text-xs px-2.5 py-1 rounded-lg font-semibold"
+                style={{
+                  background: sidePanel === 'new' ? 'rgba(37,99,235,0.15)' : 'var(--surface-secondary)',
+                  color: sidePanel === 'new' ? 'var(--blue-600)' : 'var(--text-secondary)',
+                }}
+              >
+                + 과제정의서 추가
+              </button>
+            </div>
+          )}
         </div>
 
         {/* List body */}
