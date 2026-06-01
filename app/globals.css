@@ -165,3 +165,12 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
 ._KxSXS ~ ._3KcaM {
   display: none;
 }
+
+/* Tiptap Placeholder extension */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-disabled);
+  float: left;
+  pointer-events: none;
+  height: 0;
+}

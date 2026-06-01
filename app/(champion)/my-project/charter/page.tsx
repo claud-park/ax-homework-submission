@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
+import Placeholder from '@tiptap/extension-placeholder'
 import { apiFetch } from '@/lib/api-client'
 import type { ProjectCharter, CharterSubmission, Milestone } from '@/lib/types'
 import DateRangePicker from '@/components/DateRangePicker'
@@ -19,13 +20,13 @@ type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build'
 type CharterContent = ProjectCharter['content']
 type SidePanel = null | 'new' | CharterSubmission
 
-const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: string }[] = [
-  { key: 'summary', label: '00. 30-Second Summary', required: true, tooltip: '이 프로젝트의 의의 — 어떤 반향을 기대하는가' },
-  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가', required: true, tooltip: '회사·부서·개인 차원에서 이 문제가 왜 중요한지 (영향 범위 넓을수록 좋아요)' },
-  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가', tooltip: '누가 쓸 것인가? Persona, 시나리오, Use Case 중심으로' },
-  { key: 'goal', label: '03. Goal · Success Metric', tooltip: "목표 한 줄 요약 — 정성/정량 모두 OK ('업무 시간 단축'도 충분해요)" },
-  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가', tooltip: '핵심 기능과 지표 — 무엇을 만들고 무엇으로 측정할지' },
-  { key: 'build', label: '05. Build · 어떻게 만들 것인가', tooltip: '어떻게 만들 것인가 — 기술 스택, 구현 접근법' },
+const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: string; placeholder?: string; groupHeader?: string }[] = [
+  { key: 'summary', label: '00. 30-Second Summary', required: true, groupHeader: '프로젝트 정의', tooltip: '이 프로젝트의 의의 — 어떤 반향을 기대하는가', placeholder: '30초 안에 누구에게든 설명할 수 있는 한 문단. 왜 이 프로젝트가 존재하는가?' },
+  { key: 'problem', label: '01. Problem · 왜 이 문제를 푸는가', required: true, tooltip: '회사·부서·개인 차원에서 이 문제가 왜 중요한지 (영향 범위 넓을수록 좋아요)', placeholder: '지금 어떤 문제가 있고, 그 문제를 왜 지금 풀어야 하는가?' },
+  { key: 'user', label: '02. User · 누가 이걸 쓸 것인가', groupHeader: '대상과 목표', tooltip: '누가 쓸 것인가? Persona, 시나리오, Use Case 중심으로', placeholder: '이 솔루션을 쓰는 사람은 누구인가? 어떤 상황에서, 무엇을 하려고 쓰는가?' },
+  { key: 'goal', label: '03. Goal · Success Metric', tooltip: "목표 한 줄 요약 — 정성/정량 모두 OK ('업무 시간 단축'도 충분해요)", placeholder: '이 프로젝트가 성공했을 때 무엇이 달라지는가? 어떻게 측정할 것인가?' },
+  { key: 'solution', label: '04. Solution · 어떻게 풀 것인가', groupHeader: '해결 방법', tooltip: '핵심 기능과 지표 — 무엇을 만들고 무엇으로 측정할지', placeholder: '핵심 기능 3가지와 각 기능이 어떻게 문제를 해결하는지 설명해보세요.' },
+  { key: 'build', label: '05. Build · 어떻게 만들 것인가', tooltip: '어떻게 만들 것인가 — 기술 스택, 구현 접근법', placeholder: '기술 스택, 구현 방식, 예상 일정, 필요한 협업을 정리해주세요.' },
 ]
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
@@ -98,11 +99,15 @@ function InfoTooltip({ text }: { text: string }) {
   )
 }
 
-function SectionEditor({ label, required, tooltip, content, onBlur, onDirty }: {
-  label: string; required?: boolean; tooltip?: string; content: string; onBlur: (html: string) => void; onDirty?: () => void
+function SectionEditor({ label, required, tooltip, placeholder, content, onBlur, onDirty }: {
+  label: string; required?: boolean; tooltip?: string; placeholder?: string; content: string; onBlur: (html: string) => void; onDirty?: () => void
 }) {
   const editor = useEditor({
-    extensions: [StarterKit, Underline],
+    extensions: [
+      StarterKit,
+      Underline,
+      ...(placeholder ? [Placeholder.configure({ placeholder })] : []),
+    ],
     content,
     onBlur: ({ editor }) => onBlur(editor.getHTML()),
     onUpdate: () => onDirty?.(),
@@ -117,17 +122,33 @@ function SectionEditor({ label, required, tooltip, content, onBlur, onDirty }: {
   }, [editor, content])
 
   return (
-    <div className="rounded-xl border overflow-hidden focus-within:ring-2 focus-within:ring-blue-accent" style={{ borderColor: 'var(--border-subtle)' }}>
-      <div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+    <div
+      className="rounded-xl border overflow-hidden focus-within:ring-2 focus-within:ring-blue-accent"
+      style={{ borderColor: required ? 'rgba(217,119,6,0.4)' : 'var(--border-subtle)' }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-2 border-b"
+        style={{ background: required ? 'rgba(217,119,6,0.04)' : 'var(--surface-primary)', borderColor: required ? 'rgba(217,119,6,0.25)' : 'var(--border-subtle)' }}
+      >
         <div className="flex items-center gap-1.5">
+          {required && <span style={{ color: 'var(--amber)', fontSize: 13, lineHeight: 1 }}>*</span>}
           <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{label}</span>
           {tooltip && <InfoTooltip text={tooltip} />}
         </div>
-        {required && <span className="text-xs" style={{ color: 'var(--amber)' }}>필수</span>}
+        {required && <span className="text-xs font-medium" style={{ color: 'var(--amber)' }}>필수</span>}
       </div>
       <div style={{ background: 'var(--surface-secondary)' }}>
-        <EditorContent editor={editor} className="p-3 min-h-16 text-sm prose max-w-none [&_.ProseMirror]:outline-none" />
+        <EditorContent editor={editor} className="p-3 min-h-24 text-sm prose max-w-none [&_.ProseMirror]:outline-none" />
       </div>
+    </div>
+  )
+}
+
+function SectionGroupHeader({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-1">
+      <span className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--text-disabled)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
+      <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
     </div>
   )
 }
@@ -628,16 +649,20 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
             </p>
           )}
           {SECTIONS.map(s => (
-            <SectionEditor
-              key={`${submission?.id ?? mode}-${s.key}`}
-              label={s.label}
-              required={s.required}
-              tooltip={s.tooltip}
-              content={(submission?.content ?? {})[s.key] ?? ''}
-              onBlur={html => handleSectionBlur(s.key, html)}
-              onDirty={() => {}}
-            />
+            <Fragment key={`${submission?.id ?? mode}-${s.key}`}>
+              {s.groupHeader && <SectionGroupHeader label={s.groupHeader} />}
+              <SectionEditor
+                label={s.label}
+                required={s.required}
+                tooltip={s.tooltip}
+                placeholder={s.placeholder}
+                content={(submission?.content ?? {})[s.key] ?? ''}
+                onBlur={html => handleSectionBlur(s.key, html)}
+                onDirty={() => {}}
+              />
+            </Fragment>
           ))}
+          <SectionGroupHeader label="일정" />
           <TimelineSection
             milestones={milestones}
             onAdded={m => setMilestones(prev => [...prev, m])}
@@ -734,12 +759,12 @@ export default function CharterPage() {
         <div className="flex border-l flex-shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
           <button
             onClick={() => setFeedbackOpen(v => !v)}
-            className="flex items-center justify-center flex-shrink-0 transition-colors"
+            className="flex flex-col items-center justify-center gap-2 flex-shrink-0 transition-colors"
             style={{
-              width: 24,
+              width: 40,
               background: 'var(--surface-primary)',
               border: 'none',
-              borderRight: '1px solid var(--border-faint)',
+              borderRight: feedbackOpen ? '1px solid var(--border-faint)' : 'none',
               color: 'var(--text-tertiary)',
               cursor: 'pointer',
             }}
@@ -749,7 +774,15 @@ export default function CharterPage() {
           >
             {feedbackOpen
               ? <ChevronsRight className="h-3.5 w-3.5 flex-shrink-0" />
-              : <ChevronsLeft className="h-3.5 w-3.5 flex-shrink-0" />
+              : <>
+                  <ChevronsLeft className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span
+                    className="text-xs font-semibold flex-shrink-0"
+                    style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.06em', color: 'inherit', fontSize: 10 }}
+                  >
+                    피드백
+                  </span>
+                </>
             }
           </button>
           {feedbackOpen && (
