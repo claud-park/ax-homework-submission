@@ -696,10 +696,6 @@ export default function CharterPage() {
     setSidePanel(newSub)
   }
 
-  function handleAutoSaved(_: CharterSubmission) {
-    // auto-save acknowledged; sidePanel stays unchanged to avoid remount
-  }
-
   function handleUpdated(updated: CharterSubmission) {
     setSidePanel(updated)
   }
@@ -752,7 +748,7 @@ export default function CharterPage() {
           submission={sidePanel !== 'new' ? sidePanel : undefined}
           onCreated={handleCreated}
           onUpdated={handleUpdated}
-          onAutoSaved={handleAutoSaved}
+          onAutoSaved={() => {}}
         />
       </div>
       {sidePanel !== 'new' && sidePanel.publish_status === 'published' && (
