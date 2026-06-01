@@ -7,10 +7,11 @@ import type { MilestoneStatus } from '@/lib/types'
 export interface GanttMilestone {
   id: string
   title: string
-  start_date: string
-  due_date: string
+  start_date: string | null
+  due_date: string | null
   status: MilestoneStatus
-  week_number: number
+  week_number: number | null
+  parent_milestone_id: string | null
 }
 
 export interface GanttChampion {
@@ -39,18 +40,15 @@ export async function GET(req: NextRequest) {
       .select('user_id, id, project_name'),
     supabase
       .from('milestones')
-      .select('id, user_id, title, start_date, due_date, status, week_number')
+      .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id')
       .eq('publish_status', 'published')
-      .not('start_date', 'is', null)
-      .not('due_date', 'is', null)
-      .order('week_number')
+      .order('week_number', { nullsFirst: false })
       .order('display_order'),
   ])
 
   if (usersErr) return NextResponse.json({ error: usersErr.message }, { status: 500 })
   if (chartersErr) return NextResponse.json({ error: chartersErr.message }, { status: 500 })
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
-
   const charterMap = new Map<string, { id: string; project_name: string | null }>()
   for (const c of charters ?? []) charterMap.set(c.user_id, c)
 
@@ -64,6 +62,7 @@ export async function GET(req: NextRequest) {
       due_date: m.due_date,
       status: m.status as MilestoneStatus,
       week_number: m.week_number,
+      parent_milestone_id: m.parent_milestone_id ?? null,
     })
   }
 

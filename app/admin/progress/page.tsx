@@ -54,7 +54,7 @@ const todayMs = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.
 const todayStr = new Date(todayMs).toISOString().split('T')[0]
 
 function isOverdue(m: Milestone) {
-  return new Date(m.due_date).getTime() < todayMs && m.status !== 'completed'
+  return !!m.due_date && new Date(m.due_date).getTime() < todayMs && m.status !== 'completed'
 }
 
 function daysFromToday(dueDate: string): number {
@@ -83,13 +83,13 @@ function UserAvatar({ user, size = 28 }: { user: User; size?: number }) {
 
 function DueDateBadge({ m }: { m: Milestone }) {
   const overdue = isOverdue(m)
-  const days = daysFromToday(m.due_date)
+  const days = daysFromToday(m.due_date ?? '')
   const urgent = !overdue && m.status !== 'completed' && days <= 3
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '6px' }}>
       <p style={{ fontSize: '10px', margin: 0, color: overdue ? 'var(--error)' : 'var(--text-disabled)', fontWeight: overdue ? 700 : 400 }}>
-        마감 {m.due_date}
+        마감 {m.due_date ?? ''}
       </p>
       {m.status !== 'completed' && (
         <p style={{ fontSize: '11px', fontWeight: 700, margin: 0, color: overdue ? 'var(--error)' : urgent ? 'var(--amber)' : 'var(--text-disabled)' }}>

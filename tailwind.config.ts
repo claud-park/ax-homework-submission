@@ -14,23 +14,38 @@ const config: Config = {
   			'surface-secondary': 'var(--surface-secondary)',
   			'surface-tertiary': 'var(--surface-tertiary)',
   			'surface-minimal': 'var(--surface-minimal)',
+  			'surface-alt': 'var(--surface-alt)',
 
   			/* FLO text tokens */
   			'text-primary': 'var(--text-primary)',
   			'text-secondary': 'var(--text-secondary)',
   			'text-tertiary': 'var(--text-tertiary)',
   			'text-disabled': 'var(--text-disabled)',
+  			'text-inverse': 'var(--text-inverse)',
+
+  			/* FLO icon tokens */
+  			'icon-enabled': 'var(--icon-enabled)',
+  			'icon-subtle': 'var(--icon-subtle)',
+  			'icon-inactive': 'var(--icon-inactive)',
+  			'icon-disabled': 'var(--icon-disabled)',
 
   			/* FLO interactive tokens */
-  			'blue-accent': 'var(--blue-600)',
   			'flo-accent': 'var(--accent)',
+  			'static-accent': 'var(--static-accent)',
+  			'blue-accent': 'var(--blue-600)',
 
   			/* FLO border tokens */
+  			'border-flo': 'var(--border)',
   			'border-subtle': 'var(--border-subtle)',
-  			'border-faint': 'var(--border-faint)',
+  			'border-selected': 'var(--border-selected)',
+
+  			/* FLO component tokens */
+  			'button-neutral': 'var(--button-neutral)',
+  			'modal-bg': 'var(--modal-background)',
 
   			/* FLO status tokens */
   			error: 'var(--error)',
+  			info: 'var(--info)',
   			success: 'var(--success)',
   			amber: 'var(--amber)',
 

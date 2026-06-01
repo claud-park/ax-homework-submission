@@ -73,7 +73,7 @@ export default function SubmissionPage() {
       {/* 제출 섹션 */}
       <div
         className="rounded-xl border p-4 mb-6"
-        style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
+        style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
       >
         {latest && (
           <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
@@ -86,8 +86,8 @@ export default function SubmissionPage() {
           <label
             className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm cursor-pointer"
             style={{
-              borderColor: 'var(--border-subtle)',
-              background: 'var(--surface-secondary)',
+              borderColor: 'var(--border)',
+              background: 'var(--background)',
               color: 'var(--text-secondary)',
               opacity: uploading ? 0.6 : 1,
             }}
@@ -108,16 +108,16 @@ export default function SubmissionPage() {
 
         {/* 구분선 */}
         <div className="flex items-center gap-2 my-3">
-          <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
           <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>또는</span>
-          <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
         </div>
 
         {/* 링크 제출 */}
         <div className="flex items-center gap-3">
           <div
             className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg border"
-            style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}
+            style={{ borderColor: 'var(--border)', background: 'var(--background)' }}
           >
             <Link className="h-4 w-4 shrink-0" style={{ color: 'var(--text-disabled)' }} />
             <input
@@ -160,7 +160,7 @@ export default function SubmissionPage() {
             <div
               key={sub.id}
               className="flex items-center justify-between p-4 rounded-xl border"
-              style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
+              style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
             >
               <div className="flex items-center gap-3 min-w-0">
                 {sub.link_url

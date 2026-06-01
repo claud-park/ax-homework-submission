@@ -28,7 +28,7 @@ export async function GET(
       .limit(1),
     supabase
       .from('milestones')
-      .select('*, milestone_deliverables(*)')
+      .select('*')
       .eq('user_id', userId)
       .eq('publish_status', 'published')
       .order('week_number')
@@ -58,16 +58,10 @@ export async function GET(
     charterWithComments = { ...charter, comments: comments ?? [] }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalized = (milestones ?? []).map(({ milestone_deliverables, ...rest }: any) => ({
-    ...rest,
-    deliverables: milestone_deliverables,
-  }))
-
   const result: ChampionProject = {
     user: userRow,
     charter: charterWithComments,
-    milestones: normalized,
+    milestones: milestones ?? [],
     latestSubmission: submissions?.[0] ?? null,
   }
 

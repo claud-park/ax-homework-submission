@@ -69,8 +69,8 @@ export interface Milestone {
   week_number: number | null
   title: string
   description: string | null
-  start_date: string
-  due_date: string
+  start_date: string | null
+  due_date: string | null
   status: MilestoneStatus
   is_manual_progress: boolean
   is_manual_completed: boolean
@@ -78,20 +78,12 @@ export interface Milestone {
   bottleneck_note: string | null
   bottleneck_admin_comment: string | null
   bottleneck_reviewed_at: string | null
+  parent_milestone_id: string | null
   display_order: number
   created_at: string
   updated_at: string
   publish_status: PublishStatus
-  deliverables?: MilestoneDeliverable[]
-}
-
-export interface MilestoneDeliverable {
-  id: string
-  milestone_id: string
-  file_path: string | null
-  file_name: string | null
-  link_url: string | null
-  uploaded_at: string
+  children?: Milestone[]
 }
 
 export interface DeadlineChangeRequest {
@@ -159,6 +151,7 @@ export interface KanbanCard {
   hasCharter: boolean
   pendingDeadlineRequests: number
 }
+
 
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
 export type KanbanDataV2 = Record<KanbanColumn, KanbanCard[]>

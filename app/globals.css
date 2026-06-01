@@ -4,74 +4,97 @@
 
 /* ─────────────────────────────────────────────
    FLO Design System 1.0 — Custom Tokens
-   Source: Figma node 15785:10
+   Source: DESIGN.md (generated 2026-06-01)
    ──────────────────────────────────────────── */
 :root {
   /* Surface */
-  --surface-primary: #ffffff;        /* modal_background / white card */
-  --surface-secondary: #f1f5f9;     /* gray_150 — sidebar, alt panels */
-  --surface-tertiary: #e2e8f0;      /* gray_200 — dividers, inactive */
-  --surface-minimal: #f8fafc;       /* gray_100 — subtle bg tint */
+  --background:            #ffffff;
+  --surface-primary:       #f2f2f5;
+  --surface-secondary:     #f2f2f5;
+  --surface-tertiary:      #f2f2f5;
+  --surface-minimal:       #f7f7f9;
+  --surface-alt:           #f3f4fe;
 
   /* Text */
-  --text-primary: #1e293b;          /* gray_800 */
-  --text-secondary: #475569;        /* gray_600 */
-  --text-tertiary: #64748b;         /* gray_500 */
-  --text-disabled: #94a3b8;         /* gray_400 */
+  --text-primary:          #232325;
+  --text-secondary:        #565658;
+  --text-tertiary:         #8e8e93;
+  --text-disabled:         #bcbcc0;
+  --text-inverse:          #ffffff;
 
-  /* Interactive */
-  --accent: #1e40af;                /* blue_800 — CTA buttons (light mode) */
-  --blue-600: #2563eb;              /* static_accent — links, inline icons */
-  --app-accent: #2563eb;            /* alias: static_accent */
+  /* Icon */
+  --icon-enabled:          #232325;
+  --icon-subtle:           #8e8e93;
+  --icon-inactive:         #8e8e93;
+  --icon-disabled:         #bcbcc0;
 
   /* Border */
-  --border-subtle: #e2e8f0;         /* gray_200 */
-  --border-faint: #f1f5f9;          /* gray_150 */
+  --border:                #ebebee;
+  --border-subtle:         #f2f2f5;
+  --border-selected:       #232325;
+
+  /* Accent */
+  --accent:                #3f3fff;
+  --accent-pressed:        #5868ff;
+  --accent-disabled:       #e0e1e5;
+  --static-accent:         #5868ff;
+
+  /* Backward-compat alias — components referencing --blue-600 get the new accent */
+  --blue-600:              var(--accent);
 
   /* Status */
-  --error: #b91c1c;                 /* red_700 */
-  --success: #16a34a;
-  --amber: #d97706;
+  --error:                 #e5172f;
+  --info:                  #028af4;
+  --success:               #16a34a;
+  --amber:                 #d97706;
 
-  /* Shadows (from FLO shadow tokens) */
-  --shadow-s: 0px 1px 4px 0px rgba(0, 0, 0, 0.08), 0px 1px 2px -1px rgba(0, 0, 0, 0.10);
-  --shadow-m: 0px 2px 8px 0px rgba(0, 0, 0, 0.12);
-  --shadow-l: 0px 4px 16px 0px rgba(0, 0, 0, 0.12);
-  --shadow-xl: 0px 8px 24px 0px rgba(0, 0, 0, 0.16);
+  /* Component */
+  --modal-background:      #ffffff;
+  --toast-background:      #2c2c2e;
+  --button-neutral:        #f2f2f5;
+  --button-neutral-pressed:#e0e1e5;
+  --loading-primary:       #d8d8dc;
+  --loading-secondary:     #f2f2f5;
+
+  /* Shadows */
+  --shadow-s:  0 1px 4px 0 rgba(0,0,0,.08), 0 1px 2px -1px rgba(0,0,0,.10);
+  --shadow-m:  0 2px 8px 0 rgba(0,0,0,.12);
+  --shadow-l:  0 4px 16px 0 rgba(0,0,0,.12);
+  --shadow-xl: 0 8px 24px 0 rgba(0,0,0,.16);
 }
 
 * { box-sizing: border-box; }
-html, body { background: hsl(var(--background)); color: var(--text-primary); font-family: Pretendard, 'Apple SD Gothic Neo', system-ui, sans-serif; }
+html, body { background: var(--background); color: var(--text-primary); font-family: Pretendard, 'Apple SD Gothic Neo', system-ui, sans-serif; }
 
 :focus-visible {
-  outline: 2px solid var(--blue-600);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 @layer base {
   :root {
-    /* shadcn/ui hsl tokens — aligned with FLO accent (blue_800 = hsl(221 71% 40%)) */
-    --background: 210 20% 98%;       /* gray_100 ≈ #f8fafc */
-    --foreground: 215 25% 17%;       /* gray_800 ≈ #1e293b */
+    /* shadcn/ui hsl tokens — aligned with FLO Design System 1.0 */
+    --background: 0 0% 100%;           /* #ffffff */
+    --foreground: 240 3% 14%;          /* #232325 */
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 17%;
+    --card-foreground: 240 3% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 17%;
-    --primary: 221 71% 40%;          /* blue_800 = #1e40af (FLO accent light) */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 215 25% 17%;
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 20% 96%;
-    --accent-foreground: 215 25% 17%;
-    --destructive: 0 72% 37%;        /* red_700 = #b91c1c */
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 88%;           /* gray_200 ≈ #e2e8f0 */
-    --input: 214 32% 88%;
-    --ring: 221 71% 40%;             /* blue_800 */
-    --chart-1: 221 71% 40%;
+    --popover-foreground: 240 3% 14%;
+    --primary: 240 100% 62%;           /* #3f3fff */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;           /* #f2f2f5 */
+    --secondary-foreground: 240 3% 14%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 3% 54%;    /* #8e8e93 */
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 3% 14%;
+    --destructive: 353 88% 49%;        /* #e5172f */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 93%;              /* #ebebee */
+    --input: 240 6% 93%;
+    --ring: 240 100% 62%;              /* #3f3fff */
+    --chart-1: 240 100% 62%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
@@ -80,49 +103,64 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
   }
 
   .dark {
+    color-scheme: dark;
     /* shadcn dark tokens */
-    --background: 0 0% 0%;           /* black */
-    --foreground: 0 0% 100%;         /* white */
-    --card: 215 35% 18%;             /* gray_800 */
+    --background: 0 0% 0%;             /* #000000 */
+    --foreground: 0 0% 100%;
+    --card: 240 4% 11%;                /* #1c1c1e */
     --card-foreground: 0 0% 100%;
-    --popover: 215 35% 18%;
+    --popover: 240 4% 11%;
     --popover-foreground: 0 0% 100%;
-    --primary: 221 83% 53%;          /* blue_600 = #2563eb (FLO accent dark) */
+    --primary: 233 100% 67%;           /* #5868ff */
     --primary-foreground: 0 0% 100%;
-    --secondary: 215 30% 12%;
+    --secondary: 240 4% 13%;          /* #232325 */
     --secondary-foreground: 0 0% 100%;
-    --muted: 215 30% 12%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 215 30% 12%;
+    --muted: 240 4% 13%;
+    --muted-foreground: 240 2% 55%;    /* #8e8e93 */
+    --accent: 240 4% 13%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;        /* red_600 = #dc2626 */
+    --destructive: 351 100% 60%;       /* #ff334b */
     --destructive-foreground: 0 0% 100%;
-    --border: 215 23% 30%;           /* gray_700 ≈ #334155 */
-    --input: 215 23% 30%;
-    --ring: 221 83% 53%;
-    --chart-1: 221 83% 53%;
+    --border: 240 3% 28%;              /* #48484a */
+    --input: 240 3% 28%;
+    --ring: 233 100% 67%;              /* #5868ff */
+    --chart-1: 233 100% 67%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    /* FLO dark mode custom tokens */
-    --surface-primary: #1e293b;       /* gray_800 — panels */
-    --surface-secondary: #131c2b;     /* gray_850 — deeper bg */
-    --surface-tertiary: #273347;      /* gray_750 */
-    --surface-minimal: #0f172a;       /* gray_900 — deepest */
-    --text-primary: #ffffff;
-    --text-secondary: #94a3b8;        /* gray_400 */
-    --text-tertiary: #64748b;         /* gray_500 */
-    --text-disabled: #475569;         /* gray_600 */
-    --accent: #2563eb;                /* blue_600 — CTA in dark */
-    --blue-600: #2563eb;
-    --app-accent: #2563eb;
-    --border-subtle: #334155;         /* gray_700 */
-    --border-faint: #1e293b;          /* gray_800 */
-    --error: #dc2626;                 /* red_600 */
-    --success: #4ade80;
-    --amber: #fbbf24;
+    /* FLO dark tokens */
+    --background:            #000000;
+    --surface-primary:       #1c1c1e;
+    --surface-secondary:     #232325;
+    --surface-tertiary:      #2c2c2e;
+    --surface-minimal:       #181818;
+    --surface-alt:           #2c2c2e;
+    --text-primary:          #ffffff;
+    --text-secondary:        #bcbcc0;
+    --text-tertiary:         #8e8e93;
+    --text-disabled:         #565658;
+    --text-inverse:          #000000;
+    --icon-enabled:          #ffffff;
+    --icon-subtle:           #8e8e93;
+    --icon-inactive:         #8e8e93;
+    --icon-disabled:         #565658;
+    --border:                #48484a;
+    --border-subtle:         #232325;
+    --border-selected:       #ffffff;
+    --accent:                #5868ff;
+    --accent-pressed:        #4356fe;
+    --accent-disabled:       #2c2c2e;
+    --static-accent:         #5868ff;
+    --blue-600:              var(--accent);
+    --error:                 #ff334b;
+    --info:                  #2b9df4;
+    --modal-background:      #232325;
+    --button-neutral:        #3a3a3c;
+    --button-neutral-pressed:#565658;
+    --loading-primary:       #1c1c1e;
+    --loading-secondary:     #6c6c70;
   }
 }
 
@@ -140,19 +178,42 @@ html, body { background: hsl(var(--background)); color: var(--text-primary); fon
   display: none;
 }
 
-/* Gantt project bar: accent blue outlined */
-._2RbVy {
-  stroke: #2563eb;
-  stroke-width: 1.5;
+/* Champion umbrella bar: single 8px line — scale background rect only */
+._1KJ6x ._2RbVy {
+  opacity: 1;
+  transform: scaleY(0.222);
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
 }
 
-/* Gantt project bar label: dark text (light blue fill needs dark text) */
-._1KJ6x ~ ._3zRJQ {
-  fill: #1e293b;
+/* Hide decorative top-half rect and left/right triangles on champion bar */
+._1KJ6x ._2pZMF {
+  display: none;
+}
+
+/* Hide label inside champion bar (8px too thin for text) */
+._1KJ6x ~ ._3zRJQ,
+._1KJ6x ~ ._3KcaM {
+  display: none;
 }
 
 /* Gantt task bar label: hide name on bar */
 ._KxSXS ~ ._3zRJQ,
 ._KxSXS ~ ._3KcaM {
   display: none;
+}
+
+/* gantt-task-react: white background (override default #f5f5f5 alternating rows) */
+._34SS0:nth-of-type(even) { background-color: #ffffff; }
+._2dZTy { fill: #ffffff; }
+._2dZTy:nth-child(even) { fill: #ffffff; }
+._3_ygE, ._3ZbQT { border-color: var(--border); }
+
+/* Tiptap Placeholder extension */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-disabled);
+  float: left;
+  pointer-events: none;
+  height: 0;
 }

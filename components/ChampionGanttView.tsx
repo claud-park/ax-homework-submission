@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Gantt, ViewMode } from 'gantt-task-react'
 import type { Task } from 'gantt-task-react'
 import 'gantt-task-react/dist/index.css'
@@ -8,9 +8,11 @@ import { apiFetch } from '@/lib/api-client'
 import type { GanttChampion } from '@/app/api/champions/gantt/route'
 import type { ChampionProject, MilestoneStatus } from '@/lib/types'
 
-// Column widths for the custom task list (px)
-const W = { name: 130, dept: 72, project: 130, charter: 56 }
-const LIST_WIDTH = W.name + W.dept + W.project + W.charter
+// Fixed column widths for the custom task list (px); project column is resizable via state
+const W = { name: 130, dept: 72, charter: 56 }
+const PROJECT_W_DEFAULT = 130
+const PROJECT_W_MIN = 60
+const PROJECT_W_MAX = 400
 
 const STATUS_PROGRESS: Record<MilestoneStatus, number> = {
   not_started: 0, in_progress: 50, delayed: 25, completed: 100,
@@ -18,6 +20,20 @@ const STATUS_PROGRESS: Record<MilestoneStatus, number> = {
 const STATUS_COLOR: Record<MilestoneStatus, string> = {
   not_started: '#94a3b8', in_progress: '#3b82f6', delayed: '#ef4444', completed: '#22c55e',
 }
+const STATUS_BG: Record<MilestoneStatus, string> = {
+  not_started: 'rgba(148,163,184,0.2)',
+  in_progress: 'rgba(59,130,246,0.18)',
+  delayed: 'rgba(239,68,68,0.18)',
+  completed: 'rgba(34,197,94,0.18)',
+}
+const STATUS_BG_SELECTED: Record<MilestoneStatus, string> = {
+  not_started: 'rgba(148,163,184,0.35)',
+  in_progress: 'rgba(59,130,246,0.32)',
+  delayed: 'rgba(239,68,68,0.32)',
+  completed: 'rgba(34,197,94,0.32)',
+}
+const FUTURE_BG = 'rgba(203,213,225,0.2)'
+const FUTURE_BG_SELECTED = 'rgba(203,213,225,0.35)'
 const STATUS_LABEL: Record<MilestoneStatus, string> = {
   not_started: '미시작', in_progress: '진행 중', delayed: '지연', completed: '완료',
 }
@@ -49,86 +65,172 @@ function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: stri
   )
 }
 
+// Row hierarchy:
+//   champion row  : id='champ-{userId}',  type='project', no project
+//   group row     : id='group-{msId}',    type='project', project='champ-{userId}'
+//   task row      : id=msId,              type='task',    project='champ-{userId}' or 'group-{msId}'
 function toTasks(champions: GanttChampion[]): Task[] {
+  const now = new Date()
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
   const tasks: Task[] = []
+
   for (const c of champions) {
+    if (c.milestones.length === 0) continue
+
+    const depth0 = c.milestones.filter(m => !m.parent_milestone_id)
+    const depth1 = c.milestones.filter(m => !!m.parent_milestone_id)
+
+    // Compute champion row date range from all milestones that have dates
+    const allDated = c.milestones.filter(m => m.start_date && m.due_date)
+    if (allDated.length === 0) continue
+
+    const champStart = allDated.reduce(
+      (min, m) => (m.start_date! < min ? m.start_date! : min), allDated[0].start_date!
+    )
+    const champEnd = allDated.reduce(
+      (max, m) => (m.due_date! > max ? m.due_date! : max), allDated[0].due_date!
+    )
+
+    const champId = `champ-${c.userId}`
+
+    // Champion umbrella row — shows name/dept/과제명/charter in task list
     tasks.push({
-      id: c.userId,
+      id: champId,
       type: 'project',
-      name: c.projectName || c.name,
-      start: new Date(c.milestones[0].start_date),
-      end: new Date(c.milestones[c.milestones.length - 1].due_date),
+      name: c.name,
+      start: new Date(champStart),
+      end: new Date(champEnd),
       progress: 0,
       hideChildren: false,
+      displayOrder: tasks.length + 1,
       styles: {
-        backgroundColor: '#dbeafe',
-        backgroundSelectedColor: '#bfdbfe',
-        progressColor: '#dbeafe',
-        progressSelectedColor: '#bfdbfe',
+        backgroundColor: 'rgba(63,63,255,0.25)',
+        backgroundSelectedColor: 'rgba(63,63,255,0.4)',
+        progressColor: '#3f3fff',
+        progressSelectedColor: '#5868ff',
       },
     })
-    for (const m of c.milestones) {
-      const start = new Date(m.start_date)
-      const end = new Date(m.due_date)
-      if (end <= start) end.setDate(start.getDate() + 1)
-      tasks.push({
-        id: m.id,
-        type: 'task',
-        name: m.title,
-        start,
-        end,
-        progress: STATUS_PROGRESS[m.status],
-        project: c.userId,
-        styles: {
-          backgroundColor: STATUS_COLOR[m.status],
-          backgroundSelectedColor: STATUS_COLOR[m.status],
-          progressColor: STATUS_COLOR[m.status],
-          progressSelectedColor: STATUS_COLOR[m.status],
-        },
-      })
+
+    for (const g of depth0) {
+      const children = depth1.filter(m => m.parent_milestone_id === g.id)
+      const hasChildren = children.length > 0
+
+      // Resolve group date range (fallback to children when depth-0 has no dates)
+      const gStart = g.start_date ?? children.find(m => m.start_date)?.start_date ?? null
+      const gEnd = g.due_date ?? [...children].reverse().find(m => m.due_date)?.due_date ?? null
+      if (!gStart || !gEnd) continue
+
+      const start0 = new Date(gStart)
+      let end0 = new Date(gEnd)
+      if (end0 <= start0) end0 = new Date(start0.getTime() + 86400000)
+
+      const isFuture0 = gStart > todayStr
+
+      if (hasChildren) {
+        // depth-0 with children → full-height task bar (collapse handled manually)
+        tasks.push({
+          id: `group-${g.id}`,
+          name: g.title,
+          type: 'task',
+          project: champId,
+          start: start0,
+          end: end0,
+          progress: STATUS_PROGRESS[g.status],
+          styles: {
+            backgroundColor: isFuture0 ? FUTURE_BG : STATUS_BG[g.status],
+            backgroundSelectedColor: isFuture0 ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[g.status],
+            progressColor: isFuture0 ? '#cbd5e1' : STATUS_COLOR[g.status],
+            progressSelectedColor: isFuture0 ? '#94a3b8' : STATUS_COLOR[g.status],
+          },
+          displayOrder: tasks.length + 1,
+        })
+
+        for (const m of children) {
+          if (!m.start_date || !m.due_date) continue
+          const isFuture = m.start_date > todayStr
+          const start = new Date(m.start_date)
+          let end = new Date(m.due_date)
+          if (end <= start) end = new Date(start.getTime() + 86400000)
+          tasks.push({
+            id: m.id,
+            name: m.title,
+            type: 'task',
+            project: `group-${g.id}`,
+            start,
+            end,
+            progress: STATUS_PROGRESS[m.status],
+            styles: {
+              backgroundColor: isFuture ? FUTURE_BG : STATUS_BG[m.status],
+              backgroundSelectedColor: isFuture ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[m.status],
+              progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
+              progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
+            },
+            displayOrder: tasks.length + 1,
+          })
+        }
+      } else {
+        // depth-0 with no children → task row directly under champion
+        tasks.push({
+          id: g.id,
+          name: g.title,
+          type: 'task',
+          project: champId,
+          start: start0,
+          end: end0,
+          progress: STATUS_PROGRESS[g.status],
+          styles: {
+            backgroundColor: isFuture0 ? FUTURE_BG : STATUS_BG[g.status],
+            backgroundSelectedColor: isFuture0 ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[g.status],
+            progressColor: isFuture0 ? '#cbd5e1' : STATUS_COLOR[g.status],
+            progressSelectedColor: isFuture0 ? '#94a3b8' : STATUS_COLOR[g.status],
+          },
+          displayOrder: tasks.length + 1,
+        })
+      }
     }
   }
+
   return tasks
 }
 
 function cell(width: number, extra?: React.CSSProperties): React.CSSProperties {
   return {
-    width,
-    minWidth: width,
-    maxWidth: width,
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 6px',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-    borderRight: '1px solid var(--border-subtle)',
+    width, minWidth: width, maxWidth: width,
+    display: 'flex', alignItems: 'center',
+    padding: '0 6px', overflow: 'hidden', whiteSpace: 'nowrap',
+    borderRight: '1px solid var(--border)',
     ...extra,
   }
 }
 
-// TaskListHeader does not depend on panelUserId — separate memo keeps it stable
-function makeTaskListHeader(champMap: Map<string, GanttChampion>) {
-  void champMap // ensure dependency is declared for clarity
+function makeTaskListHeader(projectW: number, listWidth: number, onResizeStart: (e: React.MouseEvent) => void) {
   function TaskListHeader({ headerHeight, fontFamily, fontSize }: {
     headerHeight: number; rowWidth: string; fontFamily: string; fontSize: string
   }) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          height: headerHeight,
-          width: LIST_WIDTH,
-          fontFamily,
-          fontSize,
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          borderBottom: '2px solid var(--border-subtle)',
-          background: 'var(--surface-primary)',
-        }}
-      >
+      <div style={{
+        display: 'flex', height: headerHeight, width: listWidth,
+        fontFamily, fontSize, fontWeight: 600, color: 'var(--text-secondary)',
+        borderBottom: '1px solid var(--border)', background: 'var(--background)',
+      }}>
         <div style={cell(W.name)}>이름</div>
         <div style={cell(W.dept)}>부서</div>
-        <div style={cell(W.project)}>과제명</div>
+        <div style={{ ...cell(projectW), position: 'relative' }}>
+          과제명
+          {/* drag handle — right edge of project column */}
+          <div
+            onMouseDown={onResizeStart}
+            style={{
+              position: 'absolute', right: 0, top: 0, bottom: 0, width: 4,
+              cursor: 'col-resize', zIndex: 1,
+              background: 'transparent',
+              transition: 'background 0.1s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--accent)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+          />
+        </div>
         <div style={{ ...cell(W.charter), borderRight: 'none' }}>정의서</div>
       </div>
     )
@@ -136,23 +238,29 @@ function makeTaskListHeader(champMap: Map<string, GanttChampion>) {
   return TaskListHeader
 }
 
-// TaskListTable depends on panelUserId (for active highlight) and onCharterClick
 function makeTaskListTable(
   champMap: Map<string, GanttChampion>,
   onCharterClick: (userId: string) => void,
   panelUserId: string | null,
+  projectW: number,
+  listWidth: number,
+  collapsedIds: Set<string>,
+  onExpand: (t: Task) => void,
 ) {
   function TaskListTable({ tasks, rowHeight, onExpanderClick, selectedTaskId, setSelectedTask, fontFamily, fontSize }: {
     rowHeight: number; rowWidth: string; fontFamily: string; fontSize: string; locale: string
     tasks: Task[]; selectedTaskId: string; setSelectedTask: (id: string) => void; onExpanderClick: (t: Task) => void
   }) {
     return (
-      <div style={{ fontFamily, fontSize, width: LIST_WIDTH }}>
+      <div style={{ fontFamily, fontSize, width: listWidth }}>
         {tasks.map(t => {
-          const isProject = t.type === 'project'
-          const champ = champMap.get(t.project ?? t.id)
+          const isChampRow = t.id.startsWith('champ-')
+          const isGroupRow = t.id.startsWith('group-')
           const isSelected = t.id === selectedTaskId
-          const isPanelOpen = isProject && t.id === panelUserId
+
+          const userId = isChampRow ? t.id.slice(6) : null
+          const champ = userId ? champMap.get(userId) : null
+          const isPanelOpen = isChampRow && userId === panelUserId
 
           return (
             <div
@@ -162,28 +270,26 @@ function makeTaskListTable(
               onClick={() => setSelectedTask(t.id)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTask(t.id) } }}
               style={{
-                display: 'flex',
-                height: rowHeight,
-                alignItems: 'center',
-                background: isSelected ? 'rgba(37,99,235,0.06)' : 'var(--surface-primary)',
-                borderBottom: '1px solid var(--surface-secondary)',
+                display: 'flex', height: rowHeight, alignItems: 'center',
+                background: isSelected ? 'rgba(37,99,235,0.06)' : 'var(--background)',
+                borderBottom: '1px solid var(--border-subtle)',
                 cursor: 'pointer',
               }}
             >
-              {isProject ? (
-                // Champion row: all 4 columns
+              {isChampRow ? (
+                // Champion row: 4 full columns
                 <>
                   <div style={cell(W.name)}>
                     <button
                       onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
-                      aria-label={t.hideChildren ? '펼치기' : '접기'}
+                      aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
-                        marginRight: 4, padding: 0, color: 'var(--text-secondary)', flexShrink: 0,
-                        display: 'flex', alignItems: 'center',
+                        marginRight: 4, padding: 0, color: 'var(--text-secondary)',
+                        flexShrink: 0, display: 'flex', alignItems: 'center',
                       }}
                     >
-                      {t.hideChildren
+                      {collapsedIds.has(t.id)
                         ? <ChevronRight className="h-3 w-3" aria-hidden="true" />
                         : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                     </button>
@@ -194,13 +300,13 @@ function makeTaskListTable(
                   <div style={cell(W.dept, { color: 'var(--text-secondary)', fontSize: 11 })}>
                     {champ?.department || '—'}
                   </div>
-                  <div style={cell(W.project, { color: 'var(--text-secondary)' })}>
+                  <div style={cell(projectW, { color: 'var(--text-secondary)' })}>
                     {champ?.projectName || '—'}
                   </div>
                   <div style={{ ...cell(W.charter), borderRight: 'none', justifyContent: 'center' }}>
                     {champ?.charterSubmissionId ? (
                       <button
-                        onClick={e => { e.stopPropagation(); onCharterClick(t.id) }}
+                        onClick={e => { e.stopPropagation(); if (userId) onCharterClick(userId) }}
                         aria-pressed={isPanelOpen}
                         style={{
                           fontSize: 10, padding: '2px 6px', borderRadius: 4,
@@ -216,15 +322,27 @@ function makeTaskListTable(
                   </div>
                 </>
               ) : (
-                // Milestone row: single full-width name cell (no column dividers)
+                // Milestone row (group or task): single-width name cell with indent
                 <div style={{
-                  width: LIST_WIDTH,
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 6px 0 23px',
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
+                  width: listWidth, display: 'flex', alignItems: 'center',
+                  padding: `0 6px 0 ${isGroupRow ? 16 : t.project?.startsWith('group-') ? 36 : 28}px`,
+                  overflow: 'hidden', whiteSpace: 'nowrap',
                 }}>
+                  {isGroupRow && (
+                    <button
+                      onClick={e => { e.stopPropagation(); onExpand(t) }}
+                      aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        marginRight: 4, padding: 0, color: 'var(--text-secondary)',
+                        flexShrink: 0, display: 'flex', alignItems: 'center',
+                      }}
+                    >
+                      {collapsedIds.has(t.id)
+                        ? <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                        : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
+                    </button>
+                  )}
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-secondary)' }}>
                     {t.name}
                   </span>
@@ -262,20 +380,14 @@ function CharterDetailPanel({ userId, champMap, onClose }: {
 
   return (
     <div style={{
-      width: 320,
-      flexShrink: 0,
-      borderLeft: '1px solid var(--border-subtle)',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--surface-primary)',
+      width: 320, flexShrink: 0,
+      borderLeft: '1px solid var(--border)',
+      display: 'flex', flexDirection: 'column',
+      background: 'var(--background)',
     }}>
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '8px 12px',
-        borderBottom: '1px solid var(--border-subtle)',
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0,
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -333,6 +445,27 @@ export function ChampionGanttView() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [panelUserId, setPanelUserId] = useState<string | null>(null)
+  const [projectW, setProjectW] = useState(PROJECT_W_DEFAULT)
+  const resizeDragRef = useRef<{ startX: number; startW: number } | null>(null)
+
+  const listWidth = W.name + W.dept + projectW + W.charter
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    resizeDragRef.current = { startX: e.clientX, startW: projectW }
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeDragRef.current) return
+      const delta = ev.clientX - resizeDragRef.current.startX
+      setProjectW(Math.max(PROJECT_W_MIN, Math.min(PROJECT_W_MAX, resizeDragRef.current.startW + delta)))
+    }
+    const onUp = () => {
+      resizeDragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [projectW])
 
   useEffect(() => {
     apiFetch<GanttChampion[]>('/api/champions/gantt')
@@ -344,6 +477,7 @@ export function ChampionGanttView() {
       .finally(() => setLoading(false))
   }, [])
 
+  // userId → champion (for charter panel and task list table)
   const champMap = useMemo(() => {
     const m = new Map<string, GanttChampion>()
     for (const c of champions) m.set(c.userId, c)
@@ -355,22 +489,49 @@ export function ChampionGanttView() {
     [champions, selectedChampions],
   )
 
+  const rawTasks = useMemo(() => toTasks(filteredChampions), [filteredChampions])
+
   const tasks = useMemo(() => {
-    const raw = toTasks(filteredChampions)
-    return raw.map(t =>
-      t.type === 'project' ? { ...t, hideChildren: collapsedIds.has(t.id) } : t
-    )
-  }, [filteredChampions, collapsedIds])
+    const collapsedChamps = new Set<string>()
+    const collapsedGroups = new Set<string>()
+    for (const id of collapsedIds) {
+      if (id.startsWith('champ-')) collapsedChamps.add(id)
+      else if (id.startsWith('group-')) collapsedGroups.add(id)
+    }
+
+    // Build a lookup: groupId → champId for grandchild filtering
+    const groupParent = new Map<string, string>()
+    for (const t of rawTasks) {
+      if (t.id.startsWith('group-') && t.project) groupParent.set(t.id, t.project)
+    }
+
+    return rawTasks
+      .map(t => t.type === 'project' ? { ...t, hideChildren: false } : t)
+      .filter(t => {
+        if (!t.project) return true
+        if (t.id.startsWith('group-')) return !collapsedChamps.has(t.project)
+        if (t.project.startsWith('group-')) {
+          if (collapsedGroups.has(t.project)) return false
+          const champId = groupParent.get(t.project)
+          return !champId || !collapsedChamps.has(champId)
+        }
+        return !collapsedChamps.has(t.project)
+      })
+  }, [rawTasks, collapsedIds])
 
   const handleCharterClick = useCallback((userId: string) => {
     setPanelUserId(prev => prev === userId ? null : userId)
   }, [])
 
-  // Split into two memos: header is stable (no panelUserId dep), table remounts only on panel change
-  const TaskListHeader = useMemo(() => makeTaskListHeader(champMap), [champMap])
+  const TaskListHeader = useMemo(
+    () => makeTaskListHeader(projectW, listWidth, handleResizeStart),
+    [projectW, listWidth, handleResizeStart],
+  )
+
   const TaskListTable = useMemo(
-    () => makeTaskListTable(champMap, handleCharterClick, panelUserId),
-    [champMap, handleCharterClick, panelUserId]
+    () => makeTaskListTable(champMap, handleCharterClick, panelUserId, projectW, listWidth, collapsedIds, handleExpandChange),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [champMap, handleCharterClick, panelUserId, projectW, listWidth, collapsedIds],
   )
 
   function handleExpandChange(task: Task) {
@@ -418,8 +579,7 @@ export function ChampionGanttView() {
           className="chip-scroll"
           style={{
             display: 'flex', gap: '6px', flexWrap: 'nowrap',
-            overflowX: 'auto', marginBottom: '12px',
-            paddingBottom: '4px',
+            overflowX: 'auto', marginBottom: '12px', paddingBottom: '4px',
             scrollbarWidth: 'none',
           }}
         >
@@ -455,12 +615,12 @@ export function ChampionGanttView() {
           })}
         </div>
 
-        {tasks.length === 0 ? (
+        {tasks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>선택된 챔피언이 없습니다</p>
             <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>위에서 챔피언을 선택하면 간트 차트가 표시됩니다</p>
           </div>
-        ) : null}
+        )}
 
         <div className="flex gap-1 mb-3" style={{ display: tasks.length === 0 ? 'none' : 'flex' }}>
           {([ViewMode.Day, ViewMode.Week, ViewMode.Month] as const).map(m => (
@@ -487,7 +647,7 @@ export function ChampionGanttView() {
                 tasks={tasks}
                 viewMode={viewMode}
                 onExpanderClick={handleExpandChange}
-                listCellWidth={`${LIST_WIDTH}px`}
+                listCellWidth={`${listWidth}px`}
                 columnWidth={viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200}
                 rowHeight={36}
                 barCornerRadius={4}

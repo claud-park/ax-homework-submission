@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { Users, FolderOpen, LogOut, Menu, X, CheckSquare } from 'lucide-react'
+import { Users, FileText, LayoutList, Upload, LogOut, Menu, X } from 'lucide-react'
 import { parseName } from '@/lib/utils'
 
 const NAV = [
-  { icon: Users, label: '전체 현황', href: '/' },
-  { icon: FolderOpen, label: '내 프로젝트', href: '/my-project' },
-  { icon: CheckSquare, label: '주간 체크인', href: '/checkin' },
+  { icon: Users,      label: '전체 현황',      href: '/',                      match: (p: string) => p === '/' || p.startsWith('/champions') },
+  { icon: FileText,   label: '내 과제정의서',   href: '/my-project/charter',    match: (p: string) => p.startsWith('/my-project/charter') },
+  { icon: LayoutList, label: '내 업무 현황',    href: '/my-project/milestones', match: (p: string) => p.startsWith('/my-project/milestones') },
+  { icon: Upload,     label: '최종 과제 제출',  href: '/my-project/submission', match: (p: string) => p.startsWith('/my-project/submission') },
 ]
 
 export default function ChampionLayout({ children }: { children: React.ReactNode }) {
@@ -50,9 +51,8 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
           drawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
         style={{
-          background: 'var(--surface-primary)',
-          borderColor: 'var(--border-subtle)',
-          boxShadow: 'var(--shadow-s)',
+          background: 'var(--background)',
+          borderColor: 'var(--border)',
         }}
       >
         {/* Brand header */}
@@ -73,9 +73,7 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
         {/* Nav */}
         <nav className="flex flex-col gap-0.5">
           {NAV.map(item => {
-            const active = item.href === '/'
-              ? pathname === '/' || pathname.startsWith('/champions')
-              : pathname.startsWith(item.href)
+            const active = item.match(pathname)
             return (
               <a
                 key={item.href}
@@ -126,9 +124,8 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
           className="flex items-center px-6 flex-shrink-0 border-b"
           style={{
             height: 52,
-            background: 'var(--surface-primary)',
-            borderColor: 'var(--border-subtle)',
-            boxShadow: 'var(--shadow-s)',
+            background: 'var(--background)',
+            borderColor: 'var(--border)',
           }}
         >
           <div className="flex items-center gap-3 md:hidden">
