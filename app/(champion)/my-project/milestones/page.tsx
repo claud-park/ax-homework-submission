@@ -203,7 +203,7 @@ export default function WorkStatusPage() {
         open={!!deadlineModal}
         onOpenChange={open => { if (!open) { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) } }}
       >
-        <DialogContent>
+        <DialogContent style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
           <DialogHeader>
             <DialogTitle>기한 변경</DialogTitle>
             {deadlineModal && (

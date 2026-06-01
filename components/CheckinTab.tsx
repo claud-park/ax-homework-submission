@@ -272,7 +272,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
 
   async function handleIssueSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!issueMilestone || !issueForm.type) return
+    if (!issueMilestone || !issueForm.type || !issueForm.note.trim()) return
     setSubmitting(true)
     try {
       await onIssueReport(issueMilestone.id, issueForm.type as BottleneckType, issueForm.note || null)
@@ -368,7 +368,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
 
       {/* 이슈 보고/도움 요청 modal */}
       <Dialog open={!!issueMilestone} onOpenChange={open => { if (!open) { setIssueMilestone(null); setIssueForm({ type: '', note: '' }) } }}>
-        <DialogContent style={{ background: 'rgba(229,23,47,0.06)', borderColor: 'rgba(229,23,47,0.2)' }}>
+        <DialogContent style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
           <DialogHeader>
             <DialogTitle>이슈 보고/도움 요청</DialogTitle>
             {issueMilestone && (
@@ -393,12 +393,13 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명 (선택)</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명 <span style={{ color: 'var(--error)' }}>*</span></label>
               <textarea
                 value={issueForm.note}
                 onChange={e => setIssueForm(f => ({ ...f, note: e.target.value }))}
                 placeholder="이슈 상황을 자세히 설명해주세요"
                 rows={3}
+                required
                 style={{ ...CHECKIN_INPUT_STYLE, resize: 'none' }}
               />
             </div>
@@ -413,9 +414,9 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
               </button>
               <button
                 type="submit"
-                disabled={submitting || !issueForm.type}
+                disabled={submitting || !issueForm.type || !issueForm.note.trim()}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--error)', color: '#fff', opacity: (submitting || !issueForm.type) ? 0.7 : 1 }}
+                style={{ background: 'var(--error)', color: '#fff', opacity: (submitting || !issueForm.type || !issueForm.note.trim()) ? 0.7 : 1 }}
               >
                 보고하기
               </button>
