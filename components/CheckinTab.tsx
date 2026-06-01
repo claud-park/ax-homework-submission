@@ -86,9 +86,23 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
       {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
-        <span className="text-xs font-semibold flex-shrink-0" style={{ color: statusColor }}>
-          {statusLabel}{m.status === 'completed' ? ' ✅' : ''}
-        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isDelayPending && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-semibold"
+              style={{
+                background: 'rgba(248,113,113,0.1)',
+                color: 'var(--error)',
+                border: '1px solid rgba(248,113,113,0.4)',
+              }}
+            >
+              이슈 검토중
+            </span>
+          )}
+          <span className="text-xs font-semibold" style={{ color: statusColor }}>
+            {statusLabel}{m.status === 'completed' ? ' ✅' : ''}
+          </span>
+        </div>
       </div>
 
       {/* Date + issue-report row */}
@@ -102,27 +116,23 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
             {dateStr}
           </span>
         )}
-        {isDelayed && showActions && (
-          isDelayPending ? (
-            <span
-              className="text-xs px-3 py-1 rounded-full font-semibold"
-              style={{
-                background: 'rgba(248,113,113,0.1)',
-                color: 'var(--error)',
-                border: '1px solid rgba(248,113,113,0.4)',
-              }}
-            >
-              이슈 검토중
-            </span>
-          ) : (
-            <button
-              onClick={() => onIssueClick(m)}
-              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }}
-            >
-              ⚠ 이슈 보고/도움 요청
-            </button>
-          )
+        {showActions && showDeadline && (
+          <button
+            onClick={() => onDeadlineExtension(m)}
+            className="text-xs"
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            기한 연장
+          </button>
+        )}
+        {isDelayed && showActions && !isDelayPending && (
+          <button
+            onClick={() => onIssueClick(m)}
+            className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+            style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }}
+          >
+            ⚠ 이슈 보고/도움 요청
+          </button>
         )}
       </div>
 
@@ -163,15 +173,6 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
               style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--success)', border: '1px solid var(--success)' }}
             >
               ✅ 완료
-            </button>
-          )}
-          {showDeadline && (
-            <button
-              onClick={() => onDeadlineExtension(m)}
-              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-              style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--amber)', border: '1px solid var(--amber)' }}
-            >
-              📅 기한 연장
             </button>
           )}
           {showProgress && (
