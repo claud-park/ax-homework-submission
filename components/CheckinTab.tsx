@@ -181,7 +181,7 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold"
                 style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
               >
-                ▶ 진행 중
+                ▶ 진행 시작
               </button>
             ) : (
               <span
