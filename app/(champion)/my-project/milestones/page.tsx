@@ -179,14 +179,15 @@ export default function WorkStatusPage() {
                       else next.add(g.id)
                       return next
                     })}
-                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg mb-2"
-                    style={{ background: 'transparent', border: '1px solid var(--border)' }}
+                    className="flex items-center gap-2 w-full mb-3"
+                    style={{ background: 'transparent', border: 'none', padding: 0 }}
                   >
                     {isCollapsed
-                      ? <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
-                      : <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />}
-                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</span>
-                    <span className="text-xs ml-auto" style={{ color: 'var(--text-disabled)' }}>{gMilestones.length}개</span>
+                      ? <ChevronRight size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />
+                      : <ChevronDown size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />}
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{g.title}</span>
+                    <span className="text-xs ml-1" style={{ color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{gMilestones.length}개</span>
+                    <span className="flex-1 ml-2" style={{ height: 1, background: 'var(--border)' }} />
                   </button>
                   {!isCollapsed && (
                     <CheckinTab milestones={gMilestones} showOverdue={false} {...checkinProps} />
