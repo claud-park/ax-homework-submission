@@ -426,12 +426,13 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
 }
 
 // Keyed by submission id or 'new' — remounts when switching between items
-function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
+function CharterPanel({ mode, submission, onClose, onCreated, onUpdated, onAutoSaved }: {
   mode: 'new' | 'edit'
   submission?: CharterSubmission
   onClose: () => void
   onCreated: (sub: CharterSubmission) => void
   onUpdated: (sub: CharterSubmission) => void
+  onAutoSaved?: (sub: CharterSubmission) => void
 }) {
   const [projectName, setProjectName] = useState(submission?.project_name ?? '')
   const [saving, setSaving] = useState(false)
@@ -440,6 +441,48 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
   const dirtyRef = useRef<boolean>(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [milestones, setMilestones] = useState<Milestone[]>([])
+
+  // Auto-save state (new mode only)
+  const autoSavedSubRef = useRef<CharterSubmission | null>(null)
+  const autoSavePendingRef = useRef(false)
+  const projectNameRef = useRef(projectName)
+  const [autoSavingDisplay, setAutoSavingDisplay] = useState(false)
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null)
+  useEffect(() => { projectNameRef.current = projectName }, [projectName])
+
+  // Always-current auto-save function (avoids stale closures via ref pattern)
+  const triggerAutoSaveRef = useRef(async () => {})
+  triggerAutoSaveRef.current = async () => {
+    if (autoSavePendingRef.current) return
+    autoSavePendingRef.current = true
+    setAutoSavingDisplay(true)
+    try {
+      const payload = { project_name: projectNameRef.current, content: contentRef.current, publish_status: 'draft' as const }
+      let result: CharterSubmission
+      if (autoSavedSubRef.current) {
+        result = await apiFetch<CharterSubmission>(`/api/charter/submissions/${autoSavedSubRef.current.id}`, {
+          method: 'PATCH', body: JSON.stringify(payload),
+        })
+      } else {
+        result = await apiFetch<CharterSubmission>('/api/charter/submissions', {
+          method: 'POST', body: JSON.stringify(payload),
+        })
+      }
+      autoSavedSubRef.current = result
+      setLastAutoSavedAt(new Date())
+      onAutoSaved?.(result)
+    } catch { /* silent */ }
+    finally {
+      autoSavePendingRef.current = false
+      setAutoSavingDisplay(false)
+    }
+  }
+
+  useEffect(() => {
+    if (mode !== 'new') return
+    const interval = setInterval(() => { void triggerAutoSaveRef.current() }, 30000)
+    return () => clearInterval(interval)
+  }, [mode])
 
   useEffect(() => {
     apiFetch<Milestone[]>('/api/milestones')
@@ -463,14 +506,15 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
     setSaving(true)
     try {
       if (mode === 'new') {
-        const newSub = await apiFetch<CharterSubmission>('/api/charter/submissions', {
-          method: 'POST',
-          body: JSON.stringify({
-            project_name: projectName,
-            content: contentRef.current,
-            publish_status: targetStatus,
-          }),
-        })
+        const existingId = autoSavedSubRef.current?.id
+        const payload = { project_name: projectName, content: contentRef.current, publish_status: targetStatus }
+        const newSub = existingId
+          ? await apiFetch<CharterSubmission>(`/api/charter/submissions/${existingId}`, {
+              method: 'PATCH', body: JSON.stringify(payload),
+            })
+          : await apiFetch<CharterSubmission>('/api/charter/submissions', {
+              method: 'POST', body: JSON.stringify(payload),
+            })
         dirtyRef.current = false
         onCreated(newSub)
       } else {
@@ -579,6 +623,17 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated }: {
           />
         </div>
         <div className="flex gap-2 flex-shrink-0">
+          {mode === 'new' && (
+            <button
+              onClick={() => { void triggerAutoSaveRef.current() }}
+              disabled={autoSavingDisplay}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
+              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+              title={lastAutoSavedAt ? `마지막 저장: ${lastAutoSavedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : '30초마다 자동저장'}
+            >
+              {autoSavingDisplay ? '저장 중...' : lastAutoSavedAt ? `자동저장됨 ${lastAutoSavedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : '자동저장'}
+            </button>
+          )}
           <button
             onClick={handleExport}
             disabled={exporting}
@@ -737,8 +792,20 @@ export default function CharterPage() {
   const activeId = sidePanel !== null && sidePanel !== 'new' ? sidePanel.id : null
 
   function handleCreated(newSub: CharterSubmission) {
-    setSubmissions(prev => [newSub, ...prev])
+    setSubmissions(prev =>
+      prev.find(s => s.id === newSub.id)
+        ? prev.map(s => s.id === newSub.id ? newSub : s)
+        : [newSub, ...prev]
+    )
     setSidePanel(newSub)
+  }
+
+  function handleAutoSaved(newSub: CharterSubmission) {
+    setSubmissions(prev =>
+      prev.find(s => s.id === newSub.id)
+        ? prev.map(s => s.id === newSub.id ? newSub : s)
+        : [newSub, ...prev]
+    )
   }
 
   function handleUpdated(updated: CharterSubmission) {
@@ -842,6 +909,7 @@ export default function CharterPage() {
               onClose={() => setSidePanel(null)}
               onCreated={handleCreated}
               onUpdated={handleUpdated}
+              onAutoSaved={handleAutoSaved}
             />
           </div>
           {sidePanel !== 'new' && sidePanel.publish_status === 'published' && (

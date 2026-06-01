@@ -1,106 +1,30 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
-import type { Milestone, DeadlineChangeRequest, CharterSubmission } from '@/lib/types'
+import type { Milestone, CharterSubmission } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
-import DateRangePicker from '@/components/DateRangePicker'
 import { toast } from 'sonner'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import { EmptyState } from '@/components/ui/empty-state'
-import { ListTodo, ChevronDown, ChevronRight, Plus, Pencil } from 'lucide-react'
 import { CheckinTab } from '@/components/CheckinTab'
 import type { BottleneckType } from '@/lib/types'
-import { DraftBadge } from '@/components/DraftBadge'
-import { PublishStatusFilter, type PublishFilterValue } from '@/components/PublishStatusFilter'
-import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
-import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
-const STATUS_LABEL: Record<string, string> = {
-  not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
-}
-const STATUS_COLOR: Record<string, string> = {
-  not_started: 'var(--text-disabled)', in_progress: 'var(--blue-600)',
-  completed: 'var(--success)', delayed: 'var(--error)',
-}
-const REQ_LABEL: Record<string, string> = { pending: '검토 중', approved: '승인됨', rejected: '반려됨' }
-const REQ_COLOR: Record<string, string> = {
-  pending: 'var(--amber)', approved: 'var(--success)', rejected: 'var(--error)',
-}
-
-interface NewMilestone { title: string; start_date: string; due_date: string; description: string; parent_milestone_id: string }
+const inputStyle = { background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
 
 export default function WorkStatusPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
-  const [requests, setRequests] = useState<DeadlineChangeRequest[]>([])
   const [charterApproved, setCharterApproved] = useState(false)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<NewMilestone>({ title: '', start_date: '', due_date: '', description: '', parent_milestone_id: '' })
-  const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; existingReqId?: string } | null>(null)
+  const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
   const [error, setError] = useState<string | null>(null)
-  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
-  const [editForm, setEditForm] = useState({ title: '', start_date: '', due_date: '' })
-  const [editSaving, setEditSaving] = useState(false)
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const { width: listWidth, setWidth: setListWidth, onMouseDown: onResizeList } = useResizableWidth({
-    initialWidth: 320,
-    min: 240,
-    max: 1200,
-    side: 'right',
-  })
-
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [collapsedCheckinGroups, setCollapsedCheckinGroups] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'wbs' | 'checkin'>('wbs')
-
   const [loading, setLoading] = useState(true)
-
-  function openForm() {
-    if (!showForm && containerRef.current) {
-      setListWidth(Math.round(containerRef.current.getBoundingClientRect().width * 0.5))
-    }
-    setShowForm(true)
-  }
-  function closeForm() {
-    setShowForm(false)
-  }
-
-  const [filter, setFilter] = useState<PublishFilterValue>(() => {
-    if (typeof window === 'undefined') return 'all'
-    const q = new URLSearchParams(window.location.search).get('status') as PublishFilterValue | null
-    return q && ['all','published','draft'].includes(q) ? q : 'all'
-  })
-  useEffect(() => {
-    const url = new URL(window.location.href)
-    if (filter === 'all') url.searchParams.delete('status')
-    else url.searchParams.set('status', filter)
-    window.history.replaceState({}, '', url.toString())
-  }, [filter])
-
-  const groupedMilestones = useMemo(() => {
-    const filtered = filter === 'all' ? milestones : milestones.filter(m => m.publish_status === filter)
-    const depth0 = milestones.filter(m => !m.parent_milestone_id)  // always all, filter-independent
-    const byParent = new Map<string, Milestone[]>()
-    for (const g of depth0) byParent.set(g.id, [])
-    for (const m of filtered) {
-      if (m.parent_milestone_id && byParent.has(m.parent_milestone_id)) {
-        byParent.get(m.parent_milestone_id)!.push(m)
-      }
-    }
-    return { depth0, byParent }
-  }, [milestones, filter])
 
   useEffect(() => {
     Promise.all([
       apiFetch<Milestone[]>('/api/milestones').then(setMilestones),
-      apiFetch<DeadlineChangeRequest[]>('/api/deadline-requests').then(setRequests),
       apiFetch<CharterSubmission[]>('/api/charter/submissions')
         .then(subs => setCharterApproved(subs.some(s => !!s.admin_approved_at))),
     ])
@@ -108,87 +32,32 @@ export default function WorkStatusPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  async function submitNew(publishStatus: 'draft' | 'published') {
-    setError(null)
-    try {
-      const { milestone: created, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>('/api/milestones', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...form,
-          start_date: form.start_date || null,
-          due_date: form.due_date || null,
-          parent_milestone_id: form.parent_milestone_id || null,
-          publish_status: publishStatus,
-        }),
-      })
-      setMilestones(prev => {
-        const next = [...prev, created]
-        return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
-      })
-      setShowForm(false)
-      setForm({ title: '', start_date: '', due_date: '', description: '', parent_milestone_id: '' })
-      toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 추가되었습니다.')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      try {
-        const parsed = JSON.parse(msg)
-        if (parsed.error === 'validation_failed') {
-          setError('필수 항목을 확인해주세요: ' + parsed.fields.map((f: { field: string }) => f.field).join(', '))
-          return
-        }
-      } catch { /* not JSON */ }
-      setError('마일스톤 저장에 실패했습니다.')
-      toast.error('저장 실패: ' + msg)
-    }
-  }
-
-  function toggleGroup(id: string) {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  async function handleMarkProgress(id: string) {
-    setError(null)
-    try {
-      const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
-        method: 'PATCH', body: JSON.stringify({ is_manual_progress: true, bottleneck_type: null, bottleneck_note: null }),
-      })
-      setMilestones(prev => prev.map(m => m.id === id ? updated : m))
-      toast.success('상태가 변경되었습니다.')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError('상태 변경에 실패했습니다.')
-      toast.error('상태 변경 실패: ' + msg)
-    }
-  }
-
   async function handleCheckinComplete(id: string) {
     try {
-      const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
+      const { milestone: updated, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_manual_completed: true, bottleneck_type: null, bottleneck_note: null }),
       })
-      setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+      setMilestones(prev => {
+        const next = prev.map(m => m.id === id ? updated : m)
+        return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
+      })
       toast.success('완료로 표시되었습니다.')
     } catch (e: unknown) {
       toast.error('완료 처리에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
     }
   }
 
-  async function handleCheckinDelayReport(id: string, type: BottleneckType, note: string | null) {
+  async function handleCheckinIssueReport(id: string, type: BottleneckType, note: string | null) {
     try {
       const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ bottleneck_type: type, bottleneck_note: note, is_manual_completed: false, is_manual_progress: false }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
-      toast.success('지연 신고가 완료되었습니다. 관리자에게 알림이 전송되었습니다.')
+      toast.success('이슈가 보고되었습니다. 관리자에게 알림이 전송되었습니다.')
     } catch (e: unknown) {
-      toast.error('지연 신고에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
+      toast.error('이슈 보고에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
     }
   }
 
@@ -206,9 +75,8 @@ export default function WorkStatusPage() {
   }
 
   function openDeadlineForCheckin(m: Milestone) {
-    const existing = requests.find(r => r.milestone_id === m.id)
-    setDeadlineModal({ id: m.id, due_date: m.due_date ?? '', existingReqId: existing?.id })
-    setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
+    setDeadlineModal({ id: m.id, due_date: m.due_date ?? '' })
+    setReqForm({ requested_due_date: '', reason: '' })
   }
 
   async function handleDeadlineRequest(e: React.FormEvent) {
@@ -216,168 +84,24 @@ export default function WorkStatusPage() {
     if (!deadlineModal) return
     setError(null)
     try {
-      const { existingReqId } = deadlineModal
-      const result = existingReqId
-        ? await apiFetch<DeadlineChangeRequest>(`/api/deadline-requests/${existingReqId}`, {
-            method: 'PATCH', body: JSON.stringify(reqForm),
-          })
-        : await apiFetch<DeadlineChangeRequest>('/api/deadline-requests', {
-            method: 'POST', body: JSON.stringify({ milestone_id: deadlineModal.id, ...reqForm }),
-          })
-      setRequests(prev =>
-        existingReqId
-          ? prev.map(r => r.id === existingReqId ? result : r)
-          : [result, ...prev]
-      )
-      setDeadlineModal(null)
-      setReqForm({ requested_due_date: '', reason: '' })
-      toast.success(existingReqId ? '기한 변경 요청이 수정되었습니다.' : '기한 변경 요청이 제출되었습니다.')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError('기한 변경 요청에 실패했습니다.')
-      toast.error('기한변경 요청 실패: ' + msg)
-    }
-  }
-
-  function openEdit(m: Milestone) {
-    setEditingMilestone(m)
-    setEditForm({ title: m.title, start_date: m.start_date ?? '', due_date: m.due_date ?? '' })
-  }
-
-  async function submitEdit(publishStatus: 'draft' | 'published') {
-    if (!editingMilestone) return
-    setEditSaving(true)
-    try {
-      const { milestone: updated, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${editingMilestone.id}`, {
+      const { milestone: updated, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${deadlineModal.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({
-          ...editForm,
-          start_date: editForm.start_date || null,
-          due_date: editForm.due_date || null,
-          publish_status: publishStatus,
-        }),
+        body: JSON.stringify({ due_date: reqForm.requested_due_date }),
       })
       setMilestones(prev => {
         const next = prev.map(m => m.id === updated.id ? updated : m)
         return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
       })
-      setEditingMilestone(null)
-      toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 수정되었습니다.')
+      setDeadlineModal(null)
+      setReqForm({ requested_due_date: '', reason: '' })
+      toast.success('기한이 변경되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      try {
-        const parsed = JSON.parse(msg)
-        if (parsed.error === 'validation_failed') {
-          setError('필수 항목을 확인해주세요: ' + parsed.fields.map((f: { field: string }) => f.field).join(', '))
-          return
-        }
-      } catch { /* not JSON */ }
-      setError('수정에 실패했습니다.')
-      toast.error('마일스톤 수정 실패: ' + msg)
-    } finally {
-      setEditSaving(false)
+      setError('기한 변경에 실패했습니다.')
+      toast.error('기한 변경 실패: ' + msg)
     }
   }
 
-  async function handleDelete(id: string) {
-    setError(null)
-    try {
-      const { parentUpdated } = await apiFetch<{ parentUpdated: Milestone | null }>(`/api/milestones/${id}`, { method: 'DELETE' })
-      setMilestones(prev => {
-        const next = prev.filter(m => m.id !== id)
-        return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
-      })
-      setEditingMilestone(null)
-      toast.success('마일스톤이 삭제되었습니다.')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError('삭제에 실패했습니다.')
-      toast.error('마일스톤 삭제 실패: ' + msg)
-    }
-  }
-
-  const inputStyle = { background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
-
-  // Fixed column widths shared across all section tables so columns line up
-  const COL_WIDTHS = ['35%', '40%', '25%']
-
-  function renderMilestoneRow(m: Milestone) {
-    const milestoneReqs = requests.filter(r => r.milestone_id === m.id)
-    return (
-      <tr key={m.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-        <td className="px-3 py-3 font-semibold" style={{ color: 'var(--text-primary)' }}>
-          <div className="flex items-center gap-1.5">
-            <span>{m.title || '(제목 없음)'}</span>
-            {m.publish_status === 'draft' && <DraftBadge />}
-            <button
-              type="button"
-              onClick={() => openEdit(m)}
-              title="편집"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)', fontSize: '12px', padding: '2px 3px', lineHeight: 1 }}
-            >
-              ✏
-            </button>
-          </div>
-        </td>
-        <td className="px-3 py-3">
-          <div className="flex flex-col gap-1.5">
-            <span style={{ color: 'var(--text-secondary)' }}>{m.start_date ?? ''} ~ {m.due_date ?? ''}</span>
-            {m.publish_status === 'published' && (m.status === 'delayed' || m.status === 'in_progress') && (
-              <button
-                onClick={() => {
-                  const existing = milestoneReqs[0]
-                  setDeadlineModal({ id: m.id, due_date: m.due_date ?? '', existingReqId: existing?.id })
-                  setReqForm({ requested_due_date: existing?.requested_due_date ?? '', reason: existing?.reason ?? '' })
-                }}
-                className="text-xs self-start underline"
-                style={{ color: 'var(--text-disabled)' }}
-              >
-                {milestoneReqs.length > 0 ? '기한 변경 요청 수정' : '기한 변경 요청'}
-              </button>
-            )}
-            {m.publish_status === 'published' && (() => {
-              const pending = milestoneReqs.find(r => r.status === 'pending')
-              const resolved = milestoneReqs.find(r => r.status === 'approved' || r.status === 'rejected')
-              const toShow = [pending, resolved].filter(Boolean) as typeof milestoneReqs
-              if (toShow.length === 0) return null
-              return (
-                <div className="flex flex-col gap-1">
-                  {toShow.map(r => (
-                    <div key={r.id} className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ color: REQ_COLOR[r.status], background: `${REQ_COLOR[r.status]}18`, border: `1px solid ${REQ_COLOR[r.status]}40` }}>
-                        {REQ_LABEL[r.status]}
-                      </span>
-                      <span style={{ color: 'var(--text-disabled)' }}>→ {r.requested_due_date}</span>
-                    </div>
-                  ))}
-                </div>
-              )
-            })()}
-          </div>
-        </td>
-        <td className="px-3 py-3">
-          <div className="flex flex-col gap-1.5">
-            <span style={{ color: STATUS_COLOR[m.status] }}>
-              {STATUS_LABEL[m.status]}{m.status === 'delayed' ? ' ⚠️' : ''}
-            </span>
-            {m.publish_status === 'published' && (m.status === 'not_started' || m.status === 'delayed') && (
-              charterApproved ? (
-                <button onClick={() => handleMarkProgress(m.id)} className="px-2 py-1 rounded font-semibold self-start" style={{ color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}>
-                  ▶ 과제 시작
-                </button>
-              ) : (
-                <span className="px-3 py-1 rounded-full text-xs font-semibold self-start" style={{ color: 'var(--text-disabled)', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
-                  과제 정의서 검토중
-                </span>
-              )
-            )}
-          </div>
-        </td>
-      </tr>
-    )
-  }
-
-  // Checkin groups (all milestones, no publish filter)
   const checkinGroups = useMemo(() => {
     const depth0 = milestones.filter(m => !m.parent_milestone_id)
     const byParent = new Map<string, Milestone[]>()
@@ -390,357 +114,118 @@ export default function WorkStatusPage() {
     return { depth0, byParent }
   }, [milestones])
 
+  const checkinProps = {
+    charterApproved,
+    onComplete: handleCheckinComplete,
+    onIssueReport: handleCheckinIssueReport,
+    onInProgress: handleCheckinInProgress,
+    onDeadlineExtension: openDeadlineForCheckin,
+  }
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 100px)', minHeight: 0 }}>
-      {/* Internal tab bar */}
-      <div className="flex gap-1 border-b flex-shrink-0 mb-4" style={{ borderColor: 'var(--border-subtle)' }}>
-        {(['wbs', 'checkin'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="text-xs px-4 py-2 font-medium transition-colors"
-            style={{
-              color: activeTab === tab ? 'var(--blue-600)' : 'var(--text-secondary)',
-              borderBottom: activeTab === tab ? '2px solid var(--blue-600)' : '2px solid transparent',
-              marginBottom: -1,
-            }}
-          >
-            {tab === 'wbs' ? '마일스톤 관리' : '체크인'}
-          </button>
-        ))}
-      </div>
-
-      {/* Checkin tab */}
-      {activeTab === 'checkin' && (
-        <div className="flex-1 overflow-y-auto pb-8">
-          {loading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
-              ))}
-            </div>
-          ) : (
-            <>
-              {milestones.some(m => !m.parent_milestone_id) && (
-                <CheckinTab
-                  milestones={milestones.filter(m => !m.parent_milestone_id)}
-                  requests={requests}
-                  charterApproved={charterApproved}
-                  onComplete={handleCheckinComplete}
-                  onDelayReport={handleCheckinDelayReport}
-                  onInProgress={handleCheckinInProgress}
-                  onDeadlineExtension={openDeadlineForCheckin}
-                />
-              )}
-              {checkinGroups.depth0.map(g => {
-                const gMilestones = checkinGroups.byParent.get(g.id) ?? []
-                if (gMilestones.length === 0) return null
-                const isCollapsed = collapsedCheckinGroups.has(g.id)
-                return (
-                  <div key={g.id} style={{ marginTop: 16 }}>
-                    <button
-                      onClick={() => setCollapsedCheckinGroups(prev => {
-                        const next = new Set(prev)
-                        if (next.has(g.id)) next.delete(g.id)
-                        else next.add(g.id)
-                        return next
-                      })}
-                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg mb-2"
-                      style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}
-                    >
-                      {isCollapsed
-                        ? <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
-                        : <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />}
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</span>
-                      <span className="text-xs ml-auto" style={{ color: 'var(--text-disabled)' }}>{gMilestones.length}개</span>
-                    </button>
-                    {!isCollapsed && (
-                      <CheckinTab
-                        milestones={gMilestones}
-                        requests={requests}
-                        charterApproved={charterApproved}
-                        onComplete={handleCheckinComplete}
-                        onDelayReport={handleCheckinDelayReport}
-                        onInProgress={handleCheckinInProgress}
-                        onDeadlineExtension={openDeadlineForCheckin}
-                      />
-                    )}
-                  </div>
-                )
-              })}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* WBS tab */}
-      {activeTab === 'wbs' && (
-      <div ref={containerRef} className="flex flex-1 min-h-0">
-      {/* Left: header + filter + list */}
-      <div
-        className="relative flex flex-col flex-shrink-0 overflow-hidden"
-        style={{
-          width: showForm ? `${listWidth}px` : '100%',
-          borderRight: showForm ? '1px solid var(--border-subtle)' : 'none',
-        }}
-      >
-        {showForm && <ResizeHandle side="right" onMouseDown={onResizeList} />}
-        <div className="flex-1 overflow-y-auto pr-2">
-          <div className="flex items-center justify-between mb-4 whitespace-nowrap">
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{milestones.length}개 마일스톤</p>
-            <button
-              onClick={() => (showForm ? closeForm() : openForm())}
-              className="px-4 py-2 rounded-lg text-xs font-semibold"
-              style={{
-                background: showForm ? 'rgba(37,99,235,0.15)' : 'var(--blue-600)',
-                color: showForm ? 'var(--blue-600)' : '#fff',
-              }}
-            >
-              + 마일스톤 추가
-            </button>
+      <div className="flex-1 overflow-y-auto pb-8">
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+            ))}
           </div>
-
-          <div className="mb-4">
-            <PublishStatusFilter value={filter} onChange={setFilter} />
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--error)', border: '1px solid var(--error)' }}>
-              {error}
-            </div>
-          )}
-
-      {loading ? (
-        <div className="flex flex-col gap-2 mt-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-10 w-full rounded-lg animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
-          ))}
-        </div>
-      ) : groupedMilestones.depth0.length === 0 ? (
-        <EmptyState
-          icon={ListTodo}
-          title="마일스톤이 없습니다"
-          description="+ 마일스톤 추가를 눌러 첫 마일스톤을 만들어보세요."
-        />
-      ) : (
-        <div className="flex flex-col gap-0">
-          {/* Milestone groups */}
-          {groupedMilestones.depth0.map(g => (
-            <div key={g.id} style={{ marginTop: 12 }}>
-              {/* Group header */}
-              <div
-                className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}
-              >
-                <button onClick={() => toggleGroup(g.id)} style={{ color: 'var(--text-secondary)', lineHeight: 1 }}>
-                  {collapsedGroups.has(g.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                </button>
-                <span
-                  className="text-xs font-semibold flex-1 cursor-pointer"
-                  style={{ color: 'var(--text-primary)' }}
-                  onClick={() => toggleGroup(g.id)}
-                >
-                  {g.title}
-                </span>
-                {g.start_date && (
-                  <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>{g.start_date} ~ {g.due_date ?? ''}</span>
-                )}
-                <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>
-                  {(groupedMilestones.byParent.get(g.id) ?? []).length}개
-                </span>
-                <button
-                  onClick={() => openEdit(g)}
-                  style={{ color: 'var(--text-secondary)' }}
-                  title="마일스톤 수정"
-                >
-                  <Pencil size={12} />
-                </button>
-                <button
-                  onClick={() => { setForm(f => ({ ...f, parent_milestone_id: g.id })); openForm() }}
-                  style={{ color: 'var(--blue-600)' }}
-                  title="이 마일스톤에 하위 마일스톤 추가"
-                >
-                  <Plus size={12} />
-                </button>
-              </div>
-              {/* Child milestones (foldable) */}
-              {!collapsedGroups.has(g.id) && (groupedMilestones.byParent.get(g.id) ?? []).length > 0 && (
-                <div className="rounded-xl border overflow-hidden mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
-                  <table className="w-full text-xs border-collapse" style={{ tableLayout: 'fixed' }}>
-                    <colgroup>{COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
-                    <thead>
-                      <tr style={{ background: 'var(--surface-secondary)' }}>
-                        {['마일스톤', '기간', '상태'].map(h => (
-                          <th key={h} className="text-left px-3 py-2 font-semibold uppercase tracking-wide" style={{ color: 'var(--text-disabled)', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(groupedMilestones.byParent.get(g.id) ?? []).map(m => renderMilestoneRow(m))}
-                    </tbody>
-                  </table>
+        ) : (
+          <>
+            {/* Ungrouped (depth-0) milestones */}
+            {milestones.some(m => !m.parent_milestone_id) && (
+              <CheckinTab
+                milestones={milestones.filter(m => !m.parent_milestone_id)}
+                {...checkinProps}
+              />
+            )}
+            {/* Grouped (depth-1) milestones under each depth-0 parent */}
+            {checkinGroups.depth0.map(g => {
+              const gMilestones = checkinGroups.byParent.get(g.id) ?? []
+              if (gMilestones.length === 0) return null
+              const isCollapsed = collapsedCheckinGroups.has(g.id)
+              return (
+                <div key={g.id} style={{ marginTop: 16 }}>
+                  <button
+                    onClick={() => setCollapsedCheckinGroups(prev => {
+                      const next = new Set(prev)
+                      if (next.has(g.id)) next.delete(g.id)
+                      else next.add(g.id)
+                      return next
+                    })}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg mb-2"
+                    style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}
+                  >
+                    {isCollapsed
+                      ? <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
+                      : <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} />}
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</span>
+                    <span className="text-xs ml-auto" style={{ color: 'var(--text-disabled)' }}>{gMilestones.length}개</span>
+                  </button>
+                  {!isCollapsed && (
+                    <CheckinTab milestones={gMilestones} {...checkinProps} />
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
-
-          {/* 마일스톤 추가 버튼 */}
-          <button
-            onClick={() => { setForm(f => ({ ...f, parent_milestone_id: '' })); openForm() }}
-            className="flex items-center gap-1 text-xs mt-3"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            <Plus size={12} /> 마일스톤 추가
-          </button>
-        </div>
-      )}
-        </div>
+              )
+            })}
+          </>
+        )}
       </div>
 
-      {/* Right: form panel */}
-      {showForm && (
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-3 border-b flex-shrink-0 whitespace-nowrap" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-primary)' }}>
-            <button
-              onClick={closeForm}
-              className="text-xs px-2 py-1 rounded"
-              style={{ color: 'var(--text-secondary)', background: 'var(--surface-secondary)' }}
-            >
-              ✕
-            </button>
-            <span className="text-sm font-bold flex-1" style={{ color: 'var(--text-primary)' }}>마일스톤 추가</span>
-            <SaveOrPublishButtons
-              status="draft"
-              saving={false}
-              onSaveDraft={() => submitNew('draft')}
-              onPublish={() => submitNew('published')}
-              size="sm"
-            />
-          </div>
-          <div className="flex-1 overflow-y-auto p-5">
-            <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-                <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
-              </div>
-              <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>상위 마일스톤</label>
-                <select
-                  value={form.parent_milestone_id}
-                  onChange={e => setForm(f => ({ ...f, parent_milestone_id: e.target.value }))}
-                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px', width: '100%' }}
-                >
-                  <option value="">없음 (최상위 마일스톤)</option>
-                  {groupedMilestones.depth0.map(g => (
-                    <option key={g.id} value={g.id}>{g.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
-                <DateRangePicker
-                  startDate={form.start_date}
-                  endDate={form.due_date}
-                  onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명</label>
-                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="선택사항" rows={2} style={{ ...inputStyle, resize: 'none', width: '100%' }} />
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit milestone modal */}
-      <Dialog
-        open={!!editingMilestone}
-        onOpenChange={open => { if (!open) setEditingMilestone(null) }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>마일스톤 편집</DialogTitle>
-          </DialogHeader>
-          {editingMilestone && (
-            <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>마일스톤 이름</label>
-                <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} required style={inputStyle} />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>작업 기간</label>
-                <DateRangePicker
-                  startDate={editForm.start_date}
-                  endDate={editForm.due_date}
-                  onChange={(s, e) => setEditForm(f => ({ ...f, start_date: s, due_date: e }))}
-                />
-              </div>
-
-              <DialogFooter className="border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button type="button"
-                      className="px-3 py-2 rounded-lg text-xs font-semibold mr-auto"
-                      style={{ color: 'var(--error)', border: '1px solid var(--error)' }}>
-                      삭제
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>마일스톤 삭제</AlertDialogTitle>
-                      <AlertDialogDescription>정말 삭제하시겠습니까? 되돌릴 수 없습니다.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>취소</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(editingMilestone.id)}>삭제</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <button type="button" onClick={() => setEditingMilestone(null)}
-                  className="px-3 py-2 rounded-lg text-xs"
-                  style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>
-                  취소
-                </button>
-                <SaveOrPublishButtons
-                  status={editingMilestone.publish_status}
-                  saving={editSaving}
-                  onSaveDraft={() => submitEdit('draft')}
-                  onPublish={() => submitEdit('published')}
-                  size="sm"
-                />
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Deadline request modal */}
+      {/* 기한 변경 dialog */}
       <Dialog
         open={!!deadlineModal}
         onOpenChange={open => { if (!open) { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) } }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{deadlineModal?.existingReqId ? '기한 변경 요청 수정' : '기한 변경 요청'}</DialogTitle>
+            <DialogTitle>기한 변경</DialogTitle>
             {deadlineModal && (
               <DialogDescription>현재 마감일: {deadlineModal.due_date}</DialogDescription>
             )}
           </DialogHeader>
           {deadlineModal && (
             <form onSubmit={handleDeadlineRequest} className="flex flex-col gap-3">
-              <DatePicker value={reqForm.requested_due_date} onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))} required placeholder="새 마감일 선택" style={{ ...inputStyle, width: '100%' }} />
-              <textarea value={reqForm.reason} onChange={e => setReqForm(r => ({ ...r, reason: e.target.value }))} placeholder="변경 사유" rows={3} required style={{ ...inputStyle, resize: 'none', width: '100%' }} />
+              {error && (
+                <p className="text-xs" style={{ color: 'var(--error)' }}>{error}</p>
+              )}
+              <DatePicker
+                value={reqForm.requested_due_date}
+                onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))}
+                required
+                placeholder="새 마감일 선택"
+                style={{ ...inputStyle, width: '100%' }}
+              />
+              <textarea
+                value={reqForm.reason}
+                onChange={e => setReqForm(r => ({ ...r, reason: e.target.value }))}
+                placeholder="변경 사유를 입력해주세요"
+                rows={3}
+                required
+                style={{ ...inputStyle, resize: 'none', width: '100%' }}
+              />
               <DialogFooter>
-                <button type="button" onClick={() => { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) }} className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}>취소</button>
-                <button type="submit" className="flex-1 py-2 rounded-lg text-xs font-semibold" style={{ background: 'var(--blue-600)', color: '#fff' }}>요청 보내기</button>
+                <button
+                  type="button"
+                  onClick={() => { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) }}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold"
+                  style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold"
+                  style={{ background: 'var(--blue-600)', color: '#fff' }}
+                >
+                  기한 변경
+                </button>
               </DialogFooter>
             </form>
           )}
         </DialogContent>
       </Dialog>
-      </div>
-      )}
     </div>
   )
 }

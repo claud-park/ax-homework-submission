@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
-import type { Milestone, DeadlineChangeRequest, BottleneckType } from '@/lib/types'
+import type { Milestone, BottleneckType } from '@/lib/types'
 
 function fmtMD(s: string): string {
   if (!s) return ''
@@ -49,78 +49,83 @@ const CHECKIN_INPUT_STYLE: React.CSSProperties = {
 interface MilestoneCardProps {
   m: Milestone
   showActions: boolean
-  hasPendingDeadlineRequest: boolean
   charterApproved: boolean
   onCompleteClick: (id: string) => void
-  onDelayClick: (m: Milestone) => void
+  onIssueClick: (m: Milestone) => void
   onDeadlineExtension: (m: Milestone) => void
   onInProgress: (id: string) => void
 }
 
-function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterApproved, onCompleteClick, onDelayClick, onDeadlineExtension, onInProgress }: MilestoneCardProps) {
+function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIssueClick, onDeadlineExtension, onInProgress }: MilestoneCardProps) {
   const statusColor = STATUS_COLOR[m.status] ?? 'var(--text-disabled)'
   const statusLabel = STATUS_LABEL[m.status] ?? m.status
 
+  const isDelayed = m.status === 'delayed'
   const isDelayPending = m.bottleneck_type !== null && m.bottleneck_reviewed_at === null
   const hasAdminReply = m.bottleneck_reviewed_at !== null && !!m.bottleneck_admin_comment
 
-  // Status-based button visibility
   const showComplete = m.status === 'in_progress' || m.status === 'delayed'
-  const showDelay = m.status === 'in_progress' || m.status === 'delayed'
   const showDeadline = m.status === 'not_started' || m.status === 'in_progress' || m.status === 'delayed'
   const showProgress = m.status === 'not_started'
 
-  const delayPendingPill = (
-    <span
-      className="text-xs px-3 py-1 rounded-full font-semibold"
-      style={{
-        background: 'rgba(248,113,113,0.1)',
-        color: 'var(--error)',
-        cursor: 'default',
-        border: '1px solid rgba(248,113,113,0.4)',
-      }}
-    >
-      지연 신고 검토중
-    </span>
-  )
-
-  const deadlinePendingPill = (
-    <span
-      className="text-xs px-3 py-1 rounded-full font-semibold"
-      style={{
-        background: 'rgba(251,191,36,0.12)',
-        color: 'var(--amber)',
-        cursor: 'default',
-        border: '1px solid rgba(251,191,36,0.4)',
-      }}
-    >
-      기한 연장 검토중
-    </span>
-  )
+  const dateStr = m.start_date
+    ? `${fmtMD(m.start_date)} – ${fmtMD(m.due_date ?? '')}`
+    : m.due_date ? `~${fmtMD(m.due_date)}` : ''
 
   return (
     <div
       style={{
-        border: '1px solid var(--border-subtle)',
+        border: isDelayed ? '2px solid var(--error)' : '1px solid var(--border-subtle)',
         borderRadius: '10px',
         padding: '14px 16px',
         background: showActions ? 'var(--surface-primary)' : 'var(--surface-secondary)',
         opacity: showActions ? 1 : 0.6,
       }}
     >
+      {/* Title row */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <div>
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
-        </div>
-        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>~{fmtMD(m.due_date ?? '')}</span>
-      </div>
-      <div className="mb-3">
-        <span className="text-xs font-semibold" style={{ color: statusColor }}>
-          {statusLabel}{m.status === 'delayed' ? ' ⚠️' : m.status === 'completed' ? ' ✅' : ''}
+        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
+        <span className="text-xs font-semibold flex-shrink-0" style={{ color: statusColor }}>
+          {statusLabel}{m.status === 'completed' ? ' ✅' : ''}
         </span>
       </div>
 
-      {/* Admin reply bubble — only when reviewed and comment is non-empty */}
+      {/* Date + issue-report row */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {isDelayed && <span style={{ color: 'var(--error)', fontSize: 15 }}>⚠️</span>}
+        {dateStr && (
+          <span
+            className="font-semibold"
+            style={{ fontSize: 14, color: isDelayed ? 'var(--error)' : 'var(--text-secondary)' }}
+          >
+            {dateStr}
+          </span>
+        )}
+        {isDelayed && showActions && (
+          isDelayPending ? (
+            <span
+              className="text-xs px-3 py-1 rounded-full font-semibold"
+              style={{
+                background: 'rgba(248,113,113,0.1)',
+                color: 'var(--error)',
+                border: '1px solid rgba(248,113,113,0.4)',
+              }}
+            >
+              이슈 검토중
+            </span>
+          ) : (
+            <button
+              onClick={() => onIssueClick(m)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }}
+            >
+              ⚠ 이슈 보고/도움 요청
+            </button>
+          )
+        )}
+      </div>
+
+      {/* Admin reply bubble */}
       {hasAdminReply && (
         <div
           style={{
@@ -159,27 +164,14 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
               ✅ 완료
             </button>
           )}
-          {showDelay && (
-            isDelayPending ? delayPendingPill : (
-              <button
-                onClick={() => onDelayClick(m)}
-                className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid var(--error)' }}
-              >
-                ⚠ 지연 신고
-              </button>
-            )
-          )}
           {showDeadline && (
-            hasPendingDeadlineRequest ? deadlinePendingPill : (
-              <button
-                onClick={() => onDeadlineExtension(m)}
-                className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--amber)', border: '1px solid var(--amber)' }}
-              >
-                📅 기한 연장
-              </button>
-            )
+            <button
+              onClick={() => onDeadlineExtension(m)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+              style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--amber)', border: '1px solid var(--amber)' }}
+            >
+              📅 기한 연장
+            </button>
           )}
           {showProgress && (
             charterApproved ? (
@@ -209,18 +201,17 @@ function MilestoneCard({ m, showActions, hasPendingDeadlineRequest, charterAppro
 
 export interface CheckinTabProps {
   milestones: Milestone[]
-  requests: DeadlineChangeRequest[]
   charterApproved: boolean
   onComplete: (id: string) => Promise<void>
-  onDelayReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
+  onIssueReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
   onInProgress: (id: string) => Promise<void>
   onDeadlineExtension: (m: Milestone) => void
 }
 
-export function CheckinTab({ milestones, requests, charterApproved, onComplete, onDelayReport, onInProgress, onDeadlineExtension }: CheckinTabProps) {
+export function CheckinTab({ milestones, charterApproved, onComplete, onIssueReport, onInProgress, onDeadlineExtension }: CheckinTabProps) {
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null)
-  const [delayMilestone, setDelayMilestone] = useState<Milestone | null>(null)
-  const [delayForm, setDelayForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })
+  const [issueMilestone, setIssueMilestone] = useState<Milestone | null>(null)
+  const [issueForm, setIssueForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })
   const [submitting, setSubmitting] = useState(false)
 
   const todayStr = useMemo(() => {
@@ -266,11 +257,6 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
     [published, todayStr]
   )
 
-  const pendingDeadlineIds = useMemo(
-    () => new Set(requests.filter(r => r.status === 'pending').map(r => r.milestone_id)),
-    [requests]
-  )
-
   async function handleCompleteConfirm() {
     if (!completeConfirmId) return
     setSubmitting(true)
@@ -282,18 +268,28 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
     }
   }
 
-  async function handleDelaySubmit(e: React.FormEvent) {
+  async function handleIssueSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!delayMilestone || !delayForm.type) return
+    if (!issueMilestone || !issueForm.type) return
     setSubmitting(true)
     try {
-      await onDelayReport(delayMilestone.id, delayForm.type as BottleneckType, delayForm.note || null)
-      setDelayMilestone(null)
-      setDelayForm({ type: '', note: '' })
+      await onIssueReport(issueMilestone.id, issueForm.type as BottleneckType, issueForm.note || null)
+      setIssueMilestone(null)
+      setIssueForm({ type: '', note: '' })
     } finally {
       setSubmitting(false)
     }
   }
+
+  const cardProps = (m: Milestone, showActions: boolean) => ({
+    m,
+    showActions,
+    charterApproved,
+    onCompleteClick: (id: string) => setCompleteConfirmId(id),
+    onIssueClick: (m: Milestone) => { setIssueMilestone(m); setIssueForm({ type: '', note: '' }) },
+    onDeadlineExtension,
+    onInProgress,
+  })
 
   const isEmpty = thisWeek.length === 0 && overdue.length === 0 && upcoming.length === 0
 
@@ -302,7 +298,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
       {isEmpty ? (
         <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>체크인할 마일스톤이 없습니다.</p>
-          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>WBS 탭에서 마일스톤을 추가해보세요.</p>
+          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>Charter 페이지에서 마일스톤을 추가해보세요.</p>
         </div>
       ) : (
         <>
@@ -310,19 +306,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
             <section>
               <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--error)' }}>지연 / 미완료</h2>
               <div className="flex flex-col gap-3">
-                {overdue.map(m => (
-                  <MilestoneCard
-                    key={m.id}
-                    m={m}
-                    showActions
-                    charterApproved={charterApproved}
-                    hasPendingDeadlineRequest={pendingDeadlineIds.has(m.id)}
-                    onCompleteClick={id => setCompleteConfirmId(id)}
-                    onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
-                    onDeadlineExtension={onDeadlineExtension}
-                    onInProgress={onInProgress}
-                  />
-                ))}
+                {overdue.map(m => <MilestoneCard key={m.id} {...cardProps(m, true)} />)}
               </div>
             </section>
           )}
@@ -330,19 +314,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
             <section>
               <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>진행 중</h2>
               <div className="flex flex-col gap-3">
-                {thisWeek.map(m => (
-                  <MilestoneCard
-                    key={m.id}
-                    m={m}
-                    showActions
-                    charterApproved={charterApproved}
-                    hasPendingDeadlineRequest={pendingDeadlineIds.has(m.id)}
-                    onCompleteClick={id => setCompleteConfirmId(id)}
-                    onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
-                    onDeadlineExtension={onDeadlineExtension}
-                    onInProgress={onInProgress}
-                  />
-                ))}
+                {thisWeek.map(m => <MilestoneCard key={m.id} {...cardProps(m, true)} />)}
               </div>
             </section>
           )}
@@ -350,19 +322,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
             <section>
               <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>예정</h2>
               <div className="flex flex-col gap-3">
-                {upcoming.map(m => (
-                  <MilestoneCard
-                    key={m.id}
-                    m={m}
-                    showActions
-                    charterApproved={charterApproved}
-                    hasPendingDeadlineRequest={pendingDeadlineIds.has(m.id)}
-                    onCompleteClick={id => setCompleteConfirmId(id)}
-                    onDelayClick={m => { setDelayMilestone(m); setDelayForm({ type: '', note: '' }) }}
-                    onDeadlineExtension={onDeadlineExtension}
-                    onInProgress={onInProgress}
-                  />
-                ))}
+                {upcoming.map(m => <MilestoneCard key={m.id} {...cardProps(m, true)} />)}
               </div>
             </section>
           )}
@@ -370,19 +330,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
             <section>
               <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>완료됨</h2>
               <div className="flex flex-col gap-3">
-                {completedInRange.map(m => (
-                  <MilestoneCard
-                    key={m.id}
-                    m={m}
-                    showActions={false}
-                    charterApproved={false}
-                    hasPendingDeadlineRequest={false}
-                    onCompleteClick={() => {}}
-                    onDelayClick={() => {}}
-                    onDeadlineExtension={() => {}}
-                    onInProgress={() => {}}
-                  />
-                ))}
+                {completedInRange.map(m => <MilestoneCard key={m.id} {...cardProps(m, false)} />)}
               </div>
             </section>
           )}
@@ -394,7 +342,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>마일스톤을 완료로 표시하시겠어요?</DialogTitle>
-            <DialogDescription>완료 후에도 WBS 탭에서 파일을 첨부할 수 있습니다.</DialogDescription>
+            <DialogDescription>완료 후에도 수정할 수 있습니다.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <button
@@ -416,23 +364,23 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
         </DialogContent>
       </Dialog>
 
-      {/* 지연 신고 modal */}
-      <Dialog open={!!delayMilestone} onOpenChange={open => { if (!open) { setDelayMilestone(null); setDelayForm({ type: '', note: '' }) } }}>
+      {/* 이슈 보고/도움 요청 modal */}
+      <Dialog open={!!issueMilestone} onOpenChange={open => { if (!open) { setIssueMilestone(null); setIssueForm({ type: '', note: '' }) } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>지연 신고</DialogTitle>
-            {delayMilestone && (
-              <DialogDescription>{delayMilestone.title}</DialogDescription>
+            <DialogTitle>이슈 보고/도움 요청</DialogTitle>
+            {issueMilestone && (
+              <DialogDescription>{issueMilestone.title}</DialogDescription>
             )}
           </DialogHeader>
-          <form onSubmit={handleDelaySubmit} className="flex flex-col gap-3">
+          <form onSubmit={handleIssueSubmit} className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                지연 유형 <span style={{ color: 'var(--error)' }}>*</span>
+                이슈 유형 <span style={{ color: 'var(--error)' }}>*</span>
               </label>
               <select
-                value={delayForm.type}
-                onChange={e => setDelayForm(f => ({ ...f, type: e.target.value as BottleneckType | '' }))}
+                value={issueForm.type}
+                onChange={e => setIssueForm(f => ({ ...f, type: e.target.value as BottleneckType | '' }))}
                 required
                 style={{ ...CHECKIN_INPUT_STYLE, cursor: 'pointer' }}
               >
@@ -445,9 +393,9 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>설명 (선택)</label>
               <textarea
-                value={delayForm.note}
-                onChange={e => setDelayForm(f => ({ ...f, note: e.target.value }))}
-                placeholder="지연 상황을 자세히 설명해주세요"
+                value={issueForm.note}
+                onChange={e => setIssueForm(f => ({ ...f, note: e.target.value }))}
+                placeholder="이슈 상황을 자세히 설명해주세요"
                 rows={3}
                 style={{ ...CHECKIN_INPUT_STYLE, resize: 'none' }}
               />
@@ -455,7 +403,7 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
             <DialogFooter>
               <button
                 type="button"
-                onClick={() => { setDelayMilestone(null); setDelayForm({ type: '', note: '' }) }}
+                onClick={() => { setIssueMilestone(null); setIssueForm({ type: '', note: '' }) }}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold"
                 style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
               >
@@ -463,11 +411,11 @@ export function CheckinTab({ milestones, requests, charterApproved, onComplete, 
               </button>
               <button
                 type="submit"
-                disabled={submitting || !delayForm.type}
+                disabled={submitting || !issueForm.type}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--error)', color: '#fff', opacity: (submitting || !delayForm.type) ? 0.7 : 1 }}
+                style={{ background: 'var(--error)', color: '#fff', opacity: (submitting || !issueForm.type) ? 0.7 : 1 }}
               >
-                신고하기
+                보고하기
               </button>
             </DialogFooter>
           </form>
