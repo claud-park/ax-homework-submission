@@ -37,8 +37,8 @@ const BOTTLENECK_OPTIONS: { value: BottleneckType; label: string }[] = [
 ]
 
 const CHECKIN_INPUT_STYLE: React.CSSProperties = {
-  background: 'var(--surface-secondary)',
-  border: '1px solid var(--border-subtle)',
+  background: 'var(--background)',
+  border: '1px solid var(--border)',
   borderRadius: '8px',
   color: 'var(--text-primary)',
   padding: '8px 12px',
@@ -75,10 +75,10 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
   return (
     <div
       style={{
-        border: isDelayed ? '2px solid var(--error)' : '1px solid var(--border-subtle)',
+        border: isDelayed ? '1px solid var(--error)' : '1px solid var(--border)',
         borderRadius: '10px',
         padding: '14px 16px',
-        background: showActions ? 'var(--surface-primary)' : 'var(--surface-secondary)',
+        background: 'var(--background)',
         opacity: showActions ? 1 : 0.6,
       }}
     >
@@ -185,7 +185,7 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
             ) : (
               <span
                 className="text-xs px-3 py-1 rounded-full font-semibold"
-                style={{ background: 'var(--surface-secondary)', color: 'var(--text-disabled)', border: '1px solid var(--border-subtle)', cursor: 'default' }}
+                style={{ background: 'transparent', color: 'var(--text-disabled)', border: '1px solid var(--border)', cursor: 'default' }}
               >
                 과제 정의서 검토중
               </span>
@@ -348,7 +348,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
             <button
               onClick={() => setCompleteConfirmId(null)}
               className="flex-1 py-2 rounded-lg text-xs font-semibold"
-              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+              style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
               취소
             </button>
@@ -405,7 +405,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
                 type="button"
                 onClick={() => { setIssueMilestone(null); setIssueForm({ type: '', note: '' }) }}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold"
-                style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+                style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
               >
                 취소
               </button>
