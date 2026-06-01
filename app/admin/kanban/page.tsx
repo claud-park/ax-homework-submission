@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent,
   PointerSensor, useSensor, useSensors, useDroppable,
@@ -20,6 +21,7 @@ const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: strin
 
 const DRAGGABLE_COLS: KanbanColumn[] = ['reviewing']
 const DROPPABLE_COLS: KanbanColumn[] = ['accepted', 'declined']
+const NAVIGATE_COLS: KanbanColumn[] = ['not_started', 'in_progress']
 
 function cardDragId(card: KanbanCard) {
   return card.userId
@@ -42,12 +44,14 @@ function KanbanCardView({
   draggable,
   clickable,
   onClick,
+  onNavigate,
 }: {
   card: KanbanCard
   col: typeof COLS[0]
   draggable: boolean
   clickable: boolean
   onClick?: () => void
+  onNavigate?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: cardDragId(card),
@@ -59,19 +63,24 @@ function KanbanCardView({
     ? Math.round((card.milestoneCompleted / card.milestoneTotal) * 100)
     : 0
 
-  const cursor = draggable ? 'grab' : clickable ? 'pointer' : 'default'
+  const cursor = draggable ? 'grab' : (clickable || onNavigate) ? 'pointer' : 'default'
+
+  function handleClick() {
+    if (onNavigate) { onNavigate(); return }
+    if (clickable) onClick?.()
+  }
 
   return (
     <div
       ref={setNodeRef}
       {...(draggable ? { ...attributes, ...listeners } : {})}
-      onClick={clickable ? onClick : undefined}
-      role={clickable ? 'button' : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onKeyDown={clickable ? (e) => {
+      onClick={!draggable && (clickable || !!onNavigate) ? handleClick : undefined}
+      role={!draggable && (clickable || !!onNavigate) ? 'button' : undefined}
+      tabIndex={!draggable && (clickable || !!onNavigate) ? 0 : undefined}
+      onKeyDown={!draggable && (clickable || !!onNavigate) ? (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          onClick?.()
+          handleClick()
         }
       } : undefined}
       className="rounded-xl border text-xs p-3 transition-shadow hover:shadow-md"
@@ -160,14 +169,17 @@ function DroppableCol({
   cards,
   isDropTarget,
   onCardClick,
+  onCardNavigate,
 }: {
   col: typeof COLS[0]
   cards: KanbanCard[]
   isDropTarget: boolean
   onCardClick: (card: KanbanCard) => void
+  onCardNavigate: (card: KanbanCard) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.key, disabled: !isDropTarget })
   const isClickable = CLICKABLE_COLS.includes(col.key)
+  const isNavigable = NAVIGATE_COLS.includes(col.key)
 
   return (
     <div
@@ -200,6 +212,7 @@ function DroppableCol({
             draggable={DRAGGABLE_COLS.includes(col.key)}
             clickable={isClickable}
             onClick={() => onCardClick(card)}
+            onNavigate={isNavigable ? () => onCardNavigate(card) : undefined}
           />
         ))}
       </div>
@@ -216,6 +229,7 @@ const EMPTY_DATA: KanbanDataV2 = {
 }
 
 export default function AdminKanbanPage() {
+  const router = useRouter()
   const [data, setData] = useState<KanbanDataV2>(EMPTY_DATA)
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null)
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null)
@@ -312,6 +326,7 @@ export default function AdminKanbanPage() {
               cards={data[col.key]}
               isDropTarget={DROPPABLE_COLS.includes(col.key)}
               onCardClick={setSelectedCard}
+              onCardNavigate={(card) => router.push(`/admin/champions/${card.userId}`)}
             />
           ))}
         </div>
