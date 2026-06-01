@@ -75,7 +75,7 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
   return (
     <div
       style={{
-        border: isDelayed ? '1px solid var(--error)' : '1px solid var(--border)',
+        border: isDelayed ? '2px solid var(--error)' : '1px solid var(--border)',
         borderRadius: '10px',
         padding: '14px 16px',
         background: 'var(--background)',
