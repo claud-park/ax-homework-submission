@@ -18,6 +18,20 @@ const STATUS_PROGRESS: Record<MilestoneStatus, number> = {
 const STATUS_COLOR: Record<MilestoneStatus, string> = {
   not_started: '#94a3b8', in_progress: '#3b82f6', delayed: '#ef4444', completed: '#22c55e',
 }
+const STATUS_BG: Record<MilestoneStatus, string> = {
+  not_started: 'rgba(148,163,184,0.2)',
+  in_progress: 'rgba(59,130,246,0.18)',
+  delayed: 'rgba(239,68,68,0.18)',
+  completed: 'rgba(34,197,94,0.18)',
+}
+const STATUS_BG_SELECTED: Record<MilestoneStatus, string> = {
+  not_started: 'rgba(148,163,184,0.35)',
+  in_progress: 'rgba(59,130,246,0.32)',
+  delayed: 'rgba(239,68,68,0.32)',
+  completed: 'rgba(34,197,94,0.32)',
+}
+const FUTURE_BG = 'rgba(203,213,225,0.2)'
+const FUTURE_BG_SELECTED = 'rgba(203,213,225,0.35)'
 const STATUS_LABEL: Record<MilestoneStatus, string> = {
   not_started: '미시작', in_progress: '진행 중', delayed: '지연', completed: '완료',
 }
@@ -110,7 +124,6 @@ function toTasks(champions: GanttChampion[]): Task[] {
       if (end0 <= start0) end0 = new Date(start0.getTime() + 86400000)
 
       const isFuture0 = gStart > todayStr
-      const isPast0 = gEnd < todayStr
 
       if (hasChildren) {
         // depth-0 with children → project (toggleable) group row under champion
@@ -129,7 +142,6 @@ function toTasks(champions: GanttChampion[]): Task[] {
         for (const m of children) {
           if (!m.start_date || !m.due_date) continue
           const isFuture = m.start_date > todayStr
-          const isPast = m.due_date < todayStr
           const start = new Date(m.start_date)
           let end = new Date(m.due_date)
           if (end <= start) end = new Date(start.getTime() + 86400000)
@@ -142,9 +154,10 @@ function toTasks(champions: GanttChampion[]): Task[] {
             end,
             progress: STATUS_PROGRESS[m.status],
             styles: {
+              backgroundColor: isFuture ? FUTURE_BG : STATUS_BG[m.status],
+              backgroundSelectedColor: isFuture ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[m.status],
               progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
               progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
-              backgroundColor: isPast && m.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
             },
             displayOrder: tasks.length + 1,
           })
@@ -160,9 +173,10 @@ function toTasks(champions: GanttChampion[]): Task[] {
           end: end0,
           progress: STATUS_PROGRESS[g.status],
           styles: {
+            backgroundColor: isFuture0 ? FUTURE_BG : STATUS_BG[g.status],
+            backgroundSelectedColor: isFuture0 ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[g.status],
             progressColor: isFuture0 ? '#cbd5e1' : STATUS_COLOR[g.status],
             progressSelectedColor: isFuture0 ? '#94a3b8' : STATUS_COLOR[g.status],
-            backgroundColor: isPast0 && g.status !== 'completed' ? 'rgba(239,68,68,0.15)' : undefined,
           },
           displayOrder: tasks.length + 1,
         })
