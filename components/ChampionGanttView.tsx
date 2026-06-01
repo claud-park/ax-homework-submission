@@ -325,7 +325,7 @@ function makeTaskListTable(
                 // Milestone row (group or task): single-width name cell with indent
                 <div style={{
                   width: listWidth, display: 'flex', alignItems: 'center',
-                  padding: `0 6px 0 ${isGroupRow ? 16 : 28}px`,
+                  padding: `0 6px 0 ${isGroupRow ? 16 : t.project?.startsWith('group-') ? 36 : 28}px`,
                   overflow: 'hidden', whiteSpace: 'nowrap',
                 }}>
                   {isGroupRow && (
