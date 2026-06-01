@@ -199,7 +199,7 @@ function cell(width: number, extra?: React.CSSProperties): React.CSSProperties {
     width, minWidth: width, maxWidth: width,
     display: 'flex', alignItems: 'center',
     padding: '0 6px', overflow: 'hidden', whiteSpace: 'nowrap',
-    borderRight: '1px solid var(--border-subtle)',
+    borderRight: '1px solid var(--border)',
     ...extra,
   }
 }
@@ -212,7 +212,7 @@ function makeTaskListHeader(projectW: number, listWidth: number, onResizeStart: 
       <div style={{
         display: 'flex', height: headerHeight, width: listWidth,
         fontFamily, fontSize, fontWeight: 600, color: 'var(--text-secondary)',
-        borderBottom: '2px solid var(--border-subtle)', background: 'var(--surface-primary)',
+        borderBottom: '1px solid var(--border)', background: 'var(--background)',
       }}>
         <div style={cell(W.name)}>이름</div>
         <div style={cell(W.dept)}>부서</div>
@@ -271,8 +271,8 @@ function makeTaskListTable(
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTask(t.id) } }}
               style={{
                 display: 'flex', height: rowHeight, alignItems: 'center',
-                background: isSelected ? 'rgba(37,99,235,0.06)' : 'var(--surface-primary)',
-                borderBottom: '1px solid var(--surface-secondary)',
+                background: isSelected ? 'rgba(37,99,235,0.06)' : 'var(--background)',
+                borderBottom: '1px solid var(--border-subtle)',
                 cursor: 'pointer',
               }}
             >
@@ -381,9 +381,9 @@ function CharterDetailPanel({ userId, champMap, onClose }: {
   return (
     <div style={{
       width: 320, flexShrink: 0,
-      borderLeft: '1px solid var(--border-subtle)',
+      borderLeft: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
-      background: 'var(--surface-primary)',
+      background: 'var(--background)',
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

@@ -51,9 +51,8 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
           drawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
         style={{
-          background: 'var(--surface-primary)',
-          borderColor: 'var(--border-subtle)',
-          boxShadow: 'var(--shadow-s)',
+          background: 'var(--background)',
+          borderColor: 'var(--border)',
         }}
       >
         {/* Brand header */}
@@ -125,9 +124,8 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
           className="flex items-center px-6 flex-shrink-0 border-b"
           style={{
             height: 52,
-            background: 'var(--surface-primary)',
-            borderColor: 'var(--border-subtle)',
-            boxShadow: 'var(--shadow-s)',
+            background: 'var(--background)',
+            borderColor: 'var(--border)',
           }}
         >
           <div className="flex items-center gap-3 md:hidden">
