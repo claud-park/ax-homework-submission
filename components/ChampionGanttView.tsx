@@ -105,10 +105,10 @@ function toTasks(champions: GanttChampion[]): Task[] {
       hideChildren: false,
       displayOrder: tasks.length + 1,
       styles: {
-        backgroundColor: 'rgba(236,72,153,0.15)',
-        backgroundSelectedColor: 'rgba(236,72,153,0.28)',
-        progressColor: 'rgba(236,72,153,0.55)',
-        progressSelectedColor: 'rgba(236,72,153,0.7)',
+        backgroundColor: 'rgba(63,63,255,0.25)',
+        backgroundSelectedColor: 'rgba(63,63,255,0.4)',
+        progressColor: '#3f3fff',
+        progressSelectedColor: '#5868ff',
       },
     })
 
