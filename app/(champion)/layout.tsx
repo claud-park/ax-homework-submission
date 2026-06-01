@@ -8,7 +8,7 @@ import { parseName } from '@/lib/utils'
 const NAV = [
   { icon: Users,      label: '전체 현황',      href: '/',                      match: (p: string) => p === '/' || p.startsWith('/champions') },
   { icon: FileText,   label: '내 과제정의서',   href: '/my-project/charter',    match: (p: string) => p.startsWith('/my-project/charter') },
-  { icon: LayoutList, label: '내 업무 현황',    href: '/my-project/milestones', match: (p: string) => p.startsWith('/my-project/milestones') || p === '/checkin' },
+  { icon: LayoutList, label: '내 업무 현황',    href: '/my-project/milestones', match: (p: string) => p.startsWith('/my-project/milestones') },
   { icon: Upload,     label: '최종 과제 제출',  href: '/my-project/submission', match: (p: string) => p.startsWith('/my-project/submission') },
 ]
 
