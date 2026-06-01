@@ -696,7 +696,7 @@ export default function CharterPage() {
     setSidePanel(newSub)
   }
 
-  function handleAutoSaved(_newSub: CharterSubmission) {
+  function handleAutoSaved(_: CharterSubmission) {
     // auto-save acknowledged; sidePanel stays unchanged to avoid remount
   }
 
