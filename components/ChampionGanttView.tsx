@@ -128,16 +128,21 @@ function toTasks(champions: GanttChampion[]): Task[] {
       const isFuture0 = gStart > todayStr
 
       if (hasChildren) {
-        // depth-0 with children → project (toggleable) group row under champion
+        // depth-0 with children → full-height task bar (collapse handled manually)
         tasks.push({
           id: `group-${g.id}`,
           name: g.title,
-          type: 'project',
+          type: 'task',
           project: champId,
           start: start0,
           end: end0,
-          progress: 0,
-          hideChildren: false,
+          progress: STATUS_PROGRESS[g.status],
+          styles: {
+            backgroundColor: isFuture0 ? FUTURE_BG : STATUS_BG[g.status],
+            backgroundSelectedColor: isFuture0 ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[g.status],
+            progressColor: isFuture0 ? '#cbd5e1' : STATUS_COLOR[g.status],
+            progressSelectedColor: isFuture0 ? '#94a3b8' : STATUS_COLOR[g.status],
+          },
           displayOrder: tasks.length + 1,
         })
 
@@ -484,12 +489,33 @@ export function ChampionGanttView() {
 
   const rawTasks = useMemo(() => toTasks(filteredChampions), [filteredChampions])
 
-  const tasks = useMemo(() =>
-    rawTasks.map(t =>
-      t.type === 'project' ? { ...t, hideChildren: collapsedIds.has(t.id) } : t
-    ),
-    [rawTasks, collapsedIds],
-  )
+  const tasks = useMemo(() => {
+    const collapsedChamps = new Set<string>()
+    const collapsedGroups = new Set<string>()
+    for (const id of collapsedIds) {
+      if (id.startsWith('champ-')) collapsedChamps.add(id)
+      else if (id.startsWith('group-')) collapsedGroups.add(id)
+    }
+
+    // Build a lookup: groupId → champId for grandchild filtering
+    const groupParent = new Map<string, string>()
+    for (const t of rawTasks) {
+      if (t.id.startsWith('group-') && t.project) groupParent.set(t.id, t.project)
+    }
+
+    return rawTasks
+      .map(t => t.type === 'project' ? { ...t, hideChildren: false } : t)
+      .filter(t => {
+        if (!t.project) return true
+        if (t.id.startsWith('group-')) return !collapsedChamps.has(t.project)
+        if (t.project.startsWith('group-')) {
+          if (collapsedGroups.has(t.project)) return false
+          const champId = groupParent.get(t.project)
+          return !champId || !collapsedChamps.has(champId)
+        }
+        return !collapsedChamps.has(t.project)
+      })
+  }, [rawTasks, collapsedIds])
 
   const handleCharterClick = useCallback((userId: string) => {
     setPanelUserId(prev => prev === userId ? null : userId)

@@ -178,24 +178,23 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
   display: none;
 }
 
-/* Gantt project bar: 8px line (8/36 row height) vertically centered */
-._2RbVy {
+/* Champion umbrella bar: single 8px line — scale background rect only */
+._1KJ6x ._2RbVy {
   opacity: 1;
   transform: scaleY(0.222);
   transform-box: fill-box;
   transform-origin: 50% 50%;
 }
 
-/* Gantt project bar progress fill: same height as background */
-._2pZMF {
-  transform: scaleY(0.222);
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
+/* Hide decorative top-half rect and left/right triangles on champion bar */
+._1KJ6x ._2pZMF {
+  display: none;
 }
 
-/* Gantt project bar label: dark text */
-._1KJ6x ~ ._3zRJQ {
-  fill: var(--text-primary);
+/* Hide label inside champion bar (8px too thin for text) */
+._1KJ6x ~ ._3zRJQ,
+._1KJ6x ~ ._3KcaM {
+  display: none;
 }
 
 /* Gantt task bar label: hide name on bar */
