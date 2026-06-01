@@ -111,7 +111,7 @@ export default function WorkStatusPage() {
   async function submitNew(publishStatus: 'draft' | 'published') {
     setError(null)
     try {
-      const created = await apiFetch<Milestone>('/api/milestones', {
+      const { milestone: created, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>('/api/milestones', {
         method: 'POST',
         body: JSON.stringify({
           ...form,
@@ -121,7 +121,10 @@ export default function WorkStatusPage() {
           publish_status: publishStatus,
         }),
       })
-      setMilestones(prev => [...prev, created])
+      setMilestones(prev => {
+        const next = [...prev, created]
+        return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
+      })
       setShowForm(false)
       setForm({ title: '', start_date: '', due_date: '', description: '', parent_milestone_id: '' })
       toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 추가되었습니다.')
@@ -151,7 +154,7 @@ export default function WorkStatusPage() {
   async function handleMarkProgress(id: string) {
     setError(null)
     try {
-      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+      const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
         method: 'PATCH', body: JSON.stringify({ is_manual_progress: true, bottleneck_type: null, bottleneck_note: null }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
@@ -165,7 +168,7 @@ export default function WorkStatusPage() {
 
   async function handleCheckinComplete(id: string) {
     try {
-      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+      const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_manual_completed: true, bottleneck_type: null, bottleneck_note: null }),
       })
@@ -178,7 +181,7 @@ export default function WorkStatusPage() {
 
   async function handleCheckinDelayReport(id: string, type: BottleneckType, note: string | null) {
     try {
-      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+      const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ bottleneck_type: type, bottleneck_note: note, is_manual_completed: false, is_manual_progress: false }),
       })
@@ -191,7 +194,7 @@ export default function WorkStatusPage() {
 
   async function handleCheckinInProgress(id: string) {
     try {
-      const updated = await apiFetch<Milestone>(`/api/milestones/${id}`, {
+      const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_manual_progress: true, bottleneck_type: null, bottleneck_note: null, is_manual_completed: false }),
       })
@@ -245,7 +248,7 @@ export default function WorkStatusPage() {
     if (!editingMilestone) return
     setEditSaving(true)
     try {
-      const updated = await apiFetch<Milestone>(`/api/milestones/${editingMilestone.id}`, {
+      const { milestone: updated, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${editingMilestone.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           ...editForm,
@@ -254,7 +257,10 @@ export default function WorkStatusPage() {
           publish_status: publishStatus,
         }),
       })
-      setMilestones(prev => prev.map(m => m.id === updated.id ? updated : m))
+      setMilestones(prev => {
+        const next = prev.map(m => m.id === updated.id ? updated : m)
+        return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
+      })
       setEditingMilestone(null)
       toast.success(publishStatus === 'draft' ? '임시저장되었습니다.' : '마일스톤이 수정되었습니다.')
     } catch (e: unknown) {
@@ -276,8 +282,11 @@ export default function WorkStatusPage() {
   async function handleDelete(id: string) {
     setError(null)
     try {
-      await apiFetch(`/api/milestones/${id}`, { method: 'DELETE' })
-      setMilestones(prev => prev.filter(m => m.id !== id))
+      const { parentUpdated } = await apiFetch<{ parentUpdated: Milestone | null }>(`/api/milestones/${id}`, { method: 'DELETE' })
+      setMilestones(prev => {
+        const next = prev.filter(m => m.id !== id)
+        return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
+      })
       setEditingMilestone(null)
       toast.success('마일스톤이 삭제되었습니다.')
     } catch (e: unknown) {

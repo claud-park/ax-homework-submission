@@ -4,6 +4,24 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { notifyMilestoneCompleted, notifyBottleneck } from '@/lib/notifications'
 import type { MilestoneStatus, User } from '@/lib/types'
 
+async function syncParentDates(
+  supabase: ReturnType<typeof createServiceClient>,
+  parentId: string,
+  userId: string,
+) {
+  const { data: children } = await supabase
+    .from('milestones').select('start_date, due_date')
+    .eq('parent_milestone_id', parentId).eq('user_id', userId)
+  if (!children) return null
+  const startDates = children.map((c: { start_date: string | null }) => c.start_date).filter(Boolean).sort() as string[]
+  const dueDates = children.map((c: { due_date: string | null }) => c.due_date).filter(Boolean).sort() as string[]
+  const { data: parent } = await supabase
+    .from('milestones')
+    .update({ start_date: startDates[0] ?? null, due_date: dueDates[dueDates.length - 1] ?? null, updated_at: new Date().toISOString() })
+    .eq('id', parentId).eq('user_id', userId).select().single()
+  return parent ?? null
+}
+
 function computeStatus(
   milestone: {
     due_date: string | null
@@ -109,14 +127,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     notifyBottleneck({ user: notifUser, milestone: data, type: body.bottleneck_type, note: body.bottleneck_note ?? null }).catch(console.error)
   }
 
-  return NextResponse.json(data)
+  const affectsParentDates = ('start_date' in body || 'due_date' in body) && existing.parent_milestone_id
+  const parentUpdated = affectsParentDates
+    ? await syncParentDates(supabase, existing.parent_milestone_id, user.id)
+    : null
+
+  return NextResponse.json({ milestone: data, parentUpdated })
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = createServiceClient()
+  const { data: toDelete } = await supabase
+    .from('milestones').select('parent_milestone_id').eq('id', params.id).eq('user_id', user.id).single()
+  const parentId = toDelete?.parent_milestone_id ?? null
   const { error } = await supabase.from('milestones').delete().eq('id', params.id).eq('user_id', user.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return new NextResponse(null, { status: 204 })
+  const parentUpdated = parentId ? await syncParentDates(supabase, parentId, user.id) : null
+  return NextResponse.json({ parentUpdated }, { status: 200 })
 }

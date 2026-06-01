@@ -189,7 +189,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
     e.preventDefault()
     setSaving(true)
     try {
-      const created = await apiFetch<Milestone>('/api/milestones', {
+      const { milestone: created } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>('/api/milestones', {
         method: 'POST',
         body: JSON.stringify({
           title: form.title,
@@ -213,7 +213,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
     e.preventDefault()
     setSubSaving(true)
     try {
-      const created = await apiFetch<Milestone>('/api/milestones', {
+      const { milestone: created, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>('/api/milestones', {
         method: 'POST',
         body: JSON.stringify({
           title: subForm.title,
@@ -224,6 +224,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         }),
       })
       onAdded(created)
+      if (parentUpdated) onUpdated(parentUpdated)
       setSubForm({ title: '', start_date: '', due_date: '' })
       setSubFormParentId(null)
       toast.success('서브 마일스톤이 추가되었습니다.')
@@ -246,7 +247,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
     if (!editingId) return
     setEditSaving(true)
     try {
-      const updated = await apiFetch<Milestone>(`/api/milestones/${editingId}`, {
+      const { milestone: updated, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${editingId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           title: editForm.title,
@@ -255,6 +256,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         }),
       })
       onUpdated(updated)
+      if (parentUpdated) onUpdated(parentUpdated)
       setEditingId(null)
       toast.success('마일스톤이 수정되었습니다.')
     } catch (e: unknown) {
@@ -266,8 +268,9 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
 
   async function handleDelete(id: string) {
     try {
-      await apiFetch(`/api/milestones/${id}`, { method: 'DELETE' })
+      const { parentUpdated } = await apiFetch<{ parentUpdated: Milestone | null }>(`/api/milestones/${id}`, { method: 'DELETE' })
       onDeleted(id)
+      if (parentUpdated) onUpdated(parentUpdated)
       setConfirmDeleteId(null)
       toast.success('마일스톤이 삭제되었습니다.')
     } catch (e: unknown) {
