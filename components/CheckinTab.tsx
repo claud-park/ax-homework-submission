@@ -60,7 +60,8 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
   const statusColor = STATUS_COLOR[m.status] ?? 'var(--text-disabled)'
   const statusLabel = STATUS_LABEL[m.status] ?? m.status
 
-  const isDelayed = m.status === 'delayed'
+  const todayStr = new Date().toISOString().split('T')[0]
+  const isDelayed = m.status === 'delayed' || (!!m.due_date && m.due_date < todayStr && m.status !== 'completed')
   const isDelayPending = m.bottleneck_type !== null && m.bottleneck_reviewed_at === null
   const hasAdminReply = m.bottleneck_reviewed_at !== null && !!m.bottleneck_admin_comment
 
