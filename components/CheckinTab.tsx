@@ -342,7 +342,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
 
       {/* 완료 confirm dialog */}
       <Dialog open={!!completeConfirmId} onOpenChange={open => { if (!open) setCompleteConfirmId(null) }}>
-        <DialogContent>
+        <DialogContent style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
           <DialogHeader>
             <DialogTitle>마일스톤을 완료로 표시하시겠어요?</DialogTitle>
             <DialogDescription>완료 후에도 수정할 수 있습니다.</DialogDescription>

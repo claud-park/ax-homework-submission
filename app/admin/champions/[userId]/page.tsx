@@ -13,6 +13,12 @@ function fmtMD(s: string): string {
   return `${m}/${d}`
 }
 
+const todayStr = new Date().toISOString().split('T')[0]
+
+function isDelayed(m: Milestone): boolean {
+  return m.status === 'delayed' || (!!m.due_date && m.due_date < todayStr && m.status !== 'completed')
+}
+
 const MS_STATUS_LABEL: Record<MilestoneStatus, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
 }
@@ -233,22 +239,60 @@ export default function AdminChampionPage() {
         return (
           <section className="mb-8">
             <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>마일스톤 그룹</h2>
-            <div style={{ marginBottom: 16 }}>
-              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>마일스톤 그룹</p>
-              <div className="flex flex-col gap-2">
-                {depth0.map((g: Milestone) => {
-                  const children = (data.milestones ?? []).filter((m: Milestone) => m.parent_milestone_id === g.id)
-                  return (
-                    <div key={g.id} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 12px', background: 'var(--surface-secondary)' }}>
-                      <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</p>
-                      {g.start_date && (
-                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{g.start_date} ~ {g.due_date}</p>
-                      )}
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>하위 마일스톤 {children.length}개</p>
+            <div className="flex flex-col gap-4">
+              {depth0.map((g: Milestone) => {
+                const children = (data.milestones ?? []).filter((m: Milestone) => m.parent_milestone_id === g.id)
+                return (
+                  <div key={g.id}>
+                    {/* line header */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{g.title}</span>
+                      <span className="text-xs ml-1" style={{ color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{children.length}개</span>
+                      <span className="flex-1 ml-2" style={{ height: 1, background: 'var(--border)' }} />
                     </div>
-                  )
-                })}
-              </div>
+                    {/* children */}
+                    <div className="flex flex-col gap-2">
+                      {children.map((child: Milestone) => {
+                        const delayed = isDelayed(child)
+                        const isDelayPending = child.bottleneck_type !== null && child.bottleneck_reviewed_at === null
+                        return (
+                          <div
+                            key={child.id}
+                            className="flex items-start justify-between p-3 rounded-xl"
+                            style={{
+                              border: delayed ? '2px solid var(--error)' : '1px solid var(--border-subtle)',
+                              background: 'var(--surface-primary)',
+                            }}
+                          >
+                            <div>
+                              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{child.title}</p>
+                              <p className="text-xs" style={{ color: delayed ? 'var(--error)' : 'var(--text-secondary)' }}>
+                                {fmtMD(child.start_date ?? '')} – {fmtMD(child.due_date ?? '')}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {isDelayPending && (
+                                <span
+                                  className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                                  style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid rgba(248,113,113,0.4)' }}
+                                >
+                                  이슈 검토중
+                                </span>
+                              )}
+                              <span
+                                className="text-xs font-semibold px-2 py-1 rounded-md"
+                                style={{ color: MS_STATUS_COLOR[child.status], background: `${MS_STATUS_COLOR[child.status]}20` }}
+                              >
+                                {MS_STATUS_LABEL[child.status]}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </section>
         )
@@ -258,24 +302,43 @@ export default function AdminChampionPage() {
         <section>
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>WBS / 마일스톤</h2>
           <div className="flex flex-col gap-2">
-            {allMilestones.map(m => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between p-3 rounded-xl border"
-                style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
-              >
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtMD(m.start_date ?? '')} – {fmtMD(m.due_date ?? '')}</p>
-                </div>
-                <span
-                  className="text-xs font-semibold px-2 py-1 rounded-md"
-                  style={{ color: MS_STATUS_COLOR[m.status], background: `${MS_STATUS_COLOR[m.status]}20` }}
+            {allMilestones.map(m => {
+              const delayed = isDelayed(m)
+              const isDelayPending = m.bottleneck_type !== null && m.bottleneck_reviewed_at === null
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between p-3 rounded-xl"
+                  style={{
+                    background: 'var(--surface-primary)',
+                    border: delayed ? '2px solid var(--error)' : '1px solid var(--border-subtle)',
+                  }}
                 >
-                  {MS_STATUS_LABEL[m.status]}
-                </span>
-              </div>
-            ))}
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
+                    <p className="text-xs" style={{ color: delayed ? 'var(--error)' : 'var(--text-secondary)' }}>
+                      {fmtMD(m.start_date ?? '')} – {fmtMD(m.due_date ?? '')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {isDelayPending && (
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--error)', border: '1px solid rgba(248,113,113,0.4)' }}
+                      >
+                        이슈 검토중
+                      </span>
+                    )}
+                    <span
+                      className="text-xs font-semibold px-2 py-1 rounded-md"
+                      style={{ color: MS_STATUS_COLOR[m.status], background: `${MS_STATUS_COLOR[m.status]}20` }}
+                    >
+                      {MS_STATUS_LABEL[m.status]}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </section>
       )}

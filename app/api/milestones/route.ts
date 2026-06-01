@@ -2,24 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
-async function syncParentDates(
-  supabase: ReturnType<typeof createServiceClient>,
-  parentId: string,
-  userId: string,
-) {
-  const { data: children } = await supabase
-    .from('milestones').select('start_date, due_date')
-    .eq('parent_milestone_id', parentId).eq('user_id', userId)
-  if (!children) return null
-  const startDates = children.map((c: { start_date: string | null }) => c.start_date).filter(Boolean).sort() as string[]
-  const dueDates = children.map((c: { due_date: string | null }) => c.due_date).filter(Boolean).sort() as string[]
-  const { data: parent } = await supabase
-    .from('milestones')
-    .update({ start_date: startDates[0] ?? null, due_date: dueDates[dueDates.length - 1] ?? null, updated_at: new Date().toISOString() })
-    .eq('id', parentId).eq('user_id', userId).select().single()
-  return parent ?? null
-}
-
 export async function GET(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -72,8 +54,5 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const parentUpdated = parent_milestone_id
-    ? await syncParentDates(supabase, parent_milestone_id, user.id)
-    : null
-  return NextResponse.json({ milestone: data, parentUpdated }, { status: 201 })
+  return NextResponse.json({ milestone: data, parentUpdated: null }, { status: 201 })
 }

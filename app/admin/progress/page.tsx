@@ -103,12 +103,13 @@ function DueDateBadge({ m }: { m: Milestone }) {
 function MilestoneCard({ m }: { m: MilestoneWithUser }) {
   const overdue = isOverdue(m)
   const sc = STATUS_COLOR[m.status]
+  const isDelayPending = m.bottleneck_type !== null && m.bottleneck_reviewed_at === null
 
   return (
     <div style={{
       width: '148px', flexShrink: 0,
       borderRadius: '10px',
-      border: overdue ? '1.5px solid rgba(248,113,113,0.5)' : '1px solid var(--border-subtle)',
+      border: overdue ? '2px solid var(--error)' : '1px solid var(--border-subtle)',
       background: overdue ? 'rgba(248,113,113,0.04)' : 'var(--surface-secondary)',
       padding: '10px 12px', display: 'flex', flexDirection: 'column',
     }}>
@@ -126,6 +127,16 @@ function MilestoneCard({ m }: { m: MilestoneWithUser }) {
         {m.title}
       </p>
       <span style={{ fontSize: '10px', fontWeight: 600, color: sc }}>{STATUS_LABEL[m.status]}</span>
+      {isDelayPending && (
+        <span style={{
+          marginTop: '4px', fontSize: '9px', fontWeight: 700,
+          padding: '1px 6px', borderRadius: '10px', alignSelf: 'flex-start',
+          background: 'rgba(248,113,113,0.1)', color: 'var(--error)',
+          border: '1px solid rgba(248,113,113,0.4)',
+        }}>
+          이슈 검토중
+        </span>
+      )}
       <DueDateBadge m={m} />
     </div>
   )
