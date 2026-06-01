@@ -485,10 +485,11 @@ function CharterPanel({ mode, submission, onClose, onCreated, onUpdated, onAutoS
   }, [mode])
 
   useEffect(() => {
+    if (mode !== 'edit') return
     apiFetch<Milestone[]>('/api/milestones')
       .then(data => setMilestones(data.filter(m => m.publish_status === 'published')))
       .catch(() => {})
-  }, [])
+  }, [mode])
 
   function handleSectionBlur(key: SectionKey, html: string) {
     contentRef.current = { ...contentRef.current, [key]: html }
