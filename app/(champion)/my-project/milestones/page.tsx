@@ -102,6 +102,24 @@ export default function WorkStatusPage() {
     }
   }
 
+  const todayStr = useMemo(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [])
+
+  const overdueIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const m of milestones) {
+      if (m.publish_status === 'published' && m.start_date && m.due_date &&
+          m.due_date < todayStr && m.status !== 'completed') {
+        ids.add(m.id)
+      }
+    }
+    return ids
+  }, [milestones, todayStr])
+
+  const allOverdue = useMemo(() => milestones.filter(m => overdueIds.has(m.id)), [milestones, overdueIds])
+
   const checkinGroups = useMemo(() => {
     const depth0 = milestones.filter(m => !m.parent_milestone_id)
     const byParent = new Map<string, Milestone[]>()
@@ -133,16 +151,23 @@ export default function WorkStatusPage() {
           </div>
         ) : (
           <>
-            {/* Ungrouped (depth-0) milestones */}
-            {milestones.some(m => !m.parent_milestone_id) && (
+            {/* Global overdue section — always at top across all groups */}
+            {allOverdue.length > 0 && (
+              <CheckinTab milestones={allOverdue} {...checkinProps} />
+            )}
+
+            {/* Ungrouped (depth-0) milestones — overdue already shown above */}
+            {milestones.some(m => !m.parent_milestone_id && !overdueIds.has(m.id)) && (
               <CheckinTab
-                milestones={milestones.filter(m => !m.parent_milestone_id)}
+                milestones={milestones.filter(m => !m.parent_milestone_id && !overdueIds.has(m.id))}
+                showOverdue={false}
                 {...checkinProps}
               />
             )}
-            {/* Grouped (depth-1) milestones under each depth-0 parent */}
+
+            {/* Grouped (depth-1) milestones under each depth-0 parent — overdue already shown above */}
             {checkinGroups.depth0.map(g => {
-              const gMilestones = checkinGroups.byParent.get(g.id) ?? []
+              const gMilestones = (checkinGroups.byParent.get(g.id) ?? []).filter(m => !overdueIds.has(m.id))
               if (gMilestones.length === 0) return null
               const isCollapsed = collapsedCheckinGroups.has(g.id)
               return (
@@ -164,7 +189,7 @@ export default function WorkStatusPage() {
                     <span className="text-xs ml-auto" style={{ color: 'var(--text-disabled)' }}>{gMilestones.length}개</span>
                   </button>
                   {!isCollapsed && (
-                    <CheckinTab milestones={gMilestones} {...checkinProps} />
+                    <CheckinTab milestones={gMilestones} showOverdue={false} {...checkinProps} />
                   )}
                 </div>
               )

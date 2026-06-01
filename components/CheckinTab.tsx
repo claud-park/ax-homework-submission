@@ -206,9 +206,10 @@ export interface CheckinTabProps {
   onIssueReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
   onInProgress: (id: string) => Promise<void>
   onDeadlineExtension: (m: Milestone) => void
+  showOverdue?: boolean
 }
 
-export function CheckinTab({ milestones, charterApproved, onComplete, onIssueReport, onInProgress, onDeadlineExtension }: CheckinTabProps) {
+export function CheckinTab({ milestones, charterApproved, onComplete, onIssueReport, onInProgress, onDeadlineExtension, showOverdue = true }: CheckinTabProps) {
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null)
   const [issueMilestone, setIssueMilestone] = useState<Milestone | null>(null)
   const [issueForm, setIssueForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })
@@ -302,7 +303,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
         </div>
       ) : (
         <>
-          {overdue.length > 0 && (
+          {showOverdue && overdue.length > 0 && (
             <section>
               <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--error)' }}>지연 / 미완료</h2>
               <div className="flex flex-col gap-3">
