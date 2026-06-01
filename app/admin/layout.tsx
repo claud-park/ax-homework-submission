@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { LayoutDashboard, Layers, CalendarClock, AlertTriangle, FileText, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Layers, CalendarClock, AlertTriangle, FileText, LogOut, Menu, X, Users } from 'lucide-react'
 import { parseName } from '@/lib/utils'
 
 const NAV = [
   { icon: LayoutDashboard, label: '대시보드', href: '/admin' },
+  { icon: Users, label: '챔피언 리스트', href: '/admin/champions' },
   { icon: Layers, label: '제출 현황', href: '/admin/kanban' },
   { icon: AlertTriangle, label: '지연 신고', href: '/admin/delay-reports' },
   { icon: CalendarClock, label: '기한 변경 요청', href: '/admin/requests' },
