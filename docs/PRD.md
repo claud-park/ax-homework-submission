@@ -1,513 +1,476 @@
 # AX Homework Submission Platform — PRD
 
-> **버전** 1.1 · **작성일** 2026-05-21 · **대상** Strategy Lead
-> **상태** Internal Review · **저장소** `AX/ax-homework-submission`
+> **Version** 2.0 · **Updated** 2026-06-02 · **Author** yr.park@dreamus.io
+> **Status** Internal Review · **Repo** `AX/ax-homework-submission`
+> **Previous** v1.1 (2026-05-21)
 
 ---
 
 ## 0. Executive Summary (IR-style)
 
 ### One-liner
-**AX 프로그램의 과제 정의 → 수행 → 검토 → 피드백을 단일 플랫폼에서 처리하는 풀스택 웹 애플리케이션.**
+**A full-stack web application that unifies the entire AX program lifecycle — task definition → execution → review → feedback — on a single platform.**
 
-### 왜 지금인가 (Why Now)
-- AX 프로그램은 다수의 챔피언(학생/수강생)이 멀티-마일스톤 과제를 수행하는 구조이나, **현재 제출·검토 워크플로우가 분산**되어 있어 관리 비용이 누적됨 (이메일/스프레드시트/Slack 분산 운영).
-- 본 플랫폼은 **과제정의서(Charter) → WBS 마일스톤 → 산출물 제출 → 합격 판정**의 전 라이프사이클을 단일 시스템에 통합.
+### Why Now
+AX program operations involve multiple champions executing multi-milestone assignments, but current submit/review workflows are fragmented across email, spreadsheets, and Slack. This platform integrates the full lifecycle: **Charter → WBS Milestones → Final Submission → Pass/Fail judgment**.
 
-### 핵심 차별점
-| 항목 | 기존 운영 | 본 플랫폼 |
+### Key Differentiators
+| Item | Before | This Platform |
 |---|---|---|
-| Charter 작성 | Word 첨부 | TipTap WYSIWYG + DOCX 내보내기 |
-| 진행 가시화 | 스프레드시트 수동 갱신 | Gantt + 칸반 자동 동기화 |
-| 검토 워크플로우 | 이메일 회람 | **단방향 DnD 칸반** (검토중 → 합격/불합격) |
-| 피드백 루프 | Slack/대면 | 양방향 댓글 + 이메일 자동 알림 (7 트리거) |
-| 임시저장 | 없음 | Draft/Publish 이원화 (과제·Charter·Milestone) |
-| 데이터 보안 | 파일 서버 | Supabase RLS **DENY ALL** + 서버 API 단일 게이트웨이 |
-| 배포 자동화 | 수동 | GitHub Actions CI + Docker + Jenkins CD |
+| Charter creation | Word attachment | TipTap WYSIWYG + DOCX export |
+| Progress visibility | Manual spreadsheet updates | Gantt + champion dashboard auto-sync |
+| Review workflow | Email thread | Unidirectional DnD Kanban |
+| Feedback loop | Slack / in-person | Bidirectional comments + email alerts (9 triggers) |
+| Admin action | Manual outreach | One-click Nudge email from dashboard |
+| Auto-save | None | Draft/Publish for task, Charter, Milestone |
+| Data security | Shared file server | Supabase RLS DENY ALL + server-only API gateway |
+| Deployment | Manual | GitHub Actions CI + Docker + Jenkins CD |
+| Mobile access | Desktop-only | Champion & Admin key pages mobile-optimized |
 
-### 현재 진척도 (2026-05-21 기준)
-- **기능 완성도**: 핵심 11개 영역 중 9개 완성 (82%) — 대시보드/리포팅만 골격 단계
-- **커밋 수**: 50+ (임시저장·CI/CD·FK 수정 포함)
-- **데이터 모델**: 9개 핵심 테이블 + 3개 partial index + 2개 Storage 버킷, RLS 정책 적용 완료
-- **CI/CD**: GitHub Actions (lint·typecheck·build) + Docker + Jenkins 완료
+### Current Progress (as of 2026-06-02)
+- **Feature completion**: 16 of 17 core areas complete (**94%**) — only Champion progress dashboard remains skeletal
+- **Commits**: 200+ (including milestone tree refactor, CI/CD, mobile UX)
+- **Data model**: 9 core tables + 3 partial indexes + 1 Storage bucket, RLS policies applied
+- **CI/CD**: GitHub Actions (lint · typecheck · build) + Docker + Jenkins complete
 
-### KPI 목표 (런칭 후 90일)
-| 지표 | 목표 | 측정 방식 |
+### KPI Targets (90 days post-launch)
+| Metric | Target | Measurement |
 |---|---|---|
-| 챔피언 활성률 | 주간 활성 ≥ 70% | 로그인 + Charter/Milestone 1회 이상 |
-| 평균 검토 리드타임 | 제출 → 판정 ≤ 24h | submissions.submitted_at → status 변경 |
-| Charter 제출률 | 배정 과제 대비 ≥ 90% | charter_submissions / homeworks per user |
-| 기한변경 자동승인 흐름 | 응답 ≤ 12h | deadline_change_requests.reviewed_at |
-| 이메일 도달률 | ≥ 99% | Nodemailer delivery logs |
+| Champion active rate | Weekly active ≥ 70% | Login + Charter/Milestone activity |
+| Avg review lead time | Submission → verdict ≤ 24h | submissions.submitted_at → status change |
+| Charter submission rate | ≥ 90% of assigned tasks | charter_submissions / homeworks per user |
+| Nudge → action conversion | Monitored | charter/milestone completion within 48h of nudge |
+| Email delivery rate | ≥ 99% | Nodemailer delivery logs |
 
-### Top 3 Risk
-1. **Gmail SMTP 의존성** — 발송 한도(500/일) 도달 시 알림 누락. → SendGrid/SES 마이그레이션 옵션 준비.
-2. **단일 어드민 메일박스 (`ADMIN_NOTIFICATION_EMAIL`)** — 어드민 다중화 시 라우팅 로직 부재.
-3. **단방향 칸반 DnD** — 합격/불합격 후 되돌릴 수 없음. 오판정 복구 프로세스 미정의.
+### Top Risks
+1. **Gmail SMTP limit (500/day)** — alert loss on volume spike. → SendGrid/SES migration prepared (P2).
+2. **Single admin mailbox** — no routing logic for multi-admin setup.
+3. **Unidirectional Kanban DnD** — no rollback after accept/reject. Mis-verdict recovery undefined.
+4. **Nudge rate limiting absent** — same champion can be nudged repeatedly.
 
 ---
 
 ## 1. Problem & Opportunity
 
-### 1.1 문제 정의
-AX 프로그램 운영에는 4개의 독립적인 정보 흐름이 동시에 진행됨:
-1. **과제 정의** — 어드민이 챔피언에게 과제 부여
-2. **과제정의서 (Charter)** — 챔피언이 문제 정의 / 목표 / 범위를 명확화
-3. **마일스톤 (WBS)** — 주차별 작업 계획 수립 및 산출물 누적
-4. **최종 제출 & 판정** — 어드민의 합격/불합격 결정
+### 1.1 Problem
+AX program operations run 4 independent information flows simultaneously:
+1. **Task definition** — admin assigns tasks to champions
+2. **Charter** — champion clarifies problem / goal / scope
+3. **Milestones (WBS)** — weekly work plans and deliverable accumulation
+4. **Final submission & verdict** — admin's pass/fail decision
 
-기존 운영의 페인 포인트:
-- **단일 진실 부재 (No SSOT)** — Charter는 Word, 진행도는 Sheet, 제출은 메일
-- **상태 가시화 부재** — 어느 챔피언이 어느 단계에서 막혀 있는지 파악 어려움
-- **피드백 사일로** — 댓글이 메일 스레드에 흩어져 컨텍스트 유실
-- **승인 워크플로우 비표준** — 기한 변경 요청이 비공식 채널로 처리
+Pain points with existing operations:
+- **No SSOT** — Charter in Word, progress in Sheet, submissions via email
+- **No status visibility** — impossible to see which champion is blocked where
+- **Feedback silos** — comments scattered across email threads, context lost
+- **Non-standard approval workflow** — deadline change requests handled informally
+- **Manual tracking of unregistered champions** — no automated way to identify who hasn't submitted charter or milestones
 
-### 1.2 기회
-- AX 프로그램의 **확장성 (더 많은 챔피언 수용)** 을 위해 표준화된 워크플로우 도구가 선결 조건.
-- 향후 **타 교육/육성 프로그램으로 재사용** 가능한 화이트라벨 베이스라인.
-- 데이터 축적 후 **챔피언 성과 분석 / 코칭 인사이트** 도출 가능.
+### 1.2 Opportunity
+- Standardized workflow tools are a prerequisite for **scaling AX** (more champions).
+- White-label baseline for **reuse across other training/coaching programs**.
+- Data accumulation enables **champion performance analytics and coaching insights**.
 
 ---
 
 ## 2. Target Users
 
-### 2.1 Persona A — Champion (학생/수강생)
-- **Goal**: 자신에게 부여된 과제를 명확히 이해하고, 계획대로 수행하여 합격받기
-- **Pain**: 과제 요구사항 불명확 / 산출물 형식 혼란 / 피드백 지연
-- **Key Actions**: Charter 작성 → Milestone 등록 → 산출물 업로드 → 댓글 응답 → 기한변경 요청
+### 2.1 Persona A — Champion (Student/Participant)
+- **Goal**: Clearly understand assigned tasks, execute according to plan, and earn a passing verdict
+- **Pain**: Unclear requirements / format confusion / delayed feedback
+- **Key Actions**: Charter → Milestone registration → Weekly check-in → Deadline change request → Final submission
 
-### 2.2 Persona B — Admin (운영자/심사자)
-- **Goal**: 다수 챔피언의 진행상황을 한눈에 파악하고, 빠르게 판정/피드백
-- **Pain**: 다수 챔피언의 비동기 제출물 트래킹 부담 / 피드백 작성/전달 오버헤드
-- **Key Actions**: 과제 생성 → Charter 리뷰 → 칸반 판정 → 댓글 작성 → 기한변경 승인
+### 2.2 Persona B — Admin (Operator/Reviewer)
+- **Goal**: Monitor all champions' progress at a glance and deliver fast verdicts/feedback
+- **Pain**: Tracking async submissions from many champions / overhead of writing and delivering feedback / manually identifying unregistered champions
+- **Key Actions**: Dashboard check → Nudge → Charter review → Kanban verdict → Deadline approval
 
-### 2.3 권한 모델
+### 2.3 Permission Model
 ```
 Champion = user_metadata.is_admin === false  (default)
 Admin    = user_metadata.is_admin === true
 ```
-- 모든 API는 JWT 검증 (`verifyJWT`) + 어드민 전용은 추가 검증 (`verifyAdmin`)
-- 클라이언트 직접 DB 접근 금지 (Supabase RLS **DENY ALL**)
+- All APIs: JWT verification (`verifyJWT`) + admin-only APIs add `verifyAdmin`
+- Direct client DB access blocked (Supabase RLS **DENY ALL**)
 
 ---
 
 ## 3. Solution Overview
 
-### 3.1 시스템 컨텍스트
-```mermaid
-flowchart LR
-    subgraph Browser["Browser (CSR)"]
-        ChampionUI["Champion UI<br/>/, /charter, /milestones, /progress"]
-        AdminUI["Admin UI<br/>/admin, /admin/kanban, /admin/requests"]
-    end
-
-    subgraph NextJS["Next.js 14 App Router"]
-        MW["middleware.ts<br/>role-based routing"]
-        API["API Routes<br/>app/api/**"]
-    end
-
-    subgraph Supabase["Supabase (RLS DENY ALL)"]
-        Auth["Auth<br/>Google OAuth"]
-        DB[("PostgreSQL<br/>8 tables")]
-        Storage[("Storage<br/>submissions, milestone-deliverables")]
-    end
-
-    Gmail["Gmail SMTP<br/>(Nodemailer)"]
-
-    ChampionUI -->|JWT| API
-    AdminUI -->|JWT + is_admin| API
-    Browser --> MW --> API
-    API -->|service key| DB
-    API -->|service key| Storage
-    API -->|6 triggers| Gmail
-    Browser -->|OAuth| Auth
-    Auth -.->|JWT| Browser
+### 3.1 System Context
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│  Browser (CSR)                                                        │
+│  Champion UI: /my-project/charter, /my-project/milestones, /progress  │
+│  Admin UI: /admin, /admin/delay-reports, /admin/reports               │
+└──────────────────────┬────────────────────────────────────────────────┘
+                       │ HTTPS + JWT
+┌──────────────────────▼────────────────────────────────────────────────┐
+│  Next.js 14 App Router                                                │
+│  middleware.ts (role-based routing) + API Routes (app/api/**)         │
+└────────┬─────────────────────────────────────────┬────────────────────┘
+         │ service_role key                         │ SMTP
+┌────────▼────────────────────────────┐   ┌────────▼──────────┐
+│  Supabase (RLS DENY ALL)            │   │  Gmail SMTP       │
+│  Auth (Google OAuth)                │   │  (Nodemailer)     │
+│  PostgreSQL (9 tables)              │   │  9 triggers       │
+│  Storage (submissions bucket)       │   └───────────────────┘
+└─────────────────────────────────────┘
 ```
 
-### 3.2 4-Layer 아키텍처
-| 레이어 | 기술 | 역할 |
+### 3.2 4-Layer Architecture
+| Layer | Technology | Role |
 |---|---|---|
-| Presentation | React 18 + shadcn/ui + Tailwind | 화면 / 상호작용 |
-| Routing/Auth | Next.js 14 App Router + middleware | 역할 기반 라우팅 |
-| Business | Next.js API Routes (Node.js) | 비즈니스 로직 / 권한 검증 |
-| Data | Supabase Auth + PostgreSQL + Storage | 영속성 / 인증 |
+| Presentation | React 18 + shadcn/ui + Tailwind + FLO Design System | UI / Interaction |
+| Routing/Auth | Next.js 14 App Router + middleware | Role-based routing |
+| Business | Next.js API Routes (Node.js) | Business logic / auth enforcement |
+| Data | Supabase Auth + PostgreSQL + Storage | Persistence / authentication |
 
 ---
 
 ## 4. Core Features
 
 ### 4.1 Champion Features
-| # | Feature | 핵심 기술 | 상태 |
+| # | Feature | Tech | Status |
 |---|---|---|---|
-| C1 | Google OAuth 로그인 | Supabase Auth | ✅ |
-| C2 | 과제 목록 (List/Board 뷰) | Next.js + dnd-kit | ✅ |
-| C3 | **Charter (과제정의서) 작성** | TipTap WYSIWYG, 6-section | ✅ |
-| C4 | Charter DOCX 내보내기 | `docx` 라이브러리 | ✅ |
-| C5 | Charter 임시저장 / 게시 | `publish_status` enum | ✅ |
-| C6 | Milestone (WBS) CRUD | 자동 상태 계산 | ✅ |
-| C7 | Milestone Gantt 시각화 | `gantt-task-react` | ✅ |
-| C8 | Milestone 임시저장 / 게시 | `publish_status` enum | ✅ |
-| C9 | 산출물 업로드 | Supabase Storage | ✅ |
-| C10 | 기한변경 요청 | `deadline_change_requests` | ✅ |
-| C11 | 댓글 작성 / 답글 | 양방향 알림 | ✅ |
-| C12 | 진행상황 대시보드 | `/progress` | 🚧 골격 |
+| C1 | Google OAuth login | Supabase Auth | ✅ |
+| C2 | Task list view | Next.js | ✅ |
+| C3 | **Charter (task definition doc) WYSIWYG** | TipTap, 6-section | ✅ |
+| C4 | Charter DOCX export | `docx` library | ✅ |
+| C5 | Charter draft / publish | `publish_status` enum | ✅ |
+| C6 | Milestone CRUD — **2-depth tree** | Auto status calculation | ✅ |
+| C7 | Milestone Gantt visualization | `gantt-task-react` | ✅ |
+| C8 | Milestone draft / publish | `publish_status` enum | ✅ |
+| C9 | Deadline change request | `deadline_change_requests` | ✅ |
+| C10 | Comments / replies (bidirectional alerts) | charter_comments | ✅ |
+| C11 | **Weekly check-in (4 actions)** | checkin status workflow | ✅ |
+| C12 | **Milestone due date change modal** | start+end for expired not_started | ✅ |
+| C13 | **Mobile UX** (BottomTabBar + card layouts) | Responsive components | ✅ |
+| C14 | Champion progress dashboard | `/progress` | 🚧 Skeletal |
 
-#### Charter 6 섹션 구조
-1. **문제 정의 (AS-IS)** ⭐ 필수
-2. **목표 (TO-BE)** ⭐ 필수
-3. **범위 In (Scope In)** ⭐ 필수
-4. **범위 Out (Scope Out)** ⭐ 필수
-5. 기대 효과
-6. 리스크
+#### Charter 6-Section Structure
+1. **Problem Definition (AS-IS)** ⭐ Required
+2. **Goal (TO-BE)** ⭐ Required
+3. **Scope In** ⭐ Required
+4. **Scope Out** ⭐ Required
+5. Expected outcomes
+6. Risks
+
+#### Weekly Check-in — 4 Actions
+| Action | Status set | Description |
+|---|---|---|
+| Mark complete | `completed` | Manual completion flag |
+| Report delay | `delayed` | Bottleneck type + notes |
+| Request extension | — | New due_date request |
+| Mark in progress | `in_progress` | Manual progress flag |
+
+#### Milestone 2-depth Tree
+```
+depth-0 (parent_milestone_id IS NULL)    → task group (dates optional)
+  └── depth-1 (parent_milestone_id NOT NULL)  → actual milestone (dates required)
+```
+
+#### Milestone Due Date Change Modal Cases
+| Case | Condition | Inputs |
+|---|---|---|
+| Standard extension | Normal cases | end_date only |
+| Start+end change | `start_date < today` AND `status = 'not_started'` | start_date + end_date |
 
 ### 4.2 Admin Features
-| # | Feature | 핵심 기술 | 상태 |
+| # | Feature | Tech | Status |
 |---|---|---|---|
-| A1 | 과제 생성 / 편집 (임시저장 포함) | TipTap (description) | ✅ |
-| A2 | **칸반 보드 (단방향 DnD)** | dnd-kit + 낙관적 업데이트 | ✅ |
-| A3 | 제출 상세 사이드 패널 | Sheet UI (리사이저블) | ✅ |
-| A4 | Charter 리뷰 & 댓글 | 양방향 알림 | ✅ |
-| A5 | 기한변경 요청 승인/거절 | 자동 마감일 갱신 | ✅ |
-| A6 | **이메일 알림 (7 트리거)** | Nodemailer + Gmail SMTP | ✅ |
-| A7 | 전체 챔피언 진행 대시보드 | `/admin/progress` | 🚧 골격 |
-| A8 | 주간 리포트 | `/admin/reports/[week]` | 🚧 골격 |
+| A1 | Task creation/editing (draft + publish) | TipTap | ✅ |
+| A2 | **Kanban board (unidirectional DnD)** | dnd-kit + optimistic updates | ✅ |
+| A3 | Submission detail side panel | Sheet UI (resizable) | ✅ |
+| A4 | Charter review & comments | Bidirectional alerts | ✅ |
+| A5 | Deadline change approval/rejection | Auto due_date update | ✅ |
+| A6 | Email alerts (9 triggers) | Nodemailer + Gmail SMTP | ✅ |
+| A7 | Delay report review & response | `/admin/delay-reports` | ✅ |
+| A8 | **Champion dashboard** (Gantt + summary table) | ChampionGanttView + ChampionSummaryTable | ✅ |
+| A9 | **"Action needed" section** (charter/milestone missing) | Amber badges + Gantt top section | ✅ |
+| A10 | **Champion Nudge** (one-click email nudge) | NudgePopover + POST /api/admin/nudge | ✅ |
+| A11 | **Weekly reports** (PDF print + week navigation) | @media print + weekly filter | ✅ |
+| A12 | Admin mobile UX | Responsive components | ✅ |
 
-#### Kanban 5-Column 구조
+#### Kanban 5-Column Structure
 ```
-미시작 → 진행중 → [검토중] ─DnD─→ 합격
-                              ╰─→ 불합격
-                              (단방향, 되돌릴 수 없음)
+Not started → In progress → Reviewing ──DnD──→ Accepted
+                                       ╰──────→ Declined
+                                (unidirectional — irreversible after verdict)
 ```
 
-### 4.3 Email Notification Matrix (7 Triggers)
-| # | 트리거 이벤트 | Sender | Recipient | Function |
-|---|---|---|---|---|
-| E1 | Champion 과제 제출 | System | Admin | `notifyNewSubmission` |
-| E2 | Champion 기한변경 요청 | System | Admin | `notifyDeadlineChangeRequest` |
-| E3 | Champion이 제출물에 댓글 | System | Admin | `notifyNewComment` |
-| E4 | Admin이 제출물에 댓글 | System | Champion | `notifyNewComment` |
-| E5 | Champion이 Charter 댓글 | System | Admin | `notifyNewComment` |
-| E6 | Admin이 Charter 답글 | System | Champion | `notifyNewComment` |
-| E7 | Milestone 산출물 업로드 | System | Admin | `notifyMilestoneCompleted` |
+#### Champion Dashboard Components
+| Component | Role |
+|---|---|
+| `ChampionSummaryTable` | Per-champion charter status, milestone registration, weekly progress grid |
+| `ChampionGanttView` | All-champion Gantt (Gantt-only, no view toggle) |
+| Action needed section | Top of Gantt — amber cards for charter-missing / milestone-missing champions, fold/unfold |
+
+#### Champion Nudge — 2 Triggers
+| Trigger | Location | Nudge type |
+|---|---|---|
+| "Action needed" chip click | Charter-missing subsection | `no_charter` |
+| "Action needed" chip click | Milestone-missing subsection | `no_milestone` |
+| Gantt delayed bar click | Gantt chart | `delayed_milestone` |
+
+#### Nudge Email Types (3 types)
+| Type | Subject |
+|---|---|
+| `no_charter` | `[AX] 과제정의서 제출을 기다리고 있습니다 🙏` |
+| `no_milestone` | `[AX] 마일스톤 등록을 기다리고 있습니다 🙏` |
+| `delayed_milestone` | `[AX] '{{title}}' 마일스톤을 확인해주세요 🙏` |
+
+### 4.3 Email Notification Matrix (9 Triggers)
+| # | Trigger Event | Recipient | Function |
+|---|---|---|---|
+| E1 | Champion final submission | Admin | `notifyNewSubmission` |
+| E2 | Champion deadline change request | Admin | `notifyDeadlineChangeRequest` |
+| E3 | Champion comments on submission | Admin | `notifyNewComment` |
+| E4 | Admin comments on submission | Champion | `notifyNewComment` |
+| E5 | Champion comments on Charter | Admin | `notifyNewComment` |
+| E6 | Admin replies on Charter | Champion | `notifyNewComment` |
+| E7 | Champion submits delay report | Admin | `notifyBottleneck` |
+| E8 | Delay report email link (→ /admin/delay-reports) | — | Link updated |
+| E9 | Admin nudge (3 types) | Champion | `nudgeChampion` |
 
 ---
 
 ## 5. User Flows
 
 ### 5.1 End-to-End — Champion Journey
-```mermaid
-flowchart TD
-    Start([Champion 진입]) --> Login{로그인?}
-    Login -->|No| GoogleOAuth[Google OAuth]
-    GoogleOAuth --> Callback[/api/auth/callback/]
-    Callback --> Dashboard
-    Login -->|Yes| Dashboard["/ 과제 목록"]
-
-    Dashboard --> SelectHW[과제 선택]
-    SelectHW --> CharterWrite["/charter<br/>Charter 작성"]
-    CharterWrite --> CharterSave[POST /api/charter/submissions]
-    CharterSave --> MilestoneCreate["/milestones<br/>WBS 등록"]
-    MilestoneCreate --> Work[과제 수행]
-    Work --> UploadDeliverable[산출물 업로드]
-    UploadDeliverable --> AutoComplete["milestones.status<br/>= completed (자동)"]
-    AutoComplete --> Email1[E7: Admin 이메일]
-
-    Work -.->|기한 부족| DeadlineReq[기한변경 요청]
-    DeadlineReq --> Email2[E2: Admin 이메일]
-
-    UploadDeliverable --> FinalSubmit[POST /api/submissions]
-    FinalSubmit --> Email3[E1: Admin 이메일]
-    FinalSubmit --> Pending[status: pending]
-    Pending --> AdminReview[Admin 검토 대기]
-    AdminReview --> Decision{판정}
-    Decision -->|Accept| Accepted[status: accepted]
-    Decision -->|Decline| Declined[status: declined]
-    Accepted --> End([완료])
-    Declined --> Retry[재제출]
-    Retry --> FinalSubmit
+```
+Entry → Google OAuth → Task list
+  ↓
+Charter (6 sections) → draft or publish
+  ↓
+WBS milestones (depth-0 groups → depth-1 milestones) → Gantt
+  ↓
+Executing...
+  ├─ Weekly check-in: complete / delay / extend / in-progress
+  ├─ start_date expired + not_started → start+end change modal
+  └─ Deadline insufficient → deadline change request → (E2 admin email)
+  ↓
+Final submission → (E1 admin email) → status: reviewing
+  ↓
+Admin Kanban DnD → accepted or declined
+  └─ Declined → comment feedback → (E4 champion email) → resubmit
 ```
 
-### 5.2 Admin Review Flow — Kanban 단방향 DnD
-```mermaid
-stateDiagram-v2
-    [*] --> 미시작: 과제 배정
-    미시작 --> 진행중: 첫 활동 감지
-    진행중 --> 검토중: Champion 제출
-    검토중 --> 합격: Admin DnD →
-    검토중 --> 불합격: Admin DnD →
-    합격 --> [*]
-    불합격 --> 검토중: Champion 재제출
-    note right of 검토중
-        DRAGGABLE_COLS = ['reviewing']
-        DROPPABLE_COLS = ['accepted', 'declined']
-        합격/불합격 후 칸반에서 되돌릴 수 없음
-    end note
+### 5.2 Admin Daily Flow
+```
+Open /admin → ChampionGanttView + "Action needed" section
+  ├─ Click action-needed chip → NudgePopover → "Nudge 📧" → E9 champion email
+  └─ Click Gantt delayed bar → NudgePopover → "Nudge 📧" → E9 champion email
+  ↓
+/admin/delay-reports → text response + mark resolved
+  ↓
+/admin/reports → weekly report (week navigation) → PDF print
+  ↓
+/admin/kanban → DnD card → accepted / declined
 ```
 
-### 5.3 Charter 양방향 댓글 루프
-```mermaid
-sequenceDiagram
-    actor C as Champion
-    participant API as API Routes
-    participant DB as Supabase
-    participant SMTP as Gmail SMTP
-    actor A as Admin
-
-    C->>API: POST /charter/submissions
-    API->>DB: INSERT charter_submissions
-    Note over C,A: Admin이 Charter 리뷰
-
-    A->>API: POST /charter/.../comments<br/>(parent_id=null)
-    API->>DB: INSERT charter_comments
-    API->>SMTP: notifyNewComment
-    SMTP-->>C: [E5/E6] 새 댓글 이메일
-
-    C->>API: POST /charter/.../comments/[id]/replies<br/>(parent_id=admin_comment)
-    API->>DB: INSERT charter_comments
-    API->>SMTP: notifyNewComment
-    SMTP-->>A: [E5/E6] 새 답글 이메일
-
-    Note over A,C: 무한 루프 가능 (max depth 2)<br/>Admin이 is_resolved=true로 종결
+### 5.3 Security Gateway
 ```
-
-### 5.4 기한변경 요청 워크플로우
-```mermaid
-flowchart LR
-    A[Champion: 기한 부족] --> B[POST /api/deadline-requests]
-    B --> C[(deadline_change_requests<br/>status=pending)]
-    C --> D[E2: Admin 이메일 알림]
-    D --> E[Admin: /admin/requests]
-    E --> F{판정}
-    F -->|승인| G1[PATCH status=approved]
-    F -->|거절| G2[PATCH status=rejected]
-    G1 --> H1["milestones.due_date<br/>= requested_due_date (자동)"]
-    H1 --> I[Champion이 /progress 확인]
-    G2 --> I
-```
-
-### 5.5 데이터 게이트웨이 (Security Boundary)
-```mermaid
-flowchart LR
-    Client[Browser Client] -->|"❌ Direct DB 접근 차단"| RLS{RLS DENY ALL}
-    Client -->|"✅ Authorization: Bearer JWT"| API[Next.js API Routes]
-    API --> Verify{verifyJWT<br/>verifyAdmin}
-    Verify -->|fail| Reject[401 / 403]
-    Verify -->|pass| Service["service key 사용<br/>RLS 우회"]
-    Service --> DB[(Supabase DB)]
-    Service --> Storage[(Supabase Storage)]
+Browser ──X──→ Supabase DB (blocked: RLS DENY ALL)
+Browser ──O──→ Next.js API Routes (verifyJWT + verifyAdmin)
+                        ↓ service_role key
+                   Supabase DB / Storage
 ```
 
 ---
 
 ## 6. Data Model
 
-### 6.1 ERD (핵심 8 테이블)
-```mermaid
-erDiagram
-    users ||--o{ submissions : submits
-    users ||--o{ charter_submissions : writes
-    users ||--o{ milestones : owns
-    users ||--o{ deadline_change_requests : requests
-    homeworks ||--o{ submissions : has
-    homeworks ||--o{ charter_submissions : has
-    homeworks ||--o{ milestones : has
-    submissions ||--o{ comments : has
-    charter_submissions ||--o{ charter_comments : has
-    charter_comments ||--o{ charter_comments : replies
-    milestones ||--o{ milestone_deliverables : has
-    milestones ||--o{ deadline_change_requests : extends
+### 6.1 Core Tables (9)
+| Table | Role | Key Columns |
+|---|---|---|
+| `users` | All users (champions + admins) | id(PK), email, name, avatar_url |
+| `homeworks` | Admin-created tasks | id(PK), title, description, due_date, publish_status |
+| `submissions` | Champion final submissions | id(PK), user_id, homework_id, file_path, status(pending·accepted·declined), attempt_number |
+| `comments` | Submission comments | id(PK), submission_id, body, author_role, author_id |
+| `charter_submissions` | Champion task definition docs | id(PK), user_id, homework_id, project_name, content(jsonb 6 sections), publish_status |
+| `charter_comments` | Charter comments/replies (max depth 2) | id(PK), charter_submission_id, parent_id, body, author_role, is_resolved |
+| `milestones` | Champion WBS items (**2-depth tree**) | id(PK), user_id, homework_id, **parent_milestone_id**(FK→self), week_number, start_date?, due_date?, status, publish_status, bottleneck_type |
+| `deadline_change_requests` | Deadline extension requests | id(PK), milestone_id, user_id, original_due_date, requested_due_date, status(pending·approved·rejected) |
+| `bottleneck_replies` | Admin responses to delay reports | id(PK), milestone_id, admin_id, body |
 
-    users {
-        uuid id PK
-        text email
-        text name
-        text avatar_url
-    }
-    homeworks {
-        serial id PK
-        text title
-        text description
-        date due_date
-    }
-    submissions {
-        uuid id PK
-        uuid user_id FK
-        int homework_id FK
-        text file_path
-        enum status "pending|accepted|declined"
-        int attempt_number
-    }
-    charter_submissions {
-        uuid id PK
-        uuid user_id FK
-        int homework_id FK
-        text project_name
-        jsonb content "6 sections"
-    }
-    milestones {
-        uuid id PK
-        uuid user_id FK
-        int week_number
-        date due_date
-        enum status "not_started|in_progress|completed|delayed"
-        bool is_manual_progress
-    }
-```
+> **v2.0 change**: `sub_tasks` table removed → consolidated into `milestones.parent_milestone_id`.
+> `milestone_deliverables` table removed (deliverable attachment simplified).
 
-### 6.2 보안 모델 (Defense-in-Depth)
-| Layer | 정책 |
+### 6.2 Milestone Auto Status Calculation (server-side, priority order)
+| Priority | Status | Condition |
+|---|---|---|
+| 1 | `completed` | `is_manual_completed = true` |
+| 2 | `delayed` | `bottleneck_type IS NOT NULL` |
+| 3 | `in_progress` | `is_manual_progress = true` (date-independent) |
+| 4 | `delayed` | `due_date < today` (no other condition met) |
+| 5 | `not_started` | All else |
+
+> **v2.0 change**: `in_progress` milestones move to in-progress section regardless of dates. `not_started` milestones past `start_date` move to delayed section.
+
+### 6.3 "Action Needed" Champion Detection
+| Case | Condition |
+|---|---|
+| Charter not submitted | `charterSubmissionId === null` |
+| Charter submitted, no milestones | `charterSubmissionId !== null` AND `milestones.length === 0` |
+
+### 6.4 Security Model (Defense-in-Depth)
+| Layer | Policy |
 |---|---|
 | Network | HTTPS only |
 | Auth | Supabase JWT (RS256), Google OAuth |
-| Authz | `is_admin` 메타데이터 + middleware + verifyAdmin |
-| DB | **RLS DENY ALL** (모든 테이블/버킷) |
-| Server | service_role key (서버 환경변수만) |
-| Storage | signed URL (다운로드 시 한정 발급) |
-
-> **핵심 원칙**: 클라이언트는 **단 한 번도 DB에 직접 접근하지 않음**. 모든 I/O는 Next.js API Routes를 통과.
+| Authz | `is_admin` metadata + middleware + verifyAdmin |
+| DB | **RLS DENY ALL** (all tables/buckets) |
+| Server | service_role key (server env vars only) |
+| Nudge API | verifyJWT + `user_metadata.is_admin` check |
 
 ---
 
 ## 7. Tech Stack
 
 ### 7.1 Production Dependencies (key)
-| 라이브러리 | 버전 | 용도 |
+| Library | Version | Purpose |
 |---|---|---|
 | next | 14.2.35 | App Router |
 | react | ^18 | UI |
-| @supabase/supabase-js | ^2.105.4 | DB / Auth client |
-| @supabase/ssr | ^0.10.3 | 서버 세션 |
+| tailwindcss | ^3.4.1 | Styling |
+| shadcn/ui (Radix) | — | Dialog, Sheet, AlertDialog, etc. |
+| FLO Design System 1.0 | — | CSS variables, typography, color tokens (Pretendard) |
 | @tiptap/react | ^3.23.4 | Charter WYSIWYG |
 | @dnd-kit/core | ^6.3.1 | Kanban DnD |
-| @radix-ui/react-dialog | ^1.1.15 | Dialog primitive |
-| tailwindcss | ^3.4.1 | Styling |
-| sonner | ^2.0.7 | Toast |
+| @supabase/supabase-js | ^2.105.4 | DB / Auth client |
 | nodemailer | ^8.0.7 | Email |
 | docx | ^9.6.1 | Charter export |
-| gantt-task-react | (installed) | WBS 시각화 |
+| gantt-task-react | ^0.3.9 | WBS visualization |
+| sonner | ^2.0.7 | Toast UI |
 
-### 7.2 환경변수
+### 7.2 Environment Variables
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY     # 서버 전용
+SUPABASE_SERVICE_ROLE_KEY     # server-side only
 GMAIL_USER
-GMAIL_APP_PASSWORD            # Gmail 2FA → App Password
+GMAIL_APP_PASSWORD
 ADMIN_NOTIFICATION_EMAIL
 APP_BASE_URL
 ```
 
-### 7.3 배포 옵션
-- **운영**: Docker (Next.js standalone) + Jenkins CD (서버 직접 빌드·기동)
-- **CI**: GitHub Actions — PR 및 main push 시 `bun lint` · `typecheck` · `build` 검증
-- 상세: [`docs/deployment/docker.md`](deployment/docker.md)
+### 7.3 Deployment
+- **Runtime**: Docker (Next.js standalone) + Jenkins CD
+- **CI**: GitHub Actions — `bun lint` · `typecheck` · `build` on PR and main push
+- Details: [`docs/deployment/docker.md`](deployment/docker.md)
 
 ---
 
 ## 8. Current Status & Roadmap
 
-### 8.1 As-Is (2026-05-21)
-- ✅ **MVP 완료**: 인증, Charter, Milestone, 제출, 칸반, 댓글, 이메일 (7 트리거)
-- ✅ **Design System**: shadcn/ui 통일 (Dialog, AlertDialog, Sheet, Toast, 리사이저블 패널)
-- ✅ **임시저장 (Draft/Publish)**: 과제·Charter·Milestone 3종 완료
-- ✅ **CI/CD**: GitHub Actions (Bun) + Dockerfile + Docker Compose + Jenkins 가이드
-- 🚧 **미완성**: `/progress`, `/admin/progress`, `/admin/reports` — 골격만 존재
+### 8.1 As-Is (2026-06-02)
+- ✅ **MVP complete**: Auth, Charter, Milestone (2-depth tree), submissions, Kanban, comments, email (9 triggers)
+- ✅ **Admin Dashboard**: ChampionGanttView + ChampionSummaryTable + "Action needed" section
+- ✅ **Champion Nudge**: NudgePopover + `/api/admin/nudge` + `nudgeChampion()` (3 types)
+- ✅ **Weekly Reports**: PDF print + weekly navigation (Sunday–Saturday)
+- ✅ **Mobile UX**: BottomTabBar + DesktopOnlyNotice + card layouts for Champion & Admin
+- ✅ **Check-in workflow**: 4 actions + delay report admin review
+- ✅ **Draft/Publish**: task, Charter, Milestone
+- ✅ **CI/CD**: GitHub Actions (Bun) + Dockerfile + Docker Compose + Jenkins
+- 🚧 **Remaining**: `/progress` (champion progress dashboard) — skeletal only
 
 ### 8.2 Roadmap
 
-| Phase | Scope | 예상 기간 | 공수 |
-|---|---|---|---|
-| **P0 — Stabilize** | 판정 취소 API, 이메일 에러 핸들링, CSS 변수 통일 | 1주 | 3 MD |
-| **P1 — Insights** | Champion `/progress` + Admin `/admin/progress` 완성, 주간 리포트 | 2주 | 6 MD |
-| **P2 — Scale** | 어드민 다중화, 이메일 인프라 마이그레이션 (SendGrid/SES) | 2주 | 6 MD |
-| **P3 — Analytics** | 챔피언 성과 분석 대시보드, 코칭 인사이트, In-app 알림 센터 | 3주 | 10 MD |
-| **P4 — Reusability** | 화이트라벨화, 타 프로그램 적용 | TBD | TBD |
-
-> 전체 WBS 및 공수 상세: [`docs/PRD-KO.md` §11](PRD-KO.md#11-wbs-및-개발-일정-공수-기준)
+| Phase | Scope | Priority |
+|---|---|---|
+| **P0 — Stabilize** | Verdict reversal API, Nudge rate limiting, email error handling | 🔴 Urgent |
+| **P1 — Champion Dashboard** | Complete `/progress` | 🟠 High |
+| **P2 — Scale** | Multi-admin support, SendGrid/SES migration | 🟡 Medium |
+| **P3 — Analytics** | Champion performance dashboard, in-app notification center | 🟢 Low |
+| **P4 — Reusability** | White-label, multi-tenant onboarding | 📋 Review |
 
 ### 8.3 Backlog
-1. 판정 취소 API — 오판정 복구 (P0 긴급)
-2. 이메일 `fire-and-forget` try-catch 래핑 (P0)
-3. Gmail 2FA → 앱 비밀번호 발급 (런칭 사전조건)
-4. `unwrapSingle<T>` 헬퍼 추출 (DB 응답 핸들링 중복 제거)
-5. UI 하드코딩 hex → CSS variable 통일 (~7개)
-6. Charter 답글 Ctrl+Enter 단축키
-7. 다크모드 지원 검토
+1. Verdict reversal API — mis-verdict recovery (P0 urgent)
+2. Nudge rate limiting — prevent duplicate nudges to same champion (P0)
+3. Email `fire-and-forget` try-catch wrapping (P0)
+4. Gmail 2FA → app password (pre-launch prerequisite)
+5. Charter reply Ctrl+Enter shortcut
+6. Dark mode support review
 
 ---
 
 ## 9. Success Metrics (KPI)
 
 ### 9.1 Adoption
-| 지표 | 정의 | 목표 |
+| Metric | Definition | Target |
 |---|---|---|
-| Champion DAU | 일간 로그인 챔피언 수 | ≥ 60% of cohort |
-| Charter 작성 완료율 | submitted_at IS NOT NULL / homeworks per user | ≥ 90% |
-| Milestone 평균 등록 수 | per Champion | ≥ 4 |
+| Champion WAU | Weekly login + any activity | ≥ 60% of cohort |
+| Charter completion rate | submitted_at IS NOT NULL / homeworks per user | ≥ 90% |
+| Avg milestones registered | per champion | ≥ 4 |
 
 ### 9.2 Operational Efficiency
-| 지표 | 정의 | 목표 |
+| Metric | Definition | Target |
 |---|---|---|
-| 평균 검토 리드타임 | submitted_at → status 변경 시각차 | ≤ 24h |
-| 평균 댓글 응답 시간 | parent comment created → reply created | ≤ 12h |
-| 기한변경 응답 시간 | created_at → reviewed_at | ≤ 12h |
+| Avg review lead time | submitted_at → status change | ≤ 24h |
+| Nudge conversion rate | Nudge → charter/milestone within 48h | Monitored |
+| Deadline change response time | created_at → reviewed_at | ≤ 12h |
 
 ### 9.3 Quality
-| 지표 | 정의 | 목표 |
+| Metric | Definition | Target |
 |---|---|---|
-| 이메일 도달률 | SMTP 성공 / 시도 | ≥ 99% |
-| 재제출률 | declined 후 재제출 비율 | 모니터링 |
-| 시스템 오류율 | 5xx / 전체 요청 | ≤ 0.1% |
+| Email delivery rate | SMTP success / attempts | ≥ 99% |
+| Re-submission rate | declined → resubmitted | Monitored |
+| System error rate | 5xx / total requests | ≤ 0.1% |
 
 ---
 
 ## 10. Risks & Mitigations
 
-| # | Risk | 가능성 | 영향 | Mitigation |
+| # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
-| R1 | Gmail SMTP 일일 발송 한도 (500/일) 도달 | 중 | 중 | SendGrid/SES 마이그레이션 옵션 사전 준비, 발송 큐잉 |
-| R2 | 단일 어드민 메일박스 라우팅 | 고 | 중 | 어드민 다중화 + 과제별 담당자 매핑 도입 (P2) |
-| R3 | 단방향 DnD 오판정 복구 부재 | 중 | 고 | 어드민 전용 SQL 패치 도구 또는 "판정 취소" API (P0 검토) |
-| R4 | Fire-and-forget 이메일 호출 unhandled rejection | 중 | 저 | try-catch 래핑 + Sentry/로그 적재 (P0) |
-| R5 | Charter content jsonb 스키마 변경 시 마이그레이션 | 저 | 중 | 버전 필드 도입 + 점진적 마이그레이션 패턴 |
-| R6 | 산출물 Storage 용량 증가 | 저 | 저 | 라이프사이클 정책 / Cold Storage 전환 |
-| R7 | 챔피언 이메일 차단 시 알림 누락 | 중 | 중 | In-app 알림 센터 (P3) |
-| R8 | Gmail App Password 노출 시 SMTP 탈취 | 저 | 고 | Vercel/서버 환경변수 격리, 정기 로테이션 |
+| R1 | Gmail SMTP daily limit (500/day) | Medium | Medium | SendGrid/SES migration (P2) |
+| R2 | Single admin mailbox routing | High | Medium | Multi-admin + per-task assignee mapping (P2) |
+| R3 | Unidirectional DnD mis-verdict | Medium | High | Admin-only verdict reversal API (P0) |
+| R4 | Nudge spam — no rate limit | Medium | Medium | Same-champion rate limiting (P0) |
+| R5 | Fire-and-forget email unhandled rejection | Medium | Low | try-catch + error logging (P0) |
+| R6 | Charter content jsonb schema migration | Low | Medium | Version field + incremental migration |
+| R7 | Champion email blocked → alert loss | Medium | Medium | In-app notification center (P3) |
+| R8 | Gmail App Password exposure | Low | High | Server env var isolation, rotation, SendGrid |
 
 ---
 
 ## 11. Appendix
 
-### A. 주요 라우트 빠른 참조
+### A. Route Quick Reference
 ```
-Champion:                       Admin:
-  /                             /admin
-  /homework/[id]                /admin/homework/[id]
-  /charter                      /admin/homework/new
-  /milestones                   /admin/kanban
-  /progress                     /admin/requests
-  /login                        /admin/progress
-                                /admin/reports
-                                /admin/login
+Champion:                            Admin:
+  /                                    /admin
+  /my-project/charter                  /admin/homework/[id]
+  /my-project/milestones               /admin/homework/new
+  /progress                            /admin/kanban
+  /login                               /admin/requests
+                                       /admin/delay-reports
+                                       /admin/reports
+                                       /admin/champions/[userId]
+                                       /admin/login
 ```
 
-### B. API 엔드포인트 카운트
-| 그룹 | 엔드포인트 수 | 인증 |
+### B. API Endpoint Count
+| Group | Endpoints | Auth |
 |---|---|---|
-| Champion API | 14 | verifyJWT |
-| Admin API | 12 | verifyJWT + verifyAdmin |
+| Champion API | 16 | verifyJWT |
+| Admin API | 14 | verifyJWT + verifyAdmin |
 | Auth | 1 | OAuth callback |
-| **합계** | **27** | — |
+| **Total** | **31** | — |
 
-### C. 참고 문서
-- `docs/ERD.md` — 데이터 모델 상세
-- `docs/PRD-KO.md` — 한국어 PRD 전문 + WBS 공수표
-- `docs/deployment/docker.md` — Docker/Jenkins 배포 가이드
-- `README.md` — 셋업 / 환경변수 가이드
+> v1.1 → v2.0: +4 endpoints (milestone tree, /api/admin/nudge, /api/admin/delay-reports, gantt improvements)
+
+### C. Reference Documents
+- `docs/ERD.md` — Data model detail
+- `docs/PRD-KO.md` — Korean PRD + WBS effort table
+- `DESIGN.md` — FLO Design System implementation guide
+- `docs/deployment/docker.md` — Docker/Jenkins deployment guide
+- `README.md` — Local setup / env var guide
 
 ---
 
-**문서 메타**
+**Document metadata**
 - Author: yr.park@dreamus.io
-- Review: Strategy Lead 1회 + Eng Lead 1회
-- Next Update: 대시보드 기능 완성 후 (P1 완료 시)
+- Review: Strategy Lead 1x + Eng Lead 1x
+- Next Update: After P0 stabilization and `/progress` completion
