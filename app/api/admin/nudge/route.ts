@@ -7,10 +7,11 @@ export async function POST(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const body = await req.json() as {
-    userId?: string
-    nudgeType?: 'no_charter' | 'no_milestone' | 'delayed_milestone'
-    milestoneTitle?: string
+  let body: { userId?: string; nudgeType?: 'no_charter' | 'no_milestone' | 'delayed_milestone'; milestoneTitle?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const { userId, nudgeType, milestoneTitle } = body
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   const { data: userData, error: userErr } = await supabase
     .from('users')
-    .select('id, email, name, avatar_url, created_at')
+    .select('id, email, name')
     .eq('id', userId)
     .single()
 

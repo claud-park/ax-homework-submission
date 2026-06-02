@@ -206,7 +206,7 @@ export async function notifyBottleneck(params: {
 }
 
 export async function nudgeChampion(params: {
-  user: User
+  user: Pick<User, 'id' | 'email' | 'name'>
   nudgeType: 'no_charter' | 'no_milestone' | 'delayed_milestone'
   milestoneTitle?: string
 }): Promise<void> {
