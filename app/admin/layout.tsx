@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { LayoutDashboard, Layers, CalendarClock, AlertTriangle, FileText, LogOut, Menu, X, Users } from 'lucide-react'
+import { LayoutDashboard, Layers, CalendarClock, AlertTriangle, FileText, BarChart2, LogOut, Menu, X, Users } from 'lucide-react'
 import { parseName } from '@/lib/utils'
 import { apiFetch } from '@/lib/api-client'
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
@@ -52,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const MOBILE_TABS: BottomTab[] = [
     { icon: AlertTriangle, label: '지연 신고',  href: '/admin/delay-reports', badge: pendingBottleneck },
     { icon: FileText,      label: '과제정의서', href: '/admin/mobile/charters', badge: pendingCharters },
-    { icon: FileText,      label: '리포트',     href: '/admin/reports' },
+    { icon: BarChart2,     label: '리포트',     href: '/admin/reports' },
   ]
 
   if (pathname === '/admin/login') return <>{children}</>

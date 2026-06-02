@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Inbox } from 'lucide-react'
+import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
 
 const DEADLINE_STATUS_COLOR: Record<string, string> = {
   pending: 'var(--amber)', approved: 'var(--success)', rejected: 'var(--error)',
@@ -61,6 +62,8 @@ export default function AdminRequestsPage() {
 
   return (
     <div className="flex flex-col gap-0">
+      <DesktopOnlyNotice />
+      <div className="hidden md:flex flex-col gap-0">
       <h1 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>기한 변경 요청</h1>
 
       {/* 탭 */}
@@ -179,6 +182,7 @@ export default function AdminRequestsPage() {
         {!loading && displayList.length === 0 && (
           <EmptyState icon={Inbox} title={activeTab === 'pending' ? '답변 대기중인 요청이 없습니다' : '확인 완료된 요청이 없습니다'} />
         )}
+      </div>
       </div>
     </div>
   )

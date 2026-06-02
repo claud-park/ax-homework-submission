@@ -1,6 +1,7 @@
 'use client'
 
 import type { LucideIcon } from 'lucide-react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 export interface BottomTab {
@@ -25,7 +26,7 @@ export function BottomTabBar({ tabs }: { tabs: BottomTab[] }) {
       {tabs.map(tab => {
         const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href)
         return (
-          <a
+          <Link
             key={tab.href}
             href={tab.href}
             className="flex-1 flex flex-col items-center gap-1 py-2 relative"
@@ -54,7 +55,7 @@ export function BottomTabBar({ tabs }: { tabs: BottomTab[] }) {
                 style={{ width: 4, height: 4, background: 'var(--accent)' }}
               />
             )}
-          </a>
+          </Link>
         )
       })}
     </nav>

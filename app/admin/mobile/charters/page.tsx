@@ -102,7 +102,7 @@ export default function AdminMobileChartersPage() {
 
         {/* 하단 고정 승인 버튼 */}
         <div
-          className="fixed bottom-16 left-0 right-0 px-4 py-3 border-t"
+          className="fixed bottom-20 left-0 right-0 px-4 py-3 border-t z-50"
           style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
         >
           {selected.admin_approved_at ? (
