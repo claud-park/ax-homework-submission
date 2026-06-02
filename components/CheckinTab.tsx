@@ -228,27 +228,25 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
   )
 
   const thisWeek = useMemo(
-    () => published.filter(m =>
-      m.status !== 'completed' && (
-        ((m.start_date ?? '') <= todayStr && todayStr <= (m.due_date ?? '')) ||
-        m.status === 'in_progress'
-      )
-    ),
-    [published, todayStr]
+    () => published.filter(m => m.status === 'in_progress'),
+    [published]
   )
 
   const overdue = useMemo(
     () => published.filter(m =>
-      (m.due_date ?? '') < todayStr &&
       m.status !== 'completed' &&
-      m.status !== 'in_progress'
+      m.status !== 'in_progress' &&
+      (
+        (m.due_date ?? '') < todayStr ||
+        ((m.start_date ?? '') < todayStr && m.status === 'not_started')
+      )
     ),
     [published, todayStr]
   )
 
   const upcoming = useMemo(
     () => published.filter(m =>
-      (m.start_date ?? '') > todayStr &&
+      (m.start_date ?? '') >= todayStr &&
       m.status !== 'completed' &&
       m.status !== 'in_progress'
     ),

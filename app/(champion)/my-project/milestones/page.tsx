@@ -112,7 +112,8 @@ export default function WorkStatusPage() {
     const ids = new Set<string>()
     for (const m of milestones) {
       if (m.publish_status === 'published' && m.start_date && m.due_date &&
-          m.due_date < todayStr && m.status !== 'completed') {
+          m.status !== 'completed' && m.status !== 'in_progress' &&
+          (m.due_date < todayStr || (m.start_date < todayStr && m.status === 'not_started'))) {
         ids.add(m.id)
       }
     }
