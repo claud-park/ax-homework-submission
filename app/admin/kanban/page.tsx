@@ -9,6 +9,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import { SubmissionDetailPanel } from '@/components/SubmissionDetailPanel'
+import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
 import type { KanbanCard, KanbanColumn, KanbanDataV2, SubmissionStatus } from '@/lib/types'
 
 const COLS: { key: KanbanColumn; label: string; color: string; cardBorder: string; cardBg: string; avatarBg: string }[] = [
@@ -300,55 +301,58 @@ export default function AdminKanbanPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6 whitespace-nowrap">
-        <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-          제출 현황 (Kanban)
-        </h1>
+      <DesktopOnlyNotice />
+      <div className="hidden md:block">
+        <div className="flex items-center justify-between mb-6 whitespace-nowrap">
+          <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+            제출 현황 (Kanban)
+          </h1>
+        </div>
+
+        {loading ? (
+          <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
+            {COLS.map(col => (
+              <div
+                key={col.key}
+                className="flex-1 rounded-xl animate-pulse"
+                style={{ minWidth: 160, minHeight: 300, background: 'var(--surface-secondary)' }}
+              />
+            ))}
+          </div>
+        ) : (
+        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
+            {COLS.map(col => (
+              <DroppableCol
+                key={col.key}
+                col={col}
+                cards={data[col.key]}
+                isDropTarget={DROPPABLE_COLS.includes(col.key)}
+                onCardClick={setSelectedCard}
+                onCardNavigate={(card) => router.push(`/admin/champions/${card.userId}`)}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeCard?.latestSubmission && (
+              <KanbanCardView
+                card={activeCard}
+                col={COLS.find(c => c.key === colForStatus(activeCard.latestSubmission!.status))!}
+                draggable={false}
+                clickable={false}
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
+        )}
+
+        <SubmissionDetailPanel
+          card={selectedCard}
+          open={selectedCard !== null}
+          onOpenChange={(open) => { if (!open) setSelectedCard(null) }}
+          onStatusChanged={fetchKanban}
+        />
       </div>
-
-      {loading ? (
-        <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
-          {COLS.map(col => (
-            <div
-              key={col.key}
-              className="flex-1 rounded-xl animate-pulse"
-              style={{ minWidth: 160, minHeight: 300, background: 'var(--surface-secondary)' }}
-            />
-          ))}
-        </div>
-      ) : (
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className="flex gap-3" style={{ overflowX: 'auto', minWidth: 0 }}>
-          {COLS.map(col => (
-            <DroppableCol
-              key={col.key}
-              col={col}
-              cards={data[col.key]}
-              isDropTarget={DROPPABLE_COLS.includes(col.key)}
-              onCardClick={setSelectedCard}
-              onCardNavigate={(card) => router.push(`/admin/champions/${card.userId}`)}
-            />
-          ))}
-        </div>
-        <DragOverlay>
-          {activeCard?.latestSubmission && (
-            <KanbanCardView
-              card={activeCard}
-              col={COLS.find(c => c.key === colForStatus(activeCard.latestSubmission!.status))!}
-              draggable={false}
-              clickable={false}
-            />
-          )}
-        </DragOverlay>
-      </DndContext>
-      )}
-
-      <SubmissionDetailPanel
-        card={selectedCard}
-        open={selectedCard !== null}
-        onOpenChange={(open) => { if (!open) setSelectedCard(null) }}
-        onStatusChanged={fetchKanban}
-      />
     </div>
   )
 }
