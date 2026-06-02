@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Users, FileText, LayoutList, Upload, LogOut, Menu, X } from 'lucide-react'
 import { parseName } from '@/lib/utils'
+import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
 
 const NAV = [
   { icon: Users,      label: '전체 현황',      href: '/',                      match: (p: string) => p === '/' || p.startsWith('/champions') },
@@ -18,6 +19,12 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
   const supabase = createSupabaseBrowserClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [userName, setUserName] = useState('')
+
+  const MOBILE_TABS: BottomTab[] = [
+    { icon: Users,      label: '전체 현황',   href: '/',                      exact: true },
+    { icon: FileText,   label: '과제정의서',  href: '/my-project/charter' },
+    { icon: LayoutList, label: '내 업무 현황', href: '/my-project/milestones' },
+  ]
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -157,7 +164,8 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
           )}
         </header>
 
-        <main className="flex-1 p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-6 overflow-auto md:pb-6 pb-20">{children}</main>
+        <BottomTabBar tabs={MOBILE_TABS} />
       </div>
     </div>
   )
