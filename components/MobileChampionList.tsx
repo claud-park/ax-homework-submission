@@ -19,11 +19,15 @@ export function MobileChampionList() {
   const [champions, setChampions] = useState<ChampionSummary[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     apiFetch<ChampionSummary[]>('/api/champions')
       .then(setChampions)
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err)
+        setError('챔피언 목록을 불러오지 못했습니다.')
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -31,6 +35,14 @@ export function MobileChampionList() {
     c.name.toLowerCase().includes(query.toLowerCase()) ||
     c.department.toLowerCase().includes(query.toLowerCase())
   )
+
+  if (error) {
+    return (
+      <div className="text-sm text-center py-6" style={{ color: 'var(--text-disabled)' }}>
+        {error}
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -45,6 +57,8 @@ export function MobileChampionList() {
   return (
     <div className="flex flex-col gap-3">
       <input
+        type="text"
+        aria-label="챔피언 검색"
         value={query}
         onChange={e => setQuery(e.target.value)}
         placeholder="챔피언 검색..."
@@ -58,6 +72,11 @@ export function MobileChampionList() {
           width: '100%',
         }}
       />
+      {filtered.length === 0 && (
+        <div className="text-sm text-center py-6" style={{ color: 'var(--text-disabled)' }}>
+          검색 결과가 없습니다.
+        </div>
+      )}
       {filtered.map(c => {
         const statuses = Object.values(c.weeklyStatus) as MilestoneStatus[]
         const counts = statuses.reduce<Partial<Record<MilestoneStatus, number>>>((acc, s) => {
@@ -84,7 +103,7 @@ export function MobileChampionList() {
                 color: hasDelay ? '#ef4444' : 'var(--text-secondary)',
               }}
             >
-              {c.name[0]}
+              {c.name?.[0] ?? '?'}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
