@@ -65,6 +65,15 @@ function ProgressChips({ milestones }: { milestones: ReportChampion['milestones'
   )
 }
 
+function detectCurrentWeek(data: ReportChampion[]): number | null {
+  const all = data.flatMap(c => c.milestones).filter(m => m.week_number != null)
+  if (all.length === 0) return null
+  // Prefer the lowest week_number among active (in_progress / not_started) milestones
+  const active = all.filter(m => m.status === 'in_progress' || m.status === 'not_started')
+  const pool = active.length > 0 ? active : all
+  return Math.min(...pool.map(m => m.week_number!))
+}
+
 export default function AdminReportsPage() {
   const [data, setData] = useState<ReportChampion[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -80,6 +89,15 @@ export default function AdminReportsPage() {
   function handlePrint() {
     window.print()
   }
+
+  const currentWeek = data ? detectCurrentWeek(data) : null
+
+  const dataWithWeekFilter = data?.map(c => ({
+    ...c,
+    milestones: currentWeek != null
+      ? c.milestones.filter(m => m.week_number === currentWeek)
+      : c.milestones,
+  })) ?? null
 
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -102,7 +120,7 @@ export default function AdminReportsPage() {
             <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>프로젝트 현황 리포트</h1>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>전체 챔피언 · 현재 DB 기준</p>
           </div>
-          {data && (
+          {dataWithWeekFilter && (
             <button
               type="button"
               onClick={handlePrint}
@@ -114,7 +132,12 @@ export default function AdminReportsPage() {
                 border: 'none', cursor: 'pointer',
               }}
             >
-              🖨 인쇄 / PDF
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              인쇄 / PDF
             </button>
           )}
         </div>
@@ -127,7 +150,7 @@ export default function AdminReportsPage() {
           </div>
         )}
 
-        {data && (
+        {dataWithWeekFilter && (
           <div id="report-printable" ref={reportRef}>
             {/* Report header */}
             <div style={{
@@ -155,16 +178,16 @@ export default function AdminReportsPage() {
               border: '1px solid #e2e8f0',
             }}>
               {[
-                { label: '전체 챔피언', value: data.length, color: '#0f172a' },
-                { label: '마일스톤 운영 중', value: data.filter(c => c.milestones.length > 0).length, color: '#3b82f6' },
+                { label: '전체 챔피언', value: dataWithWeekFilter.length, color: '#0f172a' },
+                { label: '마일스톤 운영 중', value: dataWithWeekFilter.filter(c => c.milestones.length > 0).length, color: '#3b82f6' },
                 {
                   label: '지연 발생',
-                  value: data.filter(c => c.milestones.some(m => m.status === 'delayed')).length,
+                  value: dataWithWeekFilter.filter(c => c.milestones.some(m => m.status === 'delayed')).length,
                   color: '#ef4444',
                 },
                 {
                   label: '병목 보고',
-                  value: data.filter(c => c.milestones.some(m => m.hasBottleneck)).length,
+                  value: dataWithWeekFilter.filter(c => c.milestones.some(m => m.hasBottleneck)).length,
                   color: '#d97706',
                 },
               ].map(s => (
@@ -183,7 +206,7 @@ export default function AdminReportsPage() {
             }}>
               <thead>
                 <tr style={{ background: '#f1f5f9' }}>
-                  {['부서', '이름', '과제명', '마일스톤 현황', '병목'].map((h, i) => (
+                  {['부서', '이름', '과제명', currentWeek != null ? `이번 주 마일스톤 현황 (W${currentWeek})` : '이번 주 마일스톤 현황', '병목'].map((h, i) => (
                     <th
                       key={h}
                       style={{
@@ -204,7 +227,7 @@ export default function AdminReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((c, idx) => {
+                {dataWithWeekFilter.map((c, idx) => {
                   const hasDelay = c.milestones.some(m => m.status === 'delayed')
                   const hasBottleneck = c.milestones.some(m => m.hasBottleneck)
                   const isEven = idx % 2 === 0
@@ -215,7 +238,7 @@ export default function AdminReportsPage() {
                       style={{ background: isEven ? '#ffffff' : '#f8fafc' }}
                     >
                       {/* 부서 */}
-                      <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 11, borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 11, borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {c.department || '—'}
                       </td>
 
