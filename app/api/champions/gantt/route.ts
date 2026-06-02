@@ -79,7 +79,6 @@ export async function GET(req: NextRequest) {
         milestones: msMap.get(u.id) ?? [],
       }
     })
-    .filter(c => c.milestones.length > 0)
 
   return NextResponse.json(result)
 }
