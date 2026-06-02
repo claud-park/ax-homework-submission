@@ -471,7 +471,7 @@ export function ChampionGanttView() {
     apiFetch<GanttChampion[]>('/api/champions/gantt')
       .then(data => {
         setChampions(data)
-        setSelectedChampions(new Set(data.map(c => c.userId)))
+        setSelectedChampions(new Set(data.filter(c => c.milestones.length > 0).map(c => c.userId)))
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -484,9 +484,22 @@ export function ChampionGanttView() {
     return m
   }, [champions])
 
+  const noCharter = useMemo(
+    () => champions.filter(c => !c.charterSubmissionId),
+    [champions],
+  )
+  const noMilestone = useMemo(
+    () => champions.filter(c => !!c.charterSubmissionId && c.milestones.length === 0),
+    [champions],
+  )
+  const championsWithMilestones = useMemo(
+    () => champions.filter(c => c.milestones.length > 0),
+    [champions],
+  )
+
   const filteredChampions = useMemo(
-    () => champions.filter(c => selectedChampions.has(c.userId)),
-    [champions, selectedChampions],
+    () => championsWithMilestones.filter(c => selectedChampions.has(c.userId)),
+    [championsWithMilestones, selectedChampions],
   )
 
   const rawTasks = useMemo(() => toTasks(filteredChampions), [filteredChampions])
@@ -574,6 +587,42 @@ export function ChampionGanttView() {
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        {(noCharter.length > 0 || noMilestone.length > 0) && (
+          <div style={{
+            marginBottom: 16,
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid rgba(217,119,6,0.3)',
+            background: 'rgba(217,119,6,0.04)',
+          }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber)', marginBottom: 8 }}>
+              확인 요함
+            </p>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {noCharter.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    과제정의서 미제출
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                    {noCharter.map(c => c.name).join(', ')}
+                  </p>
+                </div>
+              )}
+              {noMilestone.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                    마일스톤 미등록
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>
+                    {noMilestone.map(c => c.name).join(', ')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Champion filter chips */}
         <div
           className="chip-scroll"
@@ -583,7 +632,7 @@ export function ChampionGanttView() {
             scrollbarWidth: 'none',
           }}
         >
-          {champions.map(c => {
+          {championsWithMilestones.map(c => {
             const active = selectedChampions.has(c.userId)
             return (
               <button
