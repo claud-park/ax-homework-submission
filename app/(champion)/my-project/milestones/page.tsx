@@ -252,7 +252,7 @@ export default function WorkStatusPage() {
       >
         <DialogContent style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
           <DialogHeader>
-            <DialogTitle>기한 변경</DialogTitle>
+            <DialogTitle>기한 연장</DialogTitle>
             {deadlineModal && (
               <DialogDescription>현재 마감일: {deadlineModal.due_date}</DialogDescription>
             )}
