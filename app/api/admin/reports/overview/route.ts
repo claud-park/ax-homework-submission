@@ -9,6 +9,8 @@ export interface ReportMilestoneSummary {
   title: string
   status: MilestoneStatus
   week_number: number | null
+  start_date: string | null
+  due_date: string | null
   hasBottleneck: boolean
 }
 
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
     supabase.from('charter_submissions').select('user_id, project_name'),
     supabase
       .from('milestones')
-      .select('id, user_id, title, status, week_number, bottleneck_type')
+      .select('id, user_id, title, status, week_number, start_date, due_date, bottleneck_type')
       .eq('publish_status', 'published')
       .order('week_number', { nullsFirst: false })
       .order('display_order'),
@@ -56,6 +58,8 @@ export async function GET(req: NextRequest) {
       title: m.title,
       status: m.status as MilestoneStatus,
       week_number: m.week_number ?? null,
+      start_date: m.start_date ?? null,
+      due_date: m.due_date ?? null,
       hasBottleneck: m.bottleneck_type != null,
     })
   }
