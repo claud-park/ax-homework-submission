@@ -7,6 +7,19 @@ import { ChevronRight, ChevronDown, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import type { GanttChampion } from '@/app/api/champions/gantt/route'
 import type { ChampionProject, MilestoneStatus } from '@/lib/types'
+import { NudgePopover } from '@/components/NudgePopover'
+import type { GanttMilestone } from '@/app/api/champions/gantt/route'
+
+type NudgeType = 'no_charter' | 'no_milestone' | 'delayed_milestone'
+
+interface NudgeState {
+  userId: string
+  name: string
+  nudgeType: NudgeType
+  milestoneTitle?: string
+  anchorX: number
+  anchorY: number
+}
 
 // Fixed column widths for the custom task list (px); project column is resizable via state
 const W = { name: 130, dept: 72, charter: 56 }
@@ -438,7 +451,7 @@ function CharterDetailPanel({ userId, champMap, onClose }: {
   )
 }
 
-export function ChampionGanttView() {
+export function ChampionGanttView({ isAdmin = false }: { isAdmin?: boolean }) {
   const [champions, setChampions] = useState<GanttChampion[]>([])
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [selectedChampions, setSelectedChampions] = useState<Set<string>>(new Set())
@@ -448,6 +461,8 @@ export function ChampionGanttView() {
   const [panelUserId, setPanelUserId] = useState<string | null>(null)
   const [projectW, setProjectW] = useState(PROJECT_W_DEFAULT)
   const resizeDragRef = useRef<{ startX: number; startW: number } | null>(null)
+  const [nudgeState, setNudgeState] = useState<NudgeState | null>(null)
+  const lastMousePos = useRef({ x: 0, y: 0 })
 
   const listWidth = W.name + W.dept + projectW + W.charter
 
@@ -482,6 +497,16 @@ export function ChampionGanttView() {
   const champMap = useMemo(() => {
     const m = new Map<string, GanttChampion>()
     for (const c of champions) m.set(c.userId, c)
+    return m
+  }, [champions])
+
+  const milestoneMap = useMemo(() => {
+    const m = new Map<string, { milestone: GanttMilestone; userId: string; championName: string }>()
+    for (const c of champions) {
+      for (const ms of c.milestones) {
+        m.set(ms.id, { milestone: ms, userId: c.userId, championName: c.name })
+      }
+    }
     return m
   }, [champions])
 
@@ -536,6 +561,35 @@ export function ChampionGanttView() {
   const handleCharterClick = useCallback((userId: string) => {
     setPanelUserId(prev => prev === userId ? null : userId)
   }, [])
+
+  const handleChipNudge = useCallback((
+    c: GanttChampion,
+    nudgeType: 'no_charter' | 'no_milestone',
+    e: React.MouseEvent<HTMLElement>,
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setNudgeState({ userId: c.userId, name: c.name, nudgeType, anchorX: rect.left, anchorY: rect.bottom + 8 })
+  }, [])
+
+  const handleGanttMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    lastMousePos.current = { x: e.clientX, y: e.clientY }
+  }, [])
+
+  const handleGanttClick = useCallback((task: Task) => {
+    if (!isAdmin) return
+    if (task.id.startsWith('champ-')) return
+    const msId = task.id.startsWith('group-') ? task.id.slice(6) : task.id
+    const entry = milestoneMap.get(msId)
+    if (!entry || entry.milestone.status !== 'delayed') return
+    setNudgeState({
+      userId: entry.userId,
+      name: entry.championName,
+      nudgeType: 'delayed_milestone',
+      milestoneTitle: entry.milestone.title,
+      anchorX: lastMousePos.current.x,
+      anchorY: lastMousePos.current.y + 12,
+    })
+  }, [isAdmin, milestoneMap])
 
   const TaskListHeader = useMemo(
     () => makeTaskListHeader(projectW, listWidth, handleResizeStart),
@@ -620,8 +674,8 @@ export function ChampionGanttView() {
               </span>
             </button>
             {!alertCollapsed && [
-              { label: '과제정의서 미제출', list: noCharter },
-              { label: '마일스톤 미등록', list: noMilestone },
+              { label: '과제정의서 미제출', nudgeType: 'no_charter' as const, list: noCharter },
+              { label: '마일스톤 미등록', nudgeType: 'no_milestone' as const, list: noMilestone },
             ].filter(g => g.list.length > 0).map(g => (
               <div key={g.label}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
@@ -631,6 +685,9 @@ export function ChampionGanttView() {
                   {g.list.map(c => (
                     <span
                       key={c.userId}
+                      role={isAdmin ? 'button' : undefined}
+                      tabIndex={isAdmin ? 0 : undefined}
+                      onClick={isAdmin ? (e) => handleChipNudge(c, g.nudgeType, e as React.MouseEvent<HTMLElement>) : undefined}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 5,
                         padding: '3px 8px 3px 4px',
@@ -639,6 +696,7 @@ export function ChampionGanttView() {
                         background: 'rgba(217,119,6,0.08)',
                         fontSize: 12,
                         color: 'rgba(180,83,9,1)',
+                        cursor: isAdmin ? 'pointer' : 'default',
                       }}
                     >
                       <span style={{
@@ -726,7 +784,7 @@ export function ChampionGanttView() {
 
         {tasks.length > 0 && (
           <>
-            <div style={{ fontSize: 12 }}>
+            <div style={{ fontSize: 12 }} onMouseMove={handleGanttMouseMove}>
               <Gantt
                 tasks={tasks}
                 viewMode={viewMode}
@@ -740,6 +798,7 @@ export function ChampionGanttView() {
                 TaskListHeader={TaskListHeader}
                 TaskListTable={TaskListTable}
                 TooltipContent={GanttTooltip}
+                onClick={handleGanttClick}
               />
             </div>
 
@@ -763,6 +822,18 @@ export function ChampionGanttView() {
           userId={panelUserId}
           champMap={champMap}
           onClose={() => setPanelUserId(null)}
+        />
+      )}
+
+      {nudgeState && (
+        <NudgePopover
+          userId={nudgeState.userId}
+          name={nudgeState.name}
+          nudgeType={nudgeState.nudgeType}
+          milestoneTitle={nudgeState.milestoneTitle}
+          anchorX={nudgeState.anchorX}
+          anchorY={nudgeState.anchorY}
+          onClose={() => setNudgeState(null)}
         />
       )}
     </div>
