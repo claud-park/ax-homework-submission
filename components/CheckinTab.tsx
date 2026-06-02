@@ -52,7 +52,7 @@ interface MilestoneCardProps {
   charterApproved: boolean
   onCompleteClick: (id: string) => void
   onIssueClick: (m: Milestone) => void
-  onDeadlineExtension: (m: Milestone) => void
+  onDeadlineExtension: (m: Milestone, isReschedule?: boolean) => void
   onInProgress: (id: string) => void
 }
 
@@ -61,6 +61,7 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
   const statusLabel = STATUS_LABEL[m.status] ?? m.status
 
   const todayStr = new Date().toISOString().split('T')[0]
+  const isReschedule = (m.start_date ?? '') < todayStr && m.status === 'not_started'
   const isDelayed = m.status === 'delayed' || (!!m.due_date && m.due_date < todayStr && m.status !== 'completed')
   const isDelayPending = m.bottleneck_type !== null && m.bottleneck_reviewed_at === null
   const hasAdminReply = m.bottleneck_reviewed_at !== null && !!m.bottleneck_admin_comment
@@ -117,13 +118,23 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
           </span>
         )}
         {showActions && showDeadline && (
-          <button
-            onClick={() => onDeadlineExtension(m)}
-            className="text-xs"
-            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            기한 연장
-          </button>
+          isReschedule ? (
+            <button
+              onClick={() => onDeadlineExtension(m, true)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+              style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
+            >
+              기한 변경
+            </button>
+          ) : (
+            <button
+              onClick={() => onDeadlineExtension(m, false)}
+              className="text-xs"
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              기한 연장
+            </button>
+          )
         )}
         {isDelayed && showActions && !isDelayPending && (
           <button
@@ -207,7 +218,7 @@ export interface CheckinTabProps {
   onComplete: (id: string) => Promise<void>
   onIssueReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
   onInProgress: (id: string) => Promise<void>
-  onDeadlineExtension: (m: Milestone) => void
+  onDeadlineExtension: (m: Milestone, isReschedule?: boolean) => void
   showOverdue?: boolean
 }
 

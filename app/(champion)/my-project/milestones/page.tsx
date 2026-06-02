@@ -17,8 +17,8 @@ const inputStyle = { background: 'var(--background)', border: '1px solid var(--b
 export default function WorkStatusPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [charterApproved, setCharterApproved] = useState(false)
-  const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string } | null>(null)
-  const [reqForm, setReqForm] = useState({ requested_due_date: '', reason: '' })
+  const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; start_date: string; isReschedule: boolean } | null>(null)
+  const [reqForm, setReqForm] = useState({ requested_start_date: '', requested_due_date: '', reason: '' })
   const [error, setError] = useState<string | null>(null)
   const [collapsedCheckinGroups, setCollapsedCheckinGroups] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -75,9 +75,9 @@ export default function WorkStatusPage() {
     }
   }
 
-  function openDeadlineForCheckin(m: Milestone) {
-    setDeadlineModal({ id: m.id, due_date: m.due_date ?? '' })
-    setReqForm({ requested_due_date: '', reason: '' })
+  function openDeadlineForCheckin(m: Milestone, isReschedule = false) {
+    setDeadlineModal({ id: m.id, due_date: m.due_date ?? '', start_date: m.start_date ?? '', isReschedule })
+    setReqForm({ requested_start_date: '', requested_due_date: '', reason: '' })
   }
 
   async function handleDeadlineRequest(e: React.FormEvent) {
@@ -85,16 +85,19 @@ export default function WorkStatusPage() {
     if (!deadlineModal) return
     setError(null)
     try {
+      const patchBody = deadlineModal.isReschedule
+        ? { start_date: reqForm.requested_start_date, due_date: reqForm.requested_due_date }
+        : { due_date: reqForm.requested_due_date }
       const { milestone: updated, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${deadlineModal.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ due_date: reqForm.requested_due_date }),
+        body: JSON.stringify(patchBody),
       })
       setMilestones(prev => {
         const next = prev.map(m => m.id === updated.id ? updated : m)
         return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
       })
       setDeadlineModal(null)
-      setReqForm({ requested_due_date: '', reason: '' })
+      setReqForm({ requested_start_date: '', requested_due_date: '', reason: '' })
       toast.success('기한이 변경되었습니다.')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -248,13 +251,16 @@ export default function WorkStatusPage() {
       {/* 기한 변경 dialog (PC/모바일 공유) */}
       <Dialog
         open={!!deadlineModal}
-        onOpenChange={open => { if (!open) { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) } }}
+        onOpenChange={open => { if (!open) { setDeadlineModal(null); setReqForm({ requested_start_date: '', requested_due_date: '', reason: '' }) } }}
       >
         <DialogContent style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
           <DialogHeader>
-            <DialogTitle>기한 연장</DialogTitle>
-            {deadlineModal && (
+            <DialogTitle>{deadlineModal?.isReschedule ? '기한 변경' : '기한 연장'}</DialogTitle>
+            {deadlineModal && !deadlineModal.isReschedule && (
               <DialogDescription>현재 마감일: {deadlineModal.due_date}</DialogDescription>
+            )}
+            {deadlineModal?.isReschedule && (
+              <DialogDescription>시작일: {deadlineModal.start_date} · 마감일: {deadlineModal.due_date}</DialogDescription>
             )}
           </DialogHeader>
           {deadlineModal && (
@@ -262,25 +268,44 @@ export default function WorkStatusPage() {
               {error && (
                 <p className="text-xs" style={{ color: 'var(--error)' }}>{error}</p>
               )}
-              <DatePicker
-                value={reqForm.requested_due_date}
-                onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))}
-                required
-                placeholder="새 마감일 선택"
-                style={{ ...inputStyle, width: '100%' }}
-              />
-              <textarea
-                value={reqForm.reason}
-                onChange={e => setReqForm(r => ({ ...r, reason: e.target.value }))}
-                placeholder="변경 사유를 입력해주세요"
-                rows={3}
-                required
-                style={{ ...inputStyle, resize: 'none', width: '100%' }}
-              />
+              {deadlineModal.isReschedule && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>새 시작일</label>
+                  <DatePicker
+                    value={reqForm.requested_start_date}
+                    onChange={v => setReqForm(r => ({ ...r, requested_start_date: v }))}
+                    required
+                    placeholder="새 시작일 선택"
+                    style={{ ...inputStyle, width: '100%' }}
+                  />
+                </div>
+              )}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                  {deadlineModal.isReschedule ? '새 마감일' : '새 마감일'}
+                </label>
+                <DatePicker
+                  value={reqForm.requested_due_date}
+                  onChange={v => setReqForm(r => ({ ...r, requested_due_date: v }))}
+                  required
+                  placeholder="새 마감일 선택"
+                  style={{ ...inputStyle, width: '100%' }}
+                />
+              </div>
+              {!deadlineModal.isReschedule && (
+                <textarea
+                  value={reqForm.reason}
+                  onChange={e => setReqForm(r => ({ ...r, reason: e.target.value }))}
+                  placeholder="변경 사유를 입력해주세요"
+                  rows={3}
+                  required
+                  style={{ ...inputStyle, resize: 'none', width: '100%' }}
+                />
+              )}
               <DialogFooter>
                 <button
                   type="button"
-                  onClick={() => { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) }}
+                  onClick={() => { setDeadlineModal(null); setReqForm({ requested_start_date: '', requested_due_date: '', reason: '' }) }}
                   className="flex-1 py-2 rounded-lg text-xs font-semibold"
                   style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                 >

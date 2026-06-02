@@ -22,7 +22,7 @@ export interface MobileMilestoneCardProps {
   charterApproved: boolean
   onComplete: (id: string) => void
   onIssueReport: (id: string) => void
-  onDeadlineExtension: (m: Milestone) => void
+  onDeadlineExtension: (m: Milestone, isReschedule?: boolean) => void
 }
 
 export function MobileMilestoneCard({
@@ -34,6 +34,7 @@ export function MobileMilestoneCard({
   onDeadlineExtension,
 }: MobileMilestoneCardProps) {
   const isOverdue = !!m.due_date && m.due_date < todayStr && m.status !== 'completed'
+  const isReschedule = (m.start_date ?? '') < todayStr && m.status === 'not_started'
   const hasBottleneck = !!m.bottleneck_type
 
   const borderColor = m.status === 'delayed' || isOverdue
@@ -97,7 +98,15 @@ export function MobileMilestoneCard({
             >
               ✓ 완료
             </button>
-            {m.status !== 'delayed' ? (
+            {isReschedule ? (
+              <button
+                onClick={() => onDeadlineExtension(m, true)}
+                className="flex-1 text-xs font-bold py-2 rounded-lg"
+                style={{ border: '1.5px solid #3b82f6', color: '#2563eb', background: 'rgba(59,130,246,0.07)' }}
+              >
+                기한 변경
+              </button>
+            ) : m.status !== 'delayed' ? (
               <button
                 onClick={() => onIssueReport(m.id)}
                 className="flex-1 text-xs font-bold py-2 rounded-lg"
@@ -107,11 +116,11 @@ export function MobileMilestoneCard({
               </button>
             ) : (
               <button
-                onClick={() => onDeadlineExtension(m)}
+                onClick={() => onDeadlineExtension(m, false)}
                 className="flex-1 text-xs font-bold py-2 rounded-lg"
                 style={{ border: '1.5px solid #3b82f6', color: '#2563eb', background: 'rgba(59,130,246,0.07)' }}
               >
-                기한 변경
+                기한 연장
               </button>
             )}
           </div>
