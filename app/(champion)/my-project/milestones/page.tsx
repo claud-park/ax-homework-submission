@@ -8,6 +8,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import { CheckinTab } from '@/components/CheckinTab'
+import { MobileMilestoneCard } from '@/components/MobileMilestoneCard'
 import type { BottleneckType } from '@/lib/types'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
@@ -141,65 +142,110 @@ export default function WorkStatusPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 100px)', minHeight: 0 }}>
-      <div className="flex-1 overflow-y-auto pb-8">
+    <>
+      {/* 모바일: 마일스톤 카드 */}
+      <div className="md:hidden flex flex-col gap-3">
         {loading ? (
-          <div className="flex flex-col gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
-            ))}
-          </div>
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+          ))
         ) : (
-          <>
-            {/* Global overdue section — always at top across all groups */}
-            {allOverdue.length > 0 && (
-              <CheckinTab milestones={allOverdue} {...checkinProps} />
-            )}
-
-            {/* Ungrouped (depth-0) milestones — overdue already shown above */}
-            {milestones.some(m => !m.parent_milestone_id && !overdueIds.has(m.id)) && (
-              <CheckinTab
-                milestones={milestones.filter(m => !m.parent_milestone_id && !overdueIds.has(m.id))}
-                showOverdue={false}
-                {...checkinProps}
-              />
-            )}
-
-            {/* Grouped (depth-1) milestones under each depth-0 parent — overdue already shown above */}
-            {checkinGroups.depth0.map(g => {
-              const gMilestones = (checkinGroups.byParent.get(g.id) ?? []).filter(m => !overdueIds.has(m.id))
-              if (gMilestones.length === 0) return null
-              const isCollapsed = collapsedCheckinGroups.has(g.id)
-              return (
-                <div key={g.id} style={{ marginTop: 16 }}>
-                  <button
-                    onClick={() => setCollapsedCheckinGroups(prev => {
-                      const next = new Set(prev)
-                      if (next.has(g.id)) next.delete(g.id)
-                      else next.add(g.id)
-                      return next
-                    })}
-                    className="flex items-center gap-2 w-full mb-3"
-                    style={{ background: 'transparent', border: 'none', padding: 0 }}
-                  >
-                    {isCollapsed
-                      ? <ChevronRight size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />
-                      : <ChevronDown size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />}
-                    <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{g.title}</span>
-                    <span className="text-xs ml-1" style={{ color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{gMilestones.length}개</span>
-                    <span className="flex-1 ml-2" style={{ height: 1, background: 'var(--border)' }} />
-                  </button>
-                  {!isCollapsed && (
-                    <CheckinTab milestones={gMilestones} showOverdue={false} {...checkinProps} />
-                  )}
+          (() => {
+            const byWeek = new Map<number | null, Milestone[]>()
+            for (const m of milestones.filter(m => !m.parent_milestone_id)) {
+              const key = m.week_number ?? null
+              if (!byWeek.has(key)) byWeek.set(key, [])
+              byWeek.get(key)!.push(m)
+            }
+            const sorted = [...byWeek.entries()].sort(([a], [b]) =>
+              (a ?? 999) - (b ?? 999)
+            )
+            return sorted.map(([week, ms]) => (
+              <div key={String(week)}>
+                {week !== null && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-bold" style={{ color: 'var(--text-secondary)', letterSpacing: '.04em' }}>
+                      W{String(week).padStart(2, '0')}
+                    </span>
+                    <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  {ms.map(m => (
+                    <MobileMilestoneCard
+                      key={m.id}
+                      milestone={m}
+                      todayStr={todayStr}
+                      charterApproved={charterApproved}
+                      onComplete={handleCheckinComplete}
+                      onIssueReport={(id) => handleCheckinIssueReport(id, 'other', null)}
+                      onDeadlineExtension={openDeadlineForCheckin}
+                      onInProgress={handleCheckinInProgress}
+                    />
+                  ))}
                 </div>
-              )
-            })}
-          </>
+              </div>
+            ))
+          })()
         )}
       </div>
 
-      {/* 기한 변경 dialog */}
+      {/* 데스크톱: 기존 레이아웃 */}
+      <div className="hidden md:flex flex-col" style={{ height: 'calc(100vh - 100px)', minHeight: 0 }}>
+        <div className="flex-1 overflow-y-auto pb-8">
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+              ))}
+            </div>
+          ) : (
+            <>
+              {allOverdue.length > 0 && (
+                <CheckinTab milestones={allOverdue} {...checkinProps} />
+              )}
+              {milestones.some(m => !m.parent_milestone_id && !overdueIds.has(m.id)) && (
+                <CheckinTab
+                  milestones={milestones.filter(m => !m.parent_milestone_id && !overdueIds.has(m.id))}
+                  showOverdue={false}
+                  {...checkinProps}
+                />
+              )}
+              {checkinGroups.depth0.map(g => {
+                const gMilestones = (checkinGroups.byParent.get(g.id) ?? []).filter(m => !overdueIds.has(m.id))
+                if (gMilestones.length === 0) return null
+                const isCollapsed = collapsedCheckinGroups.has(g.id)
+                return (
+                  <div key={g.id} style={{ marginTop: 16 }}>
+                    <button
+                      onClick={() => setCollapsedCheckinGroups(prev => {
+                        const next = new Set(prev)
+                        if (next.has(g.id)) next.delete(g.id)
+                        else next.add(g.id)
+                        return next
+                      })}
+                      className="flex items-center gap-2 w-full mb-3"
+                      style={{ background: 'transparent', border: 'none', padding: 0 }}
+                    >
+                      {isCollapsed
+                        ? <ChevronRight size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />
+                        : <ChevronDown size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />}
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{g.title}</span>
+                      <span className="text-xs ml-1" style={{ color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{gMilestones.length}개</span>
+                      <span className="flex-1 ml-2" style={{ height: 1, background: 'var(--border)' }} />
+                    </button>
+                    {!isCollapsed && (
+                      <CheckinTab milestones={gMilestones} showOverdue={false} {...checkinProps} />
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 기한 변경 dialog (PC/모바일 공유) */}
       <Dialog
         open={!!deadlineModal}
         onOpenChange={open => { if (!open) { setDeadlineModal(null); setReqForm({ requested_due_date: '', reason: '' }) } }}
@@ -252,6 +298,6 @@ export default function WorkStatusPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
