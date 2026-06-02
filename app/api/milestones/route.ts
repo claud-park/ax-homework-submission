@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import type { MilestoneStatus } from '@/lib/types'
+
+function computeStatus(milestone: {
+  due_date: string | null
+  is_manual_progress: boolean
+  is_manual_completed: boolean
+  bottleneck_type: string | null
+}): MilestoneStatus {
+  if (milestone.is_manual_completed) return 'completed'
+  if (milestone.bottleneck_type) return 'delayed'
+  if (milestone.is_manual_progress) return 'in_progress'
+  if (milestone.due_date && new Date(milestone.due_date) < new Date()) return 'delayed'
+  return 'not_started'
+}
 
 async function syncParentDates(
   supabase: ReturnType<typeof createServiceClient>,
@@ -40,7 +54,12 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+  const milestones = (data ?? []).map((m: Record<string, unknown>) =>
+    m.publish_status === 'published'
+      ? { ...m, status: computeStatus(m as Parameters<typeof computeStatus>[0]) }
+      : m
+  )
+  return NextResponse.json(milestones)
 }
 
 export async function POST(req: NextRequest) {

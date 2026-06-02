@@ -22,7 +22,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   if (status === 'approved') {
-    await supabase.from('milestones').update({ due_date: req_.requested_due_date }).eq('id', req_.milestone_id)
+    const { data: ms } = await supabase
+      .from('milestones')
+      .select('is_manual_progress, is_manual_completed')
+      .eq('id', req_.milestone_id)
+      .single()
+
+    const newDueDate: string | null = req_.requested_due_date
+    const computedStatus = (() => {
+      if (ms?.is_manual_completed) return 'completed'
+      if (ms?.is_manual_progress) return 'in_progress'
+      if (newDueDate && new Date(newDueDate) < new Date()) return 'delayed'
+      return 'not_started'
+    })()
+
+    await supabase.from('milestones').update({
+      due_date: newDueDate,
+      bottleneck_type: null,
+      bottleneck_note: null,
+      bottleneck_admin_comment: null,
+      bottleneck_reviewed_at: null,
+      status: computedStatus,
+    }).eq('id', req_.milestone_id)
   }
 
   return NextResponse.json(data)
