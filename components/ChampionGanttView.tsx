@@ -594,32 +594,49 @@ export function ChampionGanttView() {
             borderRadius: 8,
             border: '1px solid rgba(217,119,6,0.3)',
             background: 'rgba(217,119,6,0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
           }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber)', marginBottom: 8 }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber)' }}>
               확인 요함
             </p>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              {noCharter.length > 0 && (
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                    과제정의서 미제출
-                  </p>
-                  <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                    {noCharter.map(c => c.name).join(', ')}
-                  </p>
+            {[
+              { label: '과제정의서 미제출', list: noCharter },
+              { label: '마일스톤 미등록', list: noMilestone },
+            ].filter(g => g.list.length > 0).map(g => (
+              <div key={g.label}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  {g.label} · {g.list.length}명
+                </p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {g.list.map(c => (
+                    <span
+                      key={c.userId}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: '3px 8px 3px 4px',
+                        borderRadius: 20,
+                        border: '1px solid rgba(217,119,6,0.3)',
+                        background: 'rgba(217,119,6,0.08)',
+                        fontSize: 12,
+                        color: 'rgba(180,83,9,1)',
+                      }}
+                    >
+                      <span style={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        background: 'rgba(217,119,6,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 9, fontWeight: 700,
+                      }}>
+                        {c.name[0]}
+                      </span>
+                      {c.name}
+                    </span>
+                  ))}
                 </div>
-              )}
-              {noMilestone.length > 0 && (
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                    마일스톤 미등록
-                  </p>
-                  <p style={{ fontSize: 12, color: 'var(--text-primary)' }}>
-                    {noMilestone.map(c => c.name).join(', ')}
-                  </p>
-                </div>
-              )}
-            </div>
+              </div>
+            ))}
           </div>
         )}
 
