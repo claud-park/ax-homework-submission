@@ -42,6 +42,7 @@ export function NudgePopover({ userId, name, nudgeType, milestoneTitle, anchorX,
         method: 'POST',
         body: JSON.stringify({ userId, nudgeType, milestoneTitle }),
       })
+      setSending(false)
       onClose()
       toast.success('📧 넛지 메일을 발송했습니다')
     } catch {
@@ -78,6 +79,7 @@ export function NudgePopover({ userId, name, nudgeType, milestoneTitle, anchorX,
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{issueLabel}</div>
       </div>
       <button
+        type="button"
         onClick={handleSend}
         disabled={sending}
         style={{
