@@ -4,6 +4,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { LayoutDashboard, Layers, CalendarClock, AlertTriangle, FileText, LogOut, Menu, X, Users } from 'lucide-react'
 import { parseName } from '@/lib/utils'
+import { apiFetch } from '@/lib/api-client'
+import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
 
 const NAV = [
   { icon: LayoutDashboard, label: '대시보드', href: '/admin' },
@@ -20,6 +22,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const supabase = createSupabaseBrowserClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [userName, setUserName] = useState('')
+  const [pendingBottleneck, setPendingBottleneck] = useState(0)
+  const [pendingCharters, setPendingCharters] = useState(0)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -28,10 +32,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     })
   }, [])
 
+  useEffect(() => {
+    if (pathname === '/admin/login') return
+    Promise.all([
+      apiFetch<{ id: string }[]>('/api/admin/milestones/bottleneck-pending')
+        .then(d => setPendingBottleneck(d.length))
+        .catch(() => {}),
+      apiFetch<{ id: string; admin_approved_at: string | null }[]>('/api/admin/charters')
+        .then(d => setPendingCharters(d.filter(c => !c.admin_approved_at).length))
+        .catch(() => {}),
+    ])
+  }, [pathname])
+
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/admin/login')
   }
+
+  const MOBILE_TABS: BottomTab[] = [
+    { icon: AlertTriangle, label: '지연 신고',  href: '/admin/delay-reports', badge: pendingBottleneck },
+    { icon: FileText,      label: '과제정의서', href: '/admin/mobile/charters', badge: pendingCharters },
+    { icon: FileText,      label: '리포트',     href: '/admin/reports' },
+  ]
 
   if (pathname === '/admin/login') return <>{children}</>
 
@@ -175,7 +197,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           )}
         </header>
 
-        <main className="flex-1 p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-6 overflow-auto md:pb-6 pb-20">{children}</main>
+        <BottomTabBar tabs={MOBILE_TABS} />
       </div>
     </div>
   )
