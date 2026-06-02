@@ -71,14 +71,16 @@ Next.js App Router, Tailwind CSS (`md:` breakpoint), React, 기존 `apiFetch` / 
 
 ### 네비게이션
 
-사이드바 드로어를 모바일에서 **Bottom Tab Bar(2탭)**으로 교체.
+사이드바 드로어를 모바일에서 **Bottom Tab Bar(3탭)**으로 교체.
 
 | 탭 | 아이콘 | 경로 | 기본 랜딩 |
 |---|---|---|---|
 | 지연 신고 | AlertTriangle | `/admin/delay-reports` | ✓ (기본) |
-| 리포트 | FileText | `/admin/reports` | — |
+| 과제정의서 | FileText | `/admin/mobile/charters` | — |
+| 리포트 | BarChart2 | `/admin/reports` | — |
 
 - 지연 신고 탭: 미처리(답변 대기중) 건수 빨간 배지
+- 과제정의서 탭: 승인 대기 건수 배지
 - 칸반(`/admin/kanban`), 대시보드(`/admin`), 챔피언 리스트(`/admin/champions`), 기한 변경 요청(`/admin/requests`) 등은 모바일 탭에서 제외 → 직접 접근 시 "PC에서 이용해주세요" 안내
 
 ### 지연 신고 (`/admin/delay-reports`) — 모바일
@@ -87,6 +89,22 @@ Next.js App Router, Tailwind CSS (`md:` breakpoint), React, 기존 `apiFetch` / 
 
 - 답변 대기중 / 확인 완료 내부 탭 유지
 - 각 신고 카드: 챔피언 이름 + 병목 유형 배지 + 마일스톤명 + 마감일 + 내용 + textarea 답변 + 확인 완료 버튼
+
+### 과제정의서 검토 (`/admin/mobile/charters`) — 모바일 전용 신규 페이지
+
+기존 `/admin/champions/[userId]#charter`에 묻혀 있던 승인 플로우를 모바일 전용 독립 페이지로 분리.
+
+**리스트 뷰 (기본)**
+- 승인 대기 / 승인 완료 내부 탭
+- 카드당: 이름 + 부서 + 과제명 + 제출일
+- 탭하면 상세 뷰로 이동
+
+**상세 뷰 (챔피언 선택 후)**
+- 상단 뒤로가기 + 챔피언 이름·부서·과제명
+- 7개 섹션(00~06) 전체 스크롤 읽기
+- 하단 고정 **"✓ 과제정의서 승인"** 버튼
+- 승인 API: `POST /api/admin/charters/{charterId}/approve`
+- 이미 승인된 경우: 승인 버튼 대신 "✓ 승인됨 · {날짜}" 배지 표시
 
 ### 리포트 (`/admin/reports`) — 모바일
 
@@ -140,6 +158,16 @@ Next.js App Router, Tailwind CSS (`md:` breakpoint), React, 기존 `apiFetch` / 
 // 기존 ChampionGanttView의 모바일 대체
 // 챔피언별 카드 + 검색 필터
 // Gantt는 md: 이상에서만 렌더링
+```
+
+### 모바일 전용 Admin 과제정의서 검토 페이지
+
+```tsx
+// app/admin/mobile/charters/page.tsx (신규)
+// 리스트: apiFetch<CharterSubmission[]>('/api/admin/charters') — 승인 대기/완료 탭 분기
+// 상세: 선택된 charter state로 관리 (별도 라우트 없이 useState로 뷰 전환)
+// 승인: POST /api/admin/charters/{charterId}/approve
+// 기존 CHARTER_SECTIONS 상수 재활용 (admin/champions/[userId]/page.tsx에서 공유)
 ```
 
 ---
