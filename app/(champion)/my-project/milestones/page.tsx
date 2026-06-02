@@ -180,7 +180,6 @@ export default function WorkStatusPage() {
                       onComplete={handleCheckinComplete}
                       onIssueReport={(id) => handleCheckinIssueReport(id, 'other', null)}
                       onDeadlineExtension={openDeadlineForCheckin}
-                      onInProgress={handleCheckinInProgress}
                     />
                   ))}
                 </div>

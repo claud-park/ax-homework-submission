@@ -1,4 +1,3 @@
-'use client'
 import type { Milestone, MilestoneStatus } from '@/lib/types'
 
 const STATUS_COLOR: Record<MilestoneStatus, string> = {
@@ -24,7 +23,6 @@ export interface MobileMilestoneCardProps {
   onComplete: (id: string) => void
   onIssueReport: (id: string) => void
   onDeadlineExtension: (m: Milestone) => void
-  onInProgress: (id: string) => void
 }
 
 export function MobileMilestoneCard({
@@ -34,7 +32,6 @@ export function MobileMilestoneCard({
   onComplete,
   onIssueReport,
   onDeadlineExtension,
-  onInProgress,
 }: MobileMilestoneCardProps) {
   const isOverdue = !!m.due_date && m.due_date < todayStr && m.status !== 'completed'
   const hasBottleneck = !!m.bottleneck_type
