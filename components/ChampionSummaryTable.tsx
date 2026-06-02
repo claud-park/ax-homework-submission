@@ -10,6 +10,15 @@ const STATUS_ICON: Record<MilestoneStatus, string> = {
   not_started: '⬜',
 }
 
+const AMBER_BADGE: React.CSSProperties = {
+  fontSize: 11,
+  padding: '2px 8px',
+  borderRadius: 4,
+  background: 'rgba(217,119,6,0.1)',
+  color: 'var(--amber)',
+  display: 'inline-block',
+}
+
 interface Props {
   onChampionClick: (userId: string) => void
   onCharterClick: (userId: string) => void
@@ -88,22 +97,30 @@ export function ChampionSummaryTable({ onChampionClick, onCharterClick, highligh
               </td>
               <td style={{ padding: '10px 12px' }}>
                 {c.charterSubmissionId ? (
-                  <button
-                    onClick={() => onCharterClick(c.userId)}
-                    style={{
-                      fontSize: 11,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      border: 'none',
-                      cursor: 'pointer',
-                      background: c.charterStatus === 'published' ? 'rgba(37,99,235,0.1)' : 'rgba(100,116,139,0.1)',
-                      color: c.charterStatus === 'published' ? 'var(--blue-600)' : 'var(--text-secondary)',
-                    }}
-                  >
-                    {c.charterStatus === 'published' ? '📋 게시됨' : '📝 초안'}
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <button
+                      onClick={() => onCharterClick(c.userId)}
+                      style={{
+                        fontSize: 11,
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: c.charterStatus === 'published' ? 'rgba(37,99,235,0.1)' : 'rgba(100,116,139,0.1)',
+                        color: c.charterStatus === 'published' ? 'var(--blue-600)' : 'var(--text-secondary)',
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      {c.charterStatus === 'published' ? '📋 게시됨' : '📝 초안'}
+                    </button>
+                    {Object.keys(c.weeklyStatus).length === 0 && (
+                      <span style={{ ...AMBER_BADGE, alignSelf: 'flex-start' }}>
+                        마일스톤 없음
+                      </span>
+                    )}
+                  </div>
                 ) : (
-                  <span style={{ color: 'var(--text-disabled)' }}>—</span>
+                  <span style={AMBER_BADGE}>⚠️ 미제출</span>
                 )}
               </td>
               {allWeeks.map(w => (
