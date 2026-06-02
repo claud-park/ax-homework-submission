@@ -179,7 +179,7 @@ export async function notifyBottleneck(params: {
   const { user, milestone, type, note } = params
   const weekLabel = milestone.week_number ? `W${String(milestone.week_number).padStart(2, '0')} ` : ''
   const subject = `[AX] 지연 신고 — ${user.name} · ${weekLabel}${milestone.title}`
-  const link = `${appBaseUrl()}/admin/requests`
+  const link = `${appBaseUrl()}/admin/delay-reports`
   const typeLabel = BOTTLENECK_LABEL[type] ?? type
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
