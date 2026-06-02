@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 
-type NudgeType = 'no_charter' | 'no_milestone' | 'delayed_milestone'
+export type NudgeType = 'no_charter' | 'no_milestone' | 'delayed_milestone'
 
 const ISSUE_LABEL: Record<NudgeType, string> = {
   no_charter: '과제정의서 미제출',

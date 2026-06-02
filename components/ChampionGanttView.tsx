@@ -7,10 +7,8 @@ import { ChevronRight, ChevronDown, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import type { GanttChampion } from '@/app/api/champions/gantt/route'
 import type { ChampionProject, MilestoneStatus } from '@/lib/types'
-import { NudgePopover } from '@/components/NudgePopover'
+import { NudgePopover, type NudgeType } from '@/components/NudgePopover'
 import type { GanttMilestone } from '@/app/api/champions/gantt/route'
-
-type NudgeType = 'no_charter' | 'no_milestone' | 'delayed_milestone'
 
 interface NudgeState {
   userId: string
