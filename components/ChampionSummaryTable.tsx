@@ -38,7 +38,7 @@ export function ChampionSummaryTable({ onChampionClick, onCharterClick, highligh
 
   const allWeeks = Array.from(
     new Set(champions.flatMap(c => Object.keys(c.weeklyStatus).map(Number)))
-  ).sort((a, b) => a - b)
+  ).filter(w => !isNaN(w) && w !== 1).sort((a, b) => a - b)
 
   if (loading) {
     return (
