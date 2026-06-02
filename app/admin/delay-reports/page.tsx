@@ -75,12 +75,6 @@ function ReportCard({
           )}
         </div>
         <div className="flex items-center gap-2 mb-1">
-          <span
-            className="text-xs font-bold px-1.5 py-0.5 rounded"
-            style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' }}
-          >
-            {report.week_number}주차
-          </span>
           <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
             {report.title}
           </span>
