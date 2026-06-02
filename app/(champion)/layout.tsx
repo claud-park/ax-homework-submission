@@ -65,7 +65,7 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
         {/* Brand header */}
         <div className="flex items-center justify-between px-3 pb-4 mb-2">
           <span className="text-flo-body1 font-semibold" style={{ color: 'var(--text-primary)' }}>
-            AX Champions' League
+            AX Champions&apos; League
           </span>
           <button
             className="md:hidden p-1 rounded"
@@ -145,7 +145,7 @@ export default function ChampionLayout({ children }: { children: React.ReactNode
               <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
             <span className="text-flo-body2 font-semibold" style={{ color: 'var(--text-primary)' }}>
-              AX Champions' League
+              AX Champions&apos; League
             </span>
           </div>
 
