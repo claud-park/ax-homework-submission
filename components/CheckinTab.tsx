@@ -315,7 +315,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
           )}
           {thisWeek.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>진행 중</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--blue-600)' }}>진행 중</h2>
               <div className="flex flex-col gap-3">
                 {thisWeek.map(m => <MilestoneCard key={m.id} {...cardProps(m, true)} />)}
               </div>
@@ -331,7 +331,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
           )}
           {completedInRange.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-disabled)' }}>완료됨</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--success)' }}>완료됨</h2>
               <div className="flex flex-col gap-3">
                 {completedInRange.map(m => <MilestoneCard key={m.id} {...cardProps(m, false)} />)}
               </div>
@@ -342,7 +342,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
 
       {/* 완료 confirm dialog */}
       <Dialog open={!!completeConfirmId} onOpenChange={open => { if (!open) setCompleteConfirmId(null) }}>
-        <DialogContent>
+        <DialogContent style={{ background: '#ffffff', borderColor: 'var(--border)' }}>
           <DialogHeader>
             <DialogTitle>마일스톤을 완료로 표시하시겠어요?</DialogTitle>
             <DialogDescription>완료 후에도 수정할 수 있습니다.</DialogDescription>
