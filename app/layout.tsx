@@ -3,8 +3,8 @@ import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: 'AX Homework',
-  description: 'AX Homework Submission System',
+  title: '디시인사이드',
+  description: 'Dreamus Champions Inside : 디시인사이드입니다.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

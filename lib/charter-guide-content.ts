@@ -1,5 +1,5 @@
 export const CHARTER_GUIDE_MD = `# View 360 — 과제정의서 읽는 법
-> 비개발자를 위한 1페이지 안내서 · Dreamus Group AX Office
+> 비개발자를 위한 1페이지 안내서 · Dreamus Champions Inside
 
 ---
 
@@ -98,4 +98,4 @@ View 360은 단순한 데이터 대시보드가 아닙니다.
 
 ---
 
-*Dreamus Group · AX Office · 2026.05*`
+*Dreamus Champions Inside · 2026.05*`
