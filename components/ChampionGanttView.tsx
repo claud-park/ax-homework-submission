@@ -442,6 +442,7 @@ export function ChampionGanttView() {
   const [champions, setChampions] = useState<GanttChampion[]>([])
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [selectedChampions, setSelectedChampions] = useState<Set<string>>(new Set())
+  const [alertCollapsed, setAlertCollapsed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [panelUserId, setPanelUserId] = useState<string | null>(null)
@@ -596,12 +597,29 @@ export function ChampionGanttView() {
             background: 'rgba(217,119,6,0.04)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
+            gap: alertCollapsed ? 0 : 10,
           }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber)' }}>
-              확인 요함
-            </p>
-            {[
+            <button
+              onClick={() => setAlertCollapsed(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                alignSelf: 'flex-start',
+              }}
+            >
+              <ChevronRight
+                className="h-3 w-3"
+                style={{
+                  color: 'var(--amber)',
+                  transform: alertCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+                  transition: 'transform 0.15s',
+                }}
+              />
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--amber)' }}>
+                확인 요함 · {noCharter.length + noMilestone.length}명
+              </span>
+            </button>
+            {!alertCollapsed && [
               { label: '과제정의서 미제출', list: noCharter },
               { label: '마일스톤 미등록', list: noMilestone },
             ].filter(g => g.list.length > 0).map(g => (
