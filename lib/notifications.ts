@@ -204,3 +204,54 @@ export async function notifyBottleneck(params: {
     console.error('[email] notifyBottleneck failed:', e)
   }
 }
+
+export async function nudgeChampion(params: {
+  user: { id: string; email: string; name: string }
+  nudgeType: 'no_charter' | 'no_milestone' | 'delayed_milestone'
+  milestoneTitle?: string
+}): Promise<void> {
+  const { user, nudgeType, milestoneTitle } = params
+  const base = appBaseUrl()
+
+  const cushion = `바쁜 일정 속에서도 AX 프로젝트를 함께해 주셔서 진심으로 감사드립니다.<br>번거로우시겠지만, 잠깐만 아래 내용을 확인해 주시면 정말 감사하겠습니다.`
+
+  let subject: string
+  let bodyLine: string
+  let ctaHref: string
+  let ctaLabel: string
+
+  if (nudgeType === 'no_charter') {
+    subject = '[AX] 과제정의서 제출을 기다리고 있습니다 🙏'
+    bodyLine = 'AX Champion 과제정의서를 제출해주세요.'
+    ctaHref = `${base}/my-project/charter`
+    ctaLabel = '과제정의서 작성하기'
+  } else if (nudgeType === 'no_milestone') {
+    subject = '[AX] 마일스톤 등록을 기다리고 있습니다 🙏'
+    bodyLine = '과제정의서에 마일스톤을 등록해주세요.'
+    ctaHref = `${base}/my-project/milestones`
+    ctaLabel = '마일스톤 등록하기'
+  } else {
+    const titleRaw = milestoneTitle ?? ''
+    subject = `[AX] '${titleRaw}' 마일스톤을 확인해주세요 🙏`
+    const titleEsc = escapeHtml(titleRaw)
+    bodyLine = `${titleEsc} 마일스톤을 완료해주세요. 혹시 병목이 생긴다면 [내 업무 현황] &gt; [이슈 보고/도움 요청]을 해 주세요.`
+    ctaHref = `${base}/my-project/milestones`
+    ctaLabel = '마일스톤 확인하기'
+  }
+
+  const html = `
+<div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
+  <div style="border-bottom:2px solid #d97706;padding-bottom:12px;margin-bottom:20px">
+    <h2 style="margin:0;font-size:18px">🙏 AX 팀에서 알림드립니다</h2>
+  </div>
+  <p style="margin:0 0 16px 0;font-size:14px;color:#0f172a">안녕하세요, ${escapeHtml(user.name)}님.</p>
+  <p style="margin:0 0 16px 0;font-size:14px;color:#64748b;line-height:1.6">${cushion}</p>
+  <p style="margin:0 0 24px 0;font-size:14px;color:#0f172a">${bodyLine}</p>
+  <div>
+    <a href="${escapeHtml(ctaHref)}" style="display:inline-block;background:#d97706;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">${ctaLabel}</a>
+  </div>
+</div>
+`.trim()
+
+  await sendEmail({ to: user.email, subject, html })
+}
