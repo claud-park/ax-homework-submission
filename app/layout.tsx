@@ -3,8 +3,8 @@ import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
-  title: '디시인사이드',
-  description: 'Dreamus Champions Inside : 디시인사이드입니다.',
+  title: "AX Champions' League",
+  description: "AX Champions' League — Dreamus AX 과제 관리 플랫폼",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

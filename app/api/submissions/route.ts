@@ -78,5 +78,13 @@ export async function POST(req: NextRequest) {
     }
   })()
 
+  // 산출물 제출 시 완료되지 않은 모든 마일스톤을 완료로 표시
+  void supabase
+    .from('milestones')
+    .update({ is_manual_completed: true, updated_at: new Date().toISOString() })
+    .eq('user_id', user.id)
+    .eq('publish_status', 'published')
+    .eq('is_manual_completed', false)
+
   return NextResponse.json(data, { status: 201 })
 }

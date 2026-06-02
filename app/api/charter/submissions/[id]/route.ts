@@ -9,7 +9,7 @@ function stripHtml(s: string | undefined | null) {
 function validateCharter(content: Record<string, string>, projectName: string | null) {
   const fields: { field: string; message: string }[] = []
   if (!projectName || !projectName.trim()) fields.push({ field: 'project_name', message: '프로젝트명은 필수입니다.' })
-  for (const key of ['summary', 'problem']) {
+  for (const key of ['summary', 'problem', 'user', 'goal', 'solution', 'build']) {
     if (!stripHtml(content?.[key])) fields.push({ field: key, message: '필수 항목입니다.' })
   }
   return fields
