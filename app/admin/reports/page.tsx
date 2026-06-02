@@ -132,8 +132,9 @@ export default function AdminReportsPage() {
             <button
               type="button"
               onClick={() => window.print()}
+              className="print-hidden hidden md:flex"
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
+                alignItems: 'center', gap: 6,
                 padding: '8px 16px', borderRadius: 8,
                 background: '#0f172a', color: '#fff',
                 fontSize: 13, fontWeight: 600,
@@ -159,6 +160,7 @@ export default function AdminReportsPage() {
         )}
 
         {dataWithWeekFilter && (
+          <>
           <div id="report-printable" ref={reportRef}>
             {/* Report header */}
             <div style={{
@@ -244,7 +246,47 @@ export default function AdminReportsPage() {
               ))}
             </div>
 
-            {/* Table */}
+            {/* 모바일 카드 리스트 */}
+            <div className="md:hidden flex flex-col gap-3 mb-6">
+              {dataWithWeekFilter.map((c) => {
+                const hasDelay = c.milestones.some(m => m.status === 'delayed')
+                const hasBottleneck = c.milestones.some(m => m.hasBottleneck)
+
+                return (
+                  <div
+                    key={c.userId}
+                    style={{
+                      background: 'var(--surface-primary)',
+                      borderRadius: 10,
+                      padding: '11px 12px',
+                      border: `1px solid ${hasDelay ? 'rgba(239,68,68,0.2)' : 'var(--border-subtle)'}`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {c.name}
+                          {hasDelay && <span style={{ marginLeft: 4, fontSize: 9, color: '#ef4444' }}>▲</span>}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'var(--text-disabled)', marginLeft: 6 }}>{c.department || '—'}</span>
+                      </div>
+                      {hasBottleneck && (
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: 'rgba(217,119,6,0.1)', color: '#d97706' }}>
+                          ⚠ 병목
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 10, color: c.projectName ? 'var(--text-primary)' : 'var(--text-disabled)', marginBottom: 6 }}>
+                      {c.projectName ?? '미제출'}
+                    </div>
+                    <ProgressChips milestones={c.milestones} />
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* 데스크톱 테이블 */}
+            <div className="hidden md:block">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f1f5f9' }}>
@@ -310,6 +352,7 @@ export default function AdminReportsPage() {
                 })}
               </tbody>
             </table>
+            </div>
 
             {/* Footer */}
             <div style={{
@@ -328,6 +371,10 @@ export default function AdminReportsPage() {
               <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>AX Program · 내부용</p>
             </div>
           </div>
+          <p className="md:hidden text-xs text-center mt-4" style={{ color: '#94a3b8' }}>
+            PDF 출력은 PC에서 이용해주세요
+          </p>
+          </>
         )}
       </div>
     </>
