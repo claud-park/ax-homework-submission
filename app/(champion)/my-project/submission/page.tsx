@@ -4,6 +4,7 @@ import { apiFetch, apiUpload } from '@/lib/api-client'
 import type { Submission } from '@/lib/types'
 import { toast } from 'sonner'
 import { Upload, FileCheck, Link } from 'lucide-react'
+import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '검토 중', accepted: '합격', declined: '불합격',
@@ -70,6 +71,8 @@ export default function SubmissionPage() {
 
   return (
     <div>
+      <DesktopOnlyNotice />
+      <div className="hidden md:block">
       {/* 제출 섹션 */}
       <div
         className="rounded-xl border p-4 mb-6"
@@ -196,6 +199,7 @@ export default function SubmissionPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }
