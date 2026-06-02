@@ -26,7 +26,7 @@ const PROJECT_W_MIN = 60
 const PROJECT_W_MAX = 400
 
 const STATUS_PROGRESS: Record<MilestoneStatus, number> = {
-  not_started: 0, in_progress: 50, delayed: 25, completed: 100,
+  not_started: 0, in_progress: 50, delayed: 100, completed: 100,
 }
 const STATUS_COLOR: Record<MilestoneStatus, string> = {
   not_started: '#94a3b8', in_progress: '#3b82f6', delayed: '#ef4444', completed: '#22c55e',
@@ -74,6 +74,67 @@ function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: stri
       {fmt(task.start)} ~ {fmt(task.end)}
     </div>
   )
+}
+
+function getMilestoneStyle(
+  status: MilestoneStatus,
+  start_date: string | null,
+  due_date: string | null,
+  isFuture: boolean,
+  todayStr: string,
+): { progress: number; styles: { backgroundColor: string; backgroundSelectedColor: string; progressColor: string; progressSelectedColor: string } } {
+  if (isFuture) {
+    return {
+      progress: 0,
+      styles: {
+        backgroundColor: FUTURE_BG,
+        backgroundSelectedColor: FUTURE_BG_SELECTED,
+        progressColor: '#cbd5e1',
+        progressSelectedColor: '#94a3b8',
+      },
+    }
+  }
+
+  if (status === 'in_progress' && start_date && due_date) {
+    // due_date 가 이미 지났으면 → delayed 로 전환
+    if (due_date < todayStr) {
+      return {
+        progress: 100,
+        styles: {
+          backgroundColor: STATUS_BG['delayed'],
+          backgroundSelectedColor: STATUS_BG_SELECTED['delayed'],
+          progressColor: STATUS_COLOR['delayed'],
+          progressSelectedColor: STATUS_COLOR['delayed'],
+        },
+      }
+    }
+    // start ~ today 구간만 solid, today ~ due_date 는 투명 배경
+    const startMs = new Date(start_date).getTime()
+    const dueMs = new Date(due_date).getTime()
+    const todayMs = new Date(todayStr).getTime()
+    const total = dueMs - startMs
+    const elapsed = todayMs - startMs
+    const progress = total > 0 ? Math.min(100, Math.max(0, Math.round((elapsed / total) * 100))) : 0
+    return {
+      progress,
+      styles: {
+        backgroundColor: STATUS_BG['in_progress'],
+        backgroundSelectedColor: STATUS_BG_SELECTED['in_progress'],
+        progressColor: STATUS_COLOR['in_progress'],
+        progressSelectedColor: STATUS_COLOR['in_progress'],
+      },
+    }
+  }
+
+  return {
+    progress: STATUS_PROGRESS[status],
+    styles: {
+      backgroundColor: STATUS_BG[status],
+      backgroundSelectedColor: STATUS_BG_SELECTED[status],
+      progressColor: STATUS_COLOR[status],
+      progressSelectedColor: STATUS_COLOR[status],
+    },
+  }
 }
 
 // Row hierarchy:
@@ -147,13 +208,7 @@ function toTasks(champions: GanttChampion[]): Task[] {
           project: champId,
           start: start0,
           end: end0,
-          progress: STATUS_PROGRESS[g.status],
-          styles: {
-            backgroundColor: isFuture0 ? FUTURE_BG : STATUS_BG[g.status],
-            backgroundSelectedColor: isFuture0 ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[g.status],
-            progressColor: isFuture0 ? '#cbd5e1' : STATUS_COLOR[g.status],
-            progressSelectedColor: isFuture0 ? '#94a3b8' : STATUS_COLOR[g.status],
-          },
+          ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
           displayOrder: tasks.length + 1,
         })
 
@@ -170,13 +225,7 @@ function toTasks(champions: GanttChampion[]): Task[] {
             project: `group-${g.id}`,
             start,
             end,
-            progress: STATUS_PROGRESS[m.status],
-            styles: {
-              backgroundColor: isFuture ? FUTURE_BG : STATUS_BG[m.status],
-              backgroundSelectedColor: isFuture ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[m.status],
-              progressColor: isFuture ? '#cbd5e1' : STATUS_COLOR[m.status],
-              progressSelectedColor: isFuture ? '#94a3b8' : STATUS_COLOR[m.status],
-            },
+            ...getMilestoneStyle(m.status, m.start_date, m.due_date, isFuture, todayStr),
             displayOrder: tasks.length + 1,
           })
         }
@@ -189,13 +238,7 @@ function toTasks(champions: GanttChampion[]): Task[] {
           project: champId,
           start: start0,
           end: end0,
-          progress: STATUS_PROGRESS[g.status],
-          styles: {
-            backgroundColor: isFuture0 ? FUTURE_BG : STATUS_BG[g.status],
-            backgroundSelectedColor: isFuture0 ? FUTURE_BG_SELECTED : STATUS_BG_SELECTED[g.status],
-            progressColor: isFuture0 ? '#cbd5e1' : STATUS_COLOR[g.status],
-            progressSelectedColor: isFuture0 ? '#94a3b8' : STATUS_COLOR[g.status],
-          },
+          ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
           displayOrder: tasks.length + 1,
         })
       }

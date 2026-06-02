@@ -121,8 +121,8 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
           isReschedule ? (
             <button
               onClick={() => onDeadlineExtension(m, true)}
-              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-              style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid var(--blue-600)' }}
+              className="text-xs"
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline' }}
             >
               기한 변경
             </button>
@@ -130,9 +130,9 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
             <button
               onClick={() => onDeadlineExtension(m, false)}
               className="text-xs"
-              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline' }}
             >
-              기한 연장
+              {m.due_date ? '기한 연장' : '기한 설정'}
             </button>
           )
         )}
@@ -234,24 +234,26 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
   }, [])
 
   const published = useMemo(
-    () => milestones.filter(m => m.publish_status === 'published' && m.start_date && m.due_date),
+    () => milestones.filter(m => m.publish_status === 'published'),
     [milestones]
   )
 
   const thisWeek = useMemo(
-    () => published.filter(m => m.status === 'in_progress'),
-    [published]
+    () => published.filter(m =>
+      m.status === 'in_progress' &&
+      !(m.due_date && m.due_date < todayStr)
+    ),
+    [published, todayStr]
   )
 
   const overdue = useMemo(
-    () => published.filter(m =>
-      m.status !== 'completed' &&
-      m.status !== 'in_progress' &&
-      (
-        (m.due_date ?? '') < todayStr ||
-        ((m.start_date ?? '') < todayStr && m.status === 'not_started')
-      )
-    ),
+    () => published.filter(m => {
+      if (m.status === 'completed') return false
+      if (m.status === 'delayed') return true
+      if (m.status === 'in_progress') return !!(m.due_date && m.due_date < todayStr)
+      return !!(m.due_date && m.due_date < todayStr) ||
+        !!(m.start_date && m.start_date < todayStr && m.status === 'not_started')
+    }),
     [published, todayStr]
   )
 
@@ -262,6 +264,11 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
       m.status !== 'in_progress'
     ),
     [published, todayStr]
+  )
+
+  const noDueDate = useMemo(
+    () => published.filter(m => !m.due_date && m.status !== 'completed'),
+    [published]
   )
 
   const completedInRange = useMemo(
@@ -306,7 +313,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
     onInProgress,
   })
 
-  const isEmpty = thisWeek.length === 0 && overdue.length === 0 && upcoming.length === 0
+  const isEmpty = thisWeek.length === 0 && overdue.length === 0 && upcoming.length === 0 && noDueDate.length === 0
 
   return (
     <div className="flex flex-col gap-6 pb-8">
@@ -319,9 +326,33 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
         <>
           {showOverdue && overdue.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--error)' }}>지연 / 미완료</h2>
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3"
+                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
+              >
+                <span style={{ fontSize: 16 }}>🚨</span>
+                <h2 className="text-sm font-bold tracking-wide" style={{ color: 'var(--error)' }}>
+                  지연 / 미완료 <span className="font-normal text-xs" style={{ color: 'rgba(239,68,68,0.7)' }}>({overdue.length}건)</span>
+                </h2>
+              </div>
               <div className="flex flex-col gap-3">
                 {overdue.map(m => <MilestoneCard key={m.id} {...cardProps(m, true)} />)}
+              </div>
+            </section>
+          )}
+          {noDueDate.length > 0 && (
+            <section>
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3"
+                style={{ background: 'rgba(148,163,184,0.08)', border: '1px solid var(--border-subtle)' }}
+              >
+                <span style={{ fontSize: 15 }}>📅</span>
+                <h2 className="text-sm font-bold tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+                  기한 미설정 <span className="font-normal text-xs" style={{ color: 'var(--text-disabled)' }}>({noDueDate.length}건)</span>
+                </h2>
+              </div>
+              <div className="flex flex-col gap-3">
+                {noDueDate.map(m => <MilestoneCard key={m.id} {...cardProps(m, true)} />)}
               </div>
             </section>
           )}

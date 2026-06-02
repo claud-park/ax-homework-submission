@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { LayoutDashboard, Layers, CalendarClock, AlertTriangle, FileText, BarChart2, LogOut, Menu, X, Users } from 'lucide-react'
+import { LayoutDashboard, Layers, AlertTriangle, FileText, BarChart2, LogOut, Menu, X, Users } from 'lucide-react'
 import { parseName } from '@/lib/utils'
 import { apiFetch } from '@/lib/api-client'
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
@@ -12,7 +12,6 @@ const NAV = [
   { icon: Users, label: '챔피언 리스트', href: '/admin/champions' },
   { icon: Layers, label: '제출 현황', href: '/admin/kanban' },
   { icon: AlertTriangle, label: '지연 신고', href: '/admin/delay-reports' },
-  { icon: CalendarClock, label: '기한 변경 요청', href: '/admin/requests' },
   { icon: FileText, label: '주간 리포트', href: '/admin/reports' },
 ]
 

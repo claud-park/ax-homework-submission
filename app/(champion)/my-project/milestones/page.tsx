@@ -76,7 +76,8 @@ export default function WorkStatusPage() {
   }
 
   function openDeadlineForCheckin(m: Milestone, isReschedule = false) {
-    setDeadlineModal({ id: m.id, due_date: m.due_date ?? '', start_date: m.start_date ?? '', isReschedule })
+    // 기한이 아예 없으면 start+due 모두 설정하는 reschedule 모드로 진입
+    setDeadlineModal({ id: m.id, due_date: m.due_date ?? '', start_date: m.start_date ?? '', isReschedule: isReschedule || !m.due_date })
     setReqForm({ requested_start_date: '', requested_due_date: '', reason: '' })
   }
 
@@ -255,11 +256,13 @@ export default function WorkStatusPage() {
       >
         <DialogContent style={{ background: 'var(--background)', borderColor: 'var(--border)' }}>
           <DialogHeader>
-            <DialogTitle>{deadlineModal?.isReschedule ? '기한 변경' : '기한 연장'}</DialogTitle>
-            {deadlineModal && !deadlineModal.isReschedule && (
+            <DialogTitle>
+              {!deadlineModal?.due_date ? '기한 설정' : deadlineModal.isReschedule ? '기한 변경' : '기한 연장'}
+            </DialogTitle>
+            {deadlineModal && !deadlineModal.isReschedule && deadlineModal.due_date && (
               <DialogDescription>현재 마감일: {deadlineModal.due_date}</DialogDescription>
             )}
-            {deadlineModal?.isReschedule && (
+            {deadlineModal?.isReschedule && deadlineModal.due_date && (
               <DialogDescription>시작일: {deadlineModal.start_date} · 마감일: {deadlineModal.due_date}</DialogDescription>
             )}
           </DialogHeader>
@@ -292,7 +295,7 @@ export default function WorkStatusPage() {
                   style={{ ...inputStyle, width: '100%' }}
                 />
               </div>
-              {!deadlineModal.isReschedule && (
+              {!deadlineModal.isReschedule && deadlineModal.due_date && (
                 <textarea
                   value={reqForm.reason}
                   onChange={e => setReqForm(r => ({ ...r, reason: e.target.value }))}

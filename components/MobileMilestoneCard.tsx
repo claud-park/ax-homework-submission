@@ -98,11 +98,19 @@ export function MobileMilestoneCard({
             >
               ✓ 완료
             </button>
-            {isReschedule ? (
+            {!m.due_date ? (
+              <button
+                onClick={() => onDeadlineExtension(m, false)}
+                className="flex-1 text-xs py-2"
+                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                기한 설정
+              </button>
+            ) : isReschedule ? (
               <button
                 onClick={() => onDeadlineExtension(m, true)}
-                className="flex-1 text-xs font-bold py-2 rounded-lg"
-                style={{ border: '1.5px solid #3b82f6', color: '#2563eb', background: 'rgba(59,130,246,0.07)' }}
+                className="flex-1 text-xs py-2"
+                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}
               >
                 기한 변경
               </button>
@@ -117,8 +125,8 @@ export function MobileMilestoneCard({
             ) : (
               <button
                 onClick={() => onDeadlineExtension(m, false)}
-                className="flex-1 text-xs font-bold py-2 rounded-lg"
-                style={{ border: '1.5px solid #3b82f6', color: '#2563eb', background: 'rgba(59,130,246,0.07)' }}
+                className="flex-1 text-xs py-2"
+                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}
               >
                 기한 연장
               </button>
