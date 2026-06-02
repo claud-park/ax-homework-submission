@@ -246,6 +246,7 @@ export default function AdminReportsPage() {
                             background: 'rgba(217,119,6,0.1)',
                             color: '#d97706',
                             fontSize: 10, fontWeight: 700,
+                            whiteSpace: 'nowrap',
                           }}>
                             ⚠ 있음
                           </span>
