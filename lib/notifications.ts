@@ -206,7 +206,7 @@ export async function notifyBottleneck(params: {
 }
 
 export async function nudgeChampion(params: {
-  user: { id: string; email: string; name: string }
+  user: User
   nudgeType: 'no_charter' | 'no_milestone' | 'delayed_milestone'
   milestoneTitle?: string
 }): Promise<void> {
@@ -233,8 +233,7 @@ export async function nudgeChampion(params: {
   } else {
     const titleRaw = milestoneTitle ?? ''
     subject = `[AX] '${titleRaw}' 마일스톤을 확인해주세요 🙏`
-    const titleEsc = escapeHtml(titleRaw)
-    bodyLine = `${titleEsc} 마일스톤을 완료해주세요. 혹시 병목이 생긴다면 [내 업무 현황] &gt; [이슈 보고/도움 요청]을 해 주세요.`
+    bodyLine = `${escapeHtml(titleRaw)} 마일스톤을 완료해주세요. 혹시 병목이 생긴다면 [내 업무 현황] &gt; [이슈 보고/도움 요청]을 해 주세요.`
     ctaHref = `${base}/my-project/milestones`
     ctaLabel = '마일스톤 확인하기'
   }
