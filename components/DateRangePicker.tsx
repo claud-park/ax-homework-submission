@@ -153,7 +153,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
     : '작업 기간을 선택하세요'
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} style={{ width: '100%' }}>
       {/* ── Trigger ── */}
       <button
         type="button"

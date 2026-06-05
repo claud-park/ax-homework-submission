@@ -333,9 +333,12 @@ function makeTaskListTable(
               {isChampRow ? (
                 // Champion row: 4 full columns
                 <>
-                  <div style={cell(W.name)}>
+                  <div
+                    style={{ ...cell(W.name), cursor: 'pointer' }}
+                    onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
+                  >
                     <button
-                      onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
+                      onClick={e => e.stopPropagation()}
                       aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
@@ -377,14 +380,18 @@ function makeTaskListTable(
                 </>
               ) : (
                 // Milestone row (group or task): single-width name cell with indent
-                <div style={{
-                  width: listWidth, display: 'flex', alignItems: 'center',
-                  padding: `0 6px 0 ${isGroupRow ? 16 : t.project?.startsWith('group-') ? 36 : 28}px`,
-                  overflow: 'hidden', whiteSpace: 'nowrap',
-                }}>
+                <div
+                  style={{
+                    width: listWidth, display: 'flex', alignItems: 'center',
+                    padding: `0 6px 0 ${isGroupRow ? 16 : t.project?.startsWith('group-') ? 36 : 28}px`,
+                    overflow: 'hidden', whiteSpace: 'nowrap',
+                    cursor: isGroupRow ? 'pointer' : 'default',
+                  }}
+                  onClick={isGroupRow ? (e => { e.stopPropagation(); onExpand(t) }) : undefined}
+                >
                   {isGroupRow && (
                     <button
-                      onClick={e => { e.stopPropagation(); onExpand(t) }}
+                      onClick={e => e.stopPropagation()}
                       aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',

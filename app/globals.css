@@ -213,7 +213,8 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--text-disabled);
-  float: left;
   pointer-events: none;
-  height: 0;
+}
+.ProseMirror p.is-editor-empty:first-child {
+  min-height: 1.5em;
 }
