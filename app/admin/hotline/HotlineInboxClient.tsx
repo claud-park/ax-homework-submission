@@ -56,7 +56,8 @@ export function HotlineInboxClient() {
         method: 'POST',
         body: JSON.stringify({ champion_user_id: selectedId, body: text }),
       })
-      setMessages(prev => [...prev, msg])
+      // Use API response directly — don't wait for a Realtime event
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
       loadThreads()
     } catch {
       setInput(text)
