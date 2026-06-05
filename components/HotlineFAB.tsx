@@ -1,6 +1,5 @@
-// components/HotlineFAB.tsx
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { MessageCircle, X, Send } from 'lucide-react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
@@ -14,7 +13,10 @@ export function HotlineFAB() {
   const [unread, setUnread] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const supabase = createSupabaseBrowserClient()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Stable supabase client — memoized so the reference never changes between renders
+  const supabase = useMemo(() => createSupabaseBrowserClient(), [])
 
   // 현재 로그인 사용자 ID 조회
   useEffect(() => {
@@ -50,7 +52,8 @@ export function HotlineFAB() {
         },
         (payload) => {
           const msg = payload.new as HotlineMessage
-          setMessages(prev => [...prev, msg])
+          // Deduplicate by id in case of re-subscription race
+          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
           if (msg.sender_role === 'admin') {
             setOpen(prev => {
               if (!prev) setUnread(u => u + 1)
@@ -64,12 +67,22 @@ export function HotlineFAB() {
     return () => { supabase.removeChannel(channel) }
   }, [userId, supabase])
 
-  // 패널 열릴 때 자동 스크롤 + 읽음 처리
+  // 패널 열릴 때 읽음 처리 + 포커스
   useEffect(() => {
     if (!open) return
-    setUnread(0)
-    apiFetch('/api/hotline/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {})
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    if (unread > 0) {
+      apiFetch('/api/hotline/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {})
+      setUnread(0)
+    }
+    inputRef.current?.focus()
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Escape 키로 패널 닫기
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
   }, [open])
 
   // 새 메시지 오면 스크롤
@@ -87,13 +100,17 @@ export function HotlineFAB() {
         method: 'POST',
         body: JSON.stringify({ body: text }),
       })
-      // Realtime이 INSERT를 수신해서 자동으로 messages에 추가됨
+      // Realtime이 INSERT를 수신해서 자동으로 messages에 추가됨 (dedup 처리됨)
     } catch {
       setInput(text) // 실패 시 복원
     } finally {
       setSending(false)
     }
   }
+
+  const fabAriaLabel = unread > 0
+    ? `Admin 핫라인 ${open ? '닫기' : '열기'}, ${unread}개 읽지 않은 메시지`
+    : `Admin 핫라인 ${open ? '닫기' : '열기'}`
 
   return (
     <>
@@ -134,7 +151,12 @@ export function HotlineFAB() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+          <div
+            role="log"
+            aria-live="polite"
+            aria-label="메시지 목록"
+            className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2"
+          >
             {messages.length === 0 && (
               <p className="text-flo-caption1 text-center mt-8" style={{ color: 'var(--text-disabled)' }}>
                 Admin에게 궁금한 점을 자유롭게 문의하세요.
@@ -166,7 +188,9 @@ export function HotlineFAB() {
             style={{ borderTop: '1px solid var(--border-faint)' }}
           >
             <input
+              ref={inputRef}
               type="text"
+              aria-label="메시지 입력"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
@@ -195,7 +219,8 @@ export function HotlineFAB() {
       {/* FAB */}
       <button
         onClick={() => setOpen(prev => !prev)}
-        aria-label="Admin 핫라인 열기"
+        aria-label={fabAriaLabel}
+        aria-expanded={open}
         className="fixed z-50 flex items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
         style={{
           bottom: '24px',
@@ -210,7 +235,8 @@ export function HotlineFAB() {
         <MessageCircle className="h-5 w-5" />
         {unread > 0 && (
           <span
-            className="absolute flex items-center justify-center text-flo-caption2 font-bold"
+            aria-hidden="true"
+            className="absolute flex items-center justify-center font-bold"
             style={{
               top: -4,
               right: -4,
@@ -222,7 +248,6 @@ export function HotlineFAB() {
               color: '#fff',
               fontSize: 10,
             }}
-            aria-label={`${unread}개 읽지 않은 메시지`}
           >
             {unread > 9 ? '9+' : unread}
           </span>
