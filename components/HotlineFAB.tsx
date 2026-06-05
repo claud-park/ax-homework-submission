@@ -1,31 +1,29 @@
+// components/HotlineFAB.tsx
 'use client'
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { MessageCircle, X, Send } from 'lucide-react'
+import { MessageCircle, X } from 'lucide-react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
-import type { HotlineMessage } from '@/lib/types'
+import type { HotlineMessage, PendingAttachment } from '@/lib/types'
+import { HotlineEditor } from './HotlineEditor'
+import { HotlineFileChip } from './HotlineFileChip'
+import DOMPurify from 'dompurify'
 
 export function HotlineFAB() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<HotlineMessage[]>([])
-  const [input, setInput] = useState('')
-  const [sending, setSending] = useState(false)
   const [unread, setUnread] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
-  // Stable supabase client — memoized so the reference never changes between renders
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
 
-  // 현재 로그인 사용자 ID 조회
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUserId(session?.user?.id ?? null)
     })
   }, [supabase])
 
-  // 메시지 초기 로드
   useEffect(() => {
     if (!userId) return
     apiFetch<HotlineMessage[]>('/api/hotline/messages')
@@ -37,7 +35,6 @@ export function HotlineFAB() {
       .catch(() => {})
   }, [userId])
 
-  // Supabase Realtime 구독
   useEffect(() => {
     if (!userId) return
     const channel = supabase
@@ -52,7 +49,6 @@ export function HotlineFAB() {
         },
         (payload) => {
           const msg = payload.new as HotlineMessage
-          // Deduplicate by id in case of re-subscription race
           setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
           if (msg.sender_role === 'admin') {
             setOpen(prev => {
@@ -63,21 +59,17 @@ export function HotlineFAB() {
         }
       )
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
   }, [userId, supabase])
 
-  // 패널 열릴 때 읽음 처리 + 포커스
   useEffect(() => {
     if (!open) return
     if (unread > 0) {
       apiFetch('/api/hotline/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {})
       setUnread(0)
     }
-    inputRef.current?.focus()
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Escape 키로 패널 닫기
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
@@ -85,28 +77,16 @@ export function HotlineFAB() {
     return () => document.removeEventListener('keydown', handler)
   }, [open])
 
-  // 새 메시지 오면 스크롤
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
 
-  async function handleSend() {
-    const text = input.trim()
-    if (!text || sending) return
-    setSending(true)
-    setInput('')
-    try {
-      const newMsg = await apiFetch<HotlineMessage>('/api/hotline/messages', {
-        method: 'POST',
-        body: JSON.stringify({ body: text }),
-      })
-      // Realtime dedup handles duplicates if the event also fires
-      setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg])
-    } catch {
-      setInput(text) // 실패 시 복원
-    } finally {
-      setSending(false)
-    }
+  async function handleSend(body: string, attachments: PendingAttachment[]) {
+    const newMsg = await apiFetch<HotlineMessage>('/api/hotline/messages', {
+      method: 'POST',
+      body: JSON.stringify({ body, attachments }),
+    })
+    setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg])
   }
 
   const fabAriaLabel = unread > 0
@@ -115,7 +95,6 @@ export function HotlineFAB() {
 
   return (
     <>
-      {/* Floating chat panel */}
       {open && (
         <div
           className="fixed z-50 flex flex-col"
@@ -123,7 +102,7 @@ export function HotlineFAB() {
             bottom: '80px',
             right: '24px',
             width: '320px',
-            height: '420px',
+            height: '460px',
             background: 'var(--surface-primary)',
             border: '1px solid var(--border-subtle)',
             borderRadius: '16px',
@@ -166,53 +145,37 @@ export function HotlineFAB() {
             {messages.map(msg => (
               <div
                 key={msg.id}
-                className={`flex ${msg.sender_role === 'champion' ? 'justify-end' : 'justify-start'}`}
+                className={`flex flex-col ${msg.sender_role === 'champion' ? 'items-end' : 'items-start'}`}
               >
                 <div
-                  className="text-flo-caption1 px-3 py-2 rounded-2xl max-w-[75%] break-words"
+                  className="hotline-msg-body text-flo-caption1 px-3 py-2 rounded-2xl max-w-[75%] break-words"
                   style={
                     msg.sender_role === 'champion'
                       ? { background: 'var(--accent)', color: '#fff', borderBottomRightRadius: 4 }
                       : { background: 'var(--surface-secondary)', color: 'var(--text-primary)', borderBottomLeftRadius: 4 }
                   }
-                >
-                  {msg.body}
-                </div>
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body) }}
+                />
+                {msg.attachments && msg.attachments.filter(a => !a.mime_type.startsWith('image/')).length > 0 && (
+                  <div className="flex flex-col gap-1 mt-1" style={{ maxWidth: '75%' }}>
+                    {msg.attachments
+                      .filter(a => !a.mime_type.startsWith('image/'))
+                      .map(a => (
+                        <HotlineFileChip key={a.id} attachment={a} onDark={msg.sender_role === 'champion'} />
+                      ))}
+                  </div>
+                )}
               </div>
             ))}
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
+          {/* Editor */}
           <div
-            className="flex gap-2 px-3 py-3 flex-shrink-0"
+            className="flex-shrink-0 px-3 py-3"
             style={{ borderTop: '1px solid var(--border-faint)' }}
           >
-            <input
-              ref={inputRef}
-              type="text"
-              aria-label="메시지 입력"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-              placeholder="메시지 입력..."
-              className="flex-1 text-flo-caption1 px-3 py-2 rounded-lg outline-none"
-              style={{
-                background: 'var(--surface-secondary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-subtle)',
-              }}
-              disabled={sending}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || sending}
-              aria-label="전송"
-              className="flex items-center justify-center rounded-lg transition-opacity disabled:opacity-40"
-              style={{ width: 36, height: 36, background: 'var(--accent)', color: '#fff', flexShrink: 0 }}
-            >
-              <Send className="h-4 w-4" />
-            </button>
+            <HotlineEditor onSend={handleSend} placeholder="메시지 입력..." />
           </div>
         </div>
       )}
