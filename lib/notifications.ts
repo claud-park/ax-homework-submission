@@ -254,3 +254,33 @@ export async function nudgeChampion(params: {
 
   await sendEmail({ to: user.email, subject, html })
 }
+
+export async function notifyHotlineMessage(params: {
+  champion: Pick<User, 'id' | 'name'>
+  body: string
+}): Promise<void> {
+  const to = adminEmail()
+  if (!to) return
+  const { champion, body } = params
+  const link = `${appBaseUrl()}/admin/hotline?champion=${encodeURIComponent(champion.id)}`
+  const subject = `[핫라인] ${escapeHtml(champion.name)} 에서 메시지가 도착했습니다`
+  const html = `
+<div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
+  <div style="border-bottom:2px solid #2563eb;padding-bottom:12px;margin-bottom:20px">
+    <h2 style="margin:0;font-size:18px">💬 Admin 핫라인 메시지</h2>
+  </div>
+  <table style="width:100%;font-size:14px;border-collapse:collapse">
+    <tr><td style="padding:8px 0;color:#64748b;width:100px">챔피언</td><td style="padding:8px 0;font-weight:600">${escapeHtml(champion.name)}</td></tr>
+    <tr><td style="padding:8px 0;color:#64748b;vertical-align:top">메시지</td><td style="padding:8px 0;white-space:pre-wrap">${escapeHtml(body)}</td></tr>
+  </table>
+  <div style="margin-top:24px">
+    <a href="${escapeHtml(link)}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">대화 바로 보기</a>
+  </div>
+</div>
+`.trim()
+  try {
+    await sendEmail({ to, subject, html })
+  } catch (e) {
+    console.error('[email] notifyHotlineMessage failed:', e)
+  }
+}
