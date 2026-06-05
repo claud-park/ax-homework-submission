@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     { data: charters, error: chartersErr },
     { data: milestones, error: msErr },
   ] = await Promise.all([
-    supabase.from('users').select('id, name'),
+    supabase.from('users').select('id, name').eq('user_group', 'champion'),
     supabase.from('charter_submissions').select('user_id, id, project_name, publish_status'),
     supabase.from('milestones').select('user_id, week_number, status').eq('publish_status', 'published'),
   ])
