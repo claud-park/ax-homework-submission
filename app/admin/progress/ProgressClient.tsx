@@ -391,8 +391,8 @@ interface ClientProps {
 }
 
 export function ProgressClient({ initialMilestones, initialCharters }: ClientProps) {
-  const milestones = initialMilestones
-  const charters = initialCharters
+  const [milestones] = useState(initialMilestones)
+  const [charters, setCharters] = useState(initialCharters)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set(initialMilestones.map(m => m.user_id)))
   const [selectedCharter, setSelectedCharter] = useState<CharterWithUser | null>(null)
 
@@ -481,7 +481,11 @@ export function ProgressClient({ initialMilestones, initialCharters }: ClientPro
         <CharterPanel
           charter={selectedCharter}
           onClose={() => setSelectedCharter(null)}
-          onApprove={approvedAt => setSelectedCharter(prev => prev ? { ...prev, admin_approved_at: approvedAt } : null)}
+          onApprove={approvedAt => {
+            const approved = selectedCharter ? { ...selectedCharter, admin_approved_at: approvedAt } : null
+            setSelectedCharter(approved)
+            if (approved) setCharters(prev => prev.map(c => c.id === approved.id ? approved : c))
+          }}
         />
       )}
     </div>

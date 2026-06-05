@@ -21,7 +21,7 @@ export default async function AdminProgressPage() {
   const [milestonesResult, chartersResult] = await Promise.all([
     supabase
       .from('milestones')
-      .select('*, users(*), milestone_deliverables(*)')
+      .select('*, users(*)')
       .eq('publish_status', 'published')
       .order('user_id').order('week_number').order('display_order'),
     supabase
