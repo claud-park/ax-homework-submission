@@ -158,6 +158,23 @@ export interface KanbanCard {
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
 export type KanbanDataV2 = Record<KanbanColumn, KanbanCard[]>
 
+export interface HotlineAttachment {
+  id: string
+  message_id: string
+  file_name: string
+  file_path: string
+  file_size: number
+  mime_type: string
+  created_at: string
+}
+
+export interface PendingAttachment {
+  file_name: string
+  file_path: string
+  file_size: number
+  mime_type: string
+}
+
 export interface HotlineMessage {
   id: string
   champion_user_id: string
@@ -167,6 +184,7 @@ export interface HotlineMessage {
   read_by_champion: boolean
   read_by_admin: boolean
   created_at: string
+  attachments?: HotlineAttachment[]
 }
 
 export interface HotlineThread {
