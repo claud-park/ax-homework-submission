@@ -1,6 +1,20 @@
 import { fetchGanttData } from '@/lib/data/champions'
-import { ChampionGanttView } from '@/components/ChampionGanttView'
 import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
+import dynamic from 'next/dynamic'
+
+const ChampionGanttView = dynamic(
+  () => import('@/components/ChampionGanttView').then(m => ({ default: m.ChampionGanttView })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="h-12 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+        ))}
+      </div>
+    ),
+  }
+)
 
 export default async function AdminDashboard() {
   const data = await fetchGanttData()

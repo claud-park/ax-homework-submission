@@ -1,11 +1,15 @@
 'use client'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import Placeholder from '@tiptap/extension-placeholder'
+import dynamic from 'next/dynamic'
 import { apiFetch } from '@/lib/api-client'
+
+const SectionEditorInner = dynamic(() => import('./SectionEditorInner'), {
+  ssr: false,
+  loading: () => (
+    <div className="p-3 min-h-24 animate-pulse" style={{ background: 'var(--surface-secondary)', borderRadius: 4 }} />
+  ),
+})
 import type { ProjectCharter, CharterSubmission, Milestone } from '@/lib/types'
 import DateRangePicker from '@/components/DateRangePicker'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
@@ -102,25 +106,6 @@ function InfoTooltip({ text }: { text: string }) {
 function SectionEditor({ label, required, tooltip, placeholder, content, onBlur, onDirty }: {
   label: string; required?: boolean; tooltip?: string; placeholder?: string; content: string; onBlur: (html: string) => void; onDirty?: () => void
 }) {
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Underline,
-      ...(placeholder ? [Placeholder.configure({ placeholder })] : []),
-    ],
-    content,
-    onBlur: ({ editor }) => onBlur(editor.getHTML()),
-    onUpdate: () => onDirty?.(),
-  })
-
-  // TipTap v3 initialises content asynchronously; imperatively sync whenever
-  // the editor instance becomes available or the content prop changes.
-  // false = suppress onUpdate so onDirty isn't triggered spuriously.
-  useEffect(() => {
-    if (!editor) return
-    editor.commands.setContent(content, { emitUpdate: false })
-  }, [editor, content])
-
   return (
     <div
       className="rounded-xl border overflow-hidden focus-within:ring-2 focus-within:ring-blue-accent"
@@ -138,7 +123,12 @@ function SectionEditor({ label, required, tooltip, placeholder, content, onBlur,
         {required && <span className="text-xs font-medium" style={{ color: 'var(--amber)' }}>필수</span>}
       </div>
       <div style={{ background: 'var(--background)' }}>
-        <EditorContent editor={editor} className="p-3 min-h-24 text-sm prose max-w-none [&_.ProseMirror]:outline-none" />
+        <SectionEditorInner
+          content={content}
+          placeholder={placeholder}
+          onBlur={onBlur}
+          onDirty={onDirty}
+        />
       </div>
     </div>
   )
