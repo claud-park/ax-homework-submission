@@ -21,12 +21,11 @@ interface Props {
 
 export function MilestonesClient({ initialMilestones, charterApproved: initialCharterApproved }: Props) {
   const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones)
-  const [charterApproved, setCharterApproved] = useState(initialCharterApproved)
+  const charterApproved = initialCharterApproved
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; start_date: string; isReschedule: boolean } | null>(null)
   const [reqForm, setReqForm] = useState({ requested_start_date: '', requested_due_date: '', reason: '' })
   const [error, setError] = useState<string | null>(null)
   const [collapsedCheckinGroups, setCollapsedCheckinGroups] = useState<Set<string>>(new Set())
-  const [loading] = useState(false)
 
   async function handleCheckinComplete(id: string) {
     try {
@@ -141,19 +140,11 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
     onDeadlineExtension: openDeadlineForCheckin,
   }
 
-  // suppress unused warning — setCharterApproved kept for future mutations
-  void setCharterApproved
-
   return (
     <>
       {/* 모바일: 마일스톤 카드 */}
       <div className="md:hidden flex flex-col gap-3">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
-          ))
-        ) : (
-          (() => {
+        {(() => {
             const byWeek = new Map<number | null, Milestone[]>()
             for (const m of milestones.filter(m => !m.parent_milestone_id)) {
               const key = m.week_number ?? null
@@ -188,62 +179,51 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
                 </div>
               </div>
             ))
-          })()
-        )}
+          })()}
       </div>
 
       {/* 데스크톱: 기존 레이아웃 */}
       <div className="hidden md:flex flex-col" style={{ height: 'calc(100vh - 100px)', minHeight: 0 }}>
         <div className="flex-1 overflow-y-auto pb-8">
-          {loading ? (
-            <div className="flex flex-col gap-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-24 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
-              ))}
-            </div>
-          ) : (
-            <>
-              {allOverdue.length > 0 && (
-                <CheckinTab milestones={allOverdue} {...checkinProps} />
-              )}
-              {milestones.some(m => !m.parent_milestone_id && !overdueIds.has(m.id)) && (
-                <CheckinTab
-                  milestones={milestones.filter(m => !m.parent_milestone_id && !overdueIds.has(m.id))}
-                  showOverdue={false}
-                  {...checkinProps}
-                />
-              )}
-              {checkinGroups.depth0.map(g => {
-                const gMilestones = (checkinGroups.byParent.get(g.id) ?? []).filter(m => !overdueIds.has(m.id))
-                if (gMilestones.length === 0) return null
-                const isCollapsed = collapsedCheckinGroups.has(g.id)
-                return (
-                  <div key={g.id} style={{ marginTop: 16 }}>
-                    <button
-                      onClick={() => setCollapsedCheckinGroups(prev => {
-                        const next = new Set(prev)
-                        if (next.has(g.id)) next.delete(g.id)
-                        else next.add(g.id)
-                        return next
-                      })}
-                      className="flex items-center gap-2 w-full mb-3"
-                      style={{ background: 'transparent', border: 'none', padding: 0 }}
-                    >
-                      {isCollapsed
-                        ? <ChevronRight size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />
-                        : <ChevronDown size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />}
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{g.title}</span>
-                      <span className="text-xs ml-1" style={{ color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{gMilestones.length}개</span>
-                      <span className="flex-1 ml-2" style={{ height: 1, background: 'var(--border)' }} />
-                    </button>
-                    {!isCollapsed && (
-                      <CheckinTab milestones={gMilestones} showOverdue={false} {...checkinProps} />
-                    )}
-                  </div>
-                )
-              })}
-            </>
+          {allOverdue.length > 0 && (
+            <CheckinTab milestones={allOverdue} {...checkinProps} />
           )}
+          {milestones.some(m => !m.parent_milestone_id && !overdueIds.has(m.id)) && (
+            <CheckinTab
+              milestones={milestones.filter(m => !m.parent_milestone_id && !overdueIds.has(m.id))}
+              showOverdue={false}
+              {...checkinProps}
+            />
+          )}
+          {checkinGroups.depth0.map(g => {
+            const gMilestones = (checkinGroups.byParent.get(g.id) ?? []).filter(m => !overdueIds.has(m.id))
+            if (gMilestones.length === 0) return null
+            const isCollapsed = collapsedCheckinGroups.has(g.id)
+            return (
+              <div key={g.id} style={{ marginTop: 16 }}>
+                <button
+                  onClick={() => setCollapsedCheckinGroups(prev => {
+                    const next = new Set(prev)
+                    if (next.has(g.id)) next.delete(g.id)
+                    else next.add(g.id)
+                    return next
+                  })}
+                  className="flex items-center gap-2 w-full mb-3"
+                  style={{ background: 'transparent', border: 'none', padding: 0 }}
+                >
+                  {isCollapsed
+                    ? <ChevronRight size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />
+                    : <ChevronDown size={13} style={{ color: 'var(--text-disabled)', flexShrink: 0 }} />}
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{g.title}</span>
+                  <span className="text-xs ml-1" style={{ color: 'var(--text-disabled)', whiteSpace: 'nowrap' }}>{gMilestones.length}개</span>
+                  <span className="flex-1 ml-2" style={{ height: 1, background: 'var(--border)' }} />
+                </button>
+                {!isCollapsed && (
+                  <CheckinTab milestones={gMilestones} showOverdue={false} {...checkinProps} />
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 

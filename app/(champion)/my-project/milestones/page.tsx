@@ -9,7 +9,7 @@ export default async function WorkStatusPage() {
   if (!user) redirect('/login')
 
   const [{ data: milestones }, { data: charters }] = await Promise.all([
-    supabase.from('milestones').select('*').eq('user_id', user.id).order('display_order'),
+    supabase.from('milestones').select('*').eq('user_id', user.id).order('display_order').order('start_date', { ascending: true, nullsFirst: false }),
     supabase.from('charter_submissions')
       .select('id, admin_approved_at')
       .eq('user_id', user.id),
