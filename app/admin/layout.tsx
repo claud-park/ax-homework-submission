@@ -23,8 +23,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const serviceClient = createServiceClient()
   const [bottleneckResult, chartersResult] = await Promise.all([
-    serviceClient.from('milestones').select('id').not('bottleneck_type', 'is', null),
-    serviceClient.from('charter_submissions').select('id, admin_approved_at'),
+    serviceClient.from('milestones').select('id')
+      .eq('publish_status', 'published')
+      .not('bottleneck_type', 'is', null)
+      .is('bottleneck_reviewed_at', null),
+    serviceClient.from('charter_submissions').select('id, admin_approved_at')
+      .eq('publish_status', 'published'),
   ])
 
   const pendingBottleneck = bottleneckResult.data?.length ?? 0
