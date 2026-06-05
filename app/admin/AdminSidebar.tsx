@@ -4,8 +4,9 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
-import { LayoutDashboard, Layers, AlertTriangle, FileText, BarChart2, LogOut, Menu, X, Users, UserCog } from 'lucide-react'
+import { LayoutDashboard, Layers, AlertTriangle, FileText, BarChart2, LogOut, Menu, X, Users, UserCog, MessageCircle } from 'lucide-react'
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
+import type { HotlineThread } from '@/lib/types'
 
 const NAV = [
   { icon: LayoutDashboard, label: '대시보드',     href: '/admin' },
@@ -14,20 +15,23 @@ const NAV = [
   { icon: Layers,          label: '제출 현황',     href: '/admin/kanban' },
   { icon: AlertTriangle,   label: '지연 신고',     href: '/admin/delay-reports' },
   { icon: FileText,        label: '주간 리포트',   href: '/admin/reports' },
+  { icon: MessageCircle,   label: '핫라인',        href: '/admin/hotline' },
 ]
 
 interface Props {
   initialPendingBottleneck: number
   initialPendingCharters: number
+  initialHotlineUnread: number
 }
 
-export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters }: Props) {
+export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters, initialHotlineUnread }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pendingBottleneck, setPendingBottleneck] = useState(initialPendingBottleneck)
   const [pendingCharters, setPendingCharters] = useState(initialPendingCharters)
+  const [hotlineUnread, setHotlineUnread] = useState(initialHotlineUnread)
 
   useEffect(() => {
     Promise.all([
@@ -36,6 +40,9 @@ export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters 
         .catch(() => {}),
       apiFetch<{ id: string; admin_approved_at: string | null }[]>('/api/admin/charters')
         .then(d => setPendingCharters(d.filter(c => !c.admin_approved_at).length))
+        .catch(() => {}),
+      apiFetch<HotlineThread[]>('/api/admin/hotline')
+        .then(threads => setHotlineUnread(threads.reduce((sum, t) => sum + t.unread_count, 0)))
         .catch(() => {}),
     ])
   }, [pathname])
@@ -46,10 +53,16 @@ export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters 
   }
 
   const MOBILE_TABS: BottomTab[] = [
-    { icon: AlertTriangle, label: '지연 신고',  href: '/admin/delay-reports', badge: pendingBottleneck },
-    { icon: FileText,      label: '과제정의서', href: '/admin/mobile/charters', badge: pendingCharters },
-    { icon: BarChart2,     label: '리포트',     href: '/admin/reports' },
+    { icon: AlertTriangle,  label: '지연 신고',  href: '/admin/delay-reports', badge: pendingBottleneck },
+    { icon: FileText,       label: '과제정의서', href: '/admin/mobile/charters', badge: pendingCharters },
+    { icon: BarChart2,      label: '리포트',     href: '/admin/reports' },
+    { icon: MessageCircle,  label: '핫라인',     href: '/admin/hotline', badge: hotlineUnread },
   ]
+
+  const badgeMap: Record<string, number> = {
+    '/admin/delay-reports': pendingBottleneck,
+    '/admin/hotline': hotlineUnread,
+  }
 
   return (
     <>
@@ -81,6 +94,7 @@ export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters 
         <nav className="flex flex-col gap-0.5">
           {NAV.map(item => {
             const active = item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href)
+            const badge = badgeMap[item.href] ?? 0
             return (
               <Link
                 key={item.href}
@@ -96,6 +110,17 @@ export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters 
                 {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full" style={{ background: 'var(--accent)' }} />}
                 <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                 {item.label}
+                {badge > 0 && (
+                  <span
+                    className="ml-auto flex items-center justify-center text-flo-caption2 font-bold rounded-full"
+                    style={{
+                      minWidth: 18, height: 18, padding: '0 4px',
+                      background: '#ef4444', color: '#fff', fontSize: 10,
+                    }}
+                  >
+                    {badge}
+                  </span>
+                )}
               </Link>
             )
           })}
