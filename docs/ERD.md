@@ -1,6 +1,6 @@
-# Entity Relationship Diagram — v3
+# Entity Relationship Diagram — v4
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-05-27
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-05
 
 ---
 
@@ -14,6 +14,7 @@
 | name | text | from Google OAuth |
 | avatar_url | text | from Google OAuth |
 | created_at | timestamptz | |
+| user_group | text | `champion`(default) \| `partner` — CHECK constraint. `admin` 여부는 `auth.users.user_metadata.is_admin`에서 런타임 파생 |
 
 ### `homeworks`
 | Column | Type | Notes |

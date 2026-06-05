@@ -175,3 +175,17 @@ export interface HotlineThread {
   last_sender_role: 'champion' | 'admin'
   unread_count: number
 }
+
+// ─── User Group ──────────────────────────────────────────────────────────────
+
+export type UserGroup = 'champion' | 'partner' | 'admin'
+
+export interface UserManagementEntry {
+  id: string
+  name: string
+  displayName: string
+  department: string
+  email: string
+  userGroup: UserGroup
+  createdAt: string
+}

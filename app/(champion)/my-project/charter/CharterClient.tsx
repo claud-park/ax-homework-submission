@@ -492,6 +492,10 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null)
   useEffect(() => { projectNameRef.current = projectName }, [projectName])
 
+  // Auto-save state (edit mode)
+  const editAutoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const editAutoSavePendingRef = useRef(false)
+
   // Always-current auto-save function (avoids stale closures via ref pattern)
   const triggerAutoSaveRef = useRef(async () => {})
   triggerAutoSaveRef.current = async () => {
@@ -526,12 +530,50 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
     return () => clearInterval(interval)
   }, [mode])
 
+  // Edit mode auto-save — always-current via ref pattern (avoids stale closures)
+  const editAutoSaveRef = useRef(async () => {})
+  editAutoSaveRef.current = async () => {
+    if (mode !== 'edit' || !submission || editAutoSavePendingRef.current) return
+    editAutoSavePendingRef.current = true
+    setAutoSavingDisplay(true)
+    try {
+      const updated = await apiFetch<CharterSubmission>(`/api/charter/submissions/${submission.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          project_name: projectNameRef.current,
+          content: contentRef.current,
+          publish_status: submission.publish_status,
+        }),
+      })
+      onUpdated(updated)
+      setLastAutoSavedAt(new Date())
+    } catch { /* silent — 자동저장 실패는 toast 없이 무시 */ }
+    finally {
+      editAutoSavePendingRef.current = false
+      setAutoSavingDisplay(false)
+    }
+  }
+
+  function scheduleAutoSave() {
+    if (mode !== 'edit') return
+    if (editAutoSaveTimerRef.current) clearTimeout(editAutoSaveTimerRef.current)
+    editAutoSaveTimerRef.current = setTimeout(() => {
+      void editAutoSaveRef.current()
+    }, 1500)
+  }
+
   useEffect(() => {
     if (mode !== 'edit') return
     apiFetch<Milestone[]>('/api/milestones')
       .then(data => setMilestones(data.filter(m => m.publish_status === 'published')))
       .catch(() => {})
   }, [mode])
+
+  useEffect(() => {
+    return () => {
+      if (editAutoSaveTimerRef.current) clearTimeout(editAutoSaveTimerRef.current)
+    }
+  }, [])
 
   function handleSectionBlur(key: SectionKey, html: string) {
     contentRef.current = { ...contentRef.current, [key]: html }
@@ -642,14 +684,14 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
             id="charter-project-name"
             type="text"
             value={projectName}
-            onChange={e => setProjectName(e.target.value)}
+            onChange={e => { setProjectName(e.target.value); scheduleAutoSave() }}
             placeholder="프로젝트명을 입력하세요"
             className="text-flo-h400 font-semibold bg-transparent outline-none w-full"
             style={{ color: 'var(--text-primary)' }}
           />
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {mode === 'new' && (
+          {(autoSavingDisplay || lastAutoSavedAt) && (
             <span className="flex items-center gap-1.5 flex-shrink-0" style={{ color: 'var(--text-disabled)', fontSize: 12 }}>
               {autoSavingDisplay
                 ? <><Spinner size="sm" className="inline" /> 저장 중...</>
@@ -695,7 +737,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
                 placeholder={s.placeholder}
                 content={(submission?.content ?? {})[s.key] ?? ''}
                 onBlur={html => handleSectionBlur(s.key, html)}
-                onDirty={() => {}}
+                onDirty={scheduleAutoSave}
               />
             </Fragment>
           ))}

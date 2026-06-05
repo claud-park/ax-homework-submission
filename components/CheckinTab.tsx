@@ -62,7 +62,9 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
 
   const todayStr = new Date().toISOString().split('T')[0]
   const isReschedule = (m.start_date ?? '') < todayStr && m.status === 'not_started'
-  const isDelayed = m.status === 'delayed' || (!!m.due_date && m.due_date < todayStr && m.status !== 'completed')
+  const isDelayed = m.status === 'delayed' ||
+    (!!m.due_date && m.due_date < todayStr && m.status !== 'completed') ||
+    (!!(m.start_date && m.start_date < todayStr) && m.status === 'not_started')
   const isDelayPending = m.bottleneck_type !== null && m.bottleneck_reviewed_at === null
   const hasAdminReply = m.bottleneck_reviewed_at !== null && !!m.bottleneck_admin_comment
 
