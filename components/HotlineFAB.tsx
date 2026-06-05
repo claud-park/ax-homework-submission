@@ -96,11 +96,12 @@ export function HotlineFAB() {
     setSending(true)
     setInput('')
     try {
-      await apiFetch<HotlineMessage>('/api/hotline/messages', {
+      const newMsg = await apiFetch<HotlineMessage>('/api/hotline/messages', {
         method: 'POST',
         body: JSON.stringify({ body: text }),
       })
-      // Realtime이 INSERT를 수신해서 자동으로 messages에 추가됨 (dedup 처리됨)
+      // Realtime dedup handles duplicates if the event also fires
+      setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg])
     } catch {
       setInput(text) // 실패 시 복원
     } finally {
