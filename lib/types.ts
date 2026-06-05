@@ -21,6 +21,8 @@ export interface Submission {
   status: SubmissionStatus
   attempt_number: number
   submitted_at: string
+  feedback: string | null
+  feedback_updated_at: string | null
   comments?: Comment[]
   user?: User
 }
