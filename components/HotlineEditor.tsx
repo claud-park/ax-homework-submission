@@ -7,6 +7,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import { ImageIcon, Paperclip, Send, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { apiUpload } from '@/lib/api-client'
+import { toast } from 'sonner'
 import type { PendingAttachment } from '@/lib/types'
 
 interface UploadResponse {
@@ -80,7 +81,7 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
         editor.chain().focus().setImage({ src: res.url }).run()
       }
     } catch {
-      // silently skip — file not uploaded
+      toast.error('파일 업로드에 실패했습니다.')
     } finally {
       setUploading(false)
     }
@@ -102,7 +103,7 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
         mime_type: res.mime_type,
       }])
     } catch {
-      // silently skip
+      toast.error('파일 업로드에 실패했습니다.')
     } finally {
       setUploading(false)
     }
@@ -204,7 +205,7 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
         <div className="flex flex-wrap gap-1 px-3 pb-1.5">
           {pendingAttachments.map((a, i) => (
             <div
-              key={i}
+              key={a.file_path}
               className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
               style={{ background: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
             >
@@ -213,6 +214,7 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
               <button
                 type="button"
                 onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
+                aria-label={`파일 제거: ${a.file_name}`}
                 className="opacity-50 hover:opacity-100 ml-0.5"
                 style={{ lineHeight: 1 }}
               >
