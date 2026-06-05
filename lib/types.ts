@@ -155,3 +155,17 @@ export interface KanbanCard {
 
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
 export type KanbanDataV2 = Record<KanbanColumn, KanbanCard[]>
+
+// ─── User Group ──────────────────────────────────────────────────────────────
+
+export type UserGroup = 'champion' | 'partner' | 'admin'
+
+export interface UserManagementEntry {
+  id: string
+  name: string
+  displayName: string
+  department: string
+  email: string
+  userGroup: UserGroup
+  createdAt: string
+}
