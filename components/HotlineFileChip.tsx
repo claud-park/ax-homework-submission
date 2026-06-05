@@ -2,6 +2,7 @@
 'use client'
 import { Download, Paperclip } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
 import type { HotlineAttachment } from '@/lib/types'
 
@@ -29,7 +30,7 @@ export function HotlineFileChip({ attachment, onDark = false }: Props) {
       })
       window.open(url, '_blank', 'noopener')
     } catch {
-      // silently ignore
+      toast.error('파일 다운로드에 실패했습니다.')
     } finally {
       setLoading(false)
     }
@@ -47,6 +48,7 @@ export function HotlineFileChip({ attachment, onDark = false }: Props) {
         maxWidth: 200,
       }}
       title="다운로드"
+      aria-label={`${attachment.file_name} 다운로드`}
     >
       <Paperclip size={11} style={{ flexShrink: 0 }} />
       <span className="truncate flex-1 text-left">{attachment.file_name}</span>
