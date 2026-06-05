@@ -6,19 +6,21 @@ CREATE TABLE hotline_attachments (
   message_id  UUID NOT NULL REFERENCES hotline_messages(id) ON DELETE CASCADE,
   file_name   TEXT NOT NULL,
   file_path   TEXT NOT NULL,
-  file_size   INTEGER NOT NULL,
+  file_size   BIGINT NOT NULL,
   mime_type   TEXT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_hotline_attachments_message_id ON hotline_attachments(message_id);
 
 ALTER TABLE hotline_attachments ENABLE ROW LEVEL SECURITY;
 
 -- Champions can only see attachments on their own messages
 CREATE POLICY "champion_read_own_attachments" ON hotline_attachments
   FOR SELECT USING (
-    message_id IN (
-      SELECT id FROM hotline_messages
-      WHERE champion_user_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM hotline_messages
+      WHERE id = message_id AND champion_user_id = auth.uid()
     )
   );
 
