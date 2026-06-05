@@ -218,3 +218,11 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
 .ProseMirror p.is-editor-empty:first-child {
   min-height: 1.5em;
 }
+
+/* Hotline HTML message body */
+.hotline-msg-body p { margin: 0; }
+.hotline-msg-body p + p { margin-top: 4px; }
+.hotline-msg-body strong, .hotline-msg-body b { font-weight: 700; }
+.hotline-msg-body em, .hotline-msg-body i { font-style: italic; }
+.hotline-msg-body code { font-family: ui-monospace, monospace; background: rgba(0,0,0,0.12); border-radius: 3px; padding: 1px 4px; font-size: 0.88em; }
+.hotline-msg-body img { max-width: 100%; border-radius: 6px; margin-top: 4px; display: block; }
