@@ -13,7 +13,7 @@ export default async function ChampionLayout({ children }: { children: React.Rea
 
   return (
     <div className="flex min-h-screen" style={{ background: 'hsl(var(--background))' }}>
-      <ChampionSidebar userName={displayName} />
+      <ChampionSidebar />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header

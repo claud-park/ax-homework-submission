@@ -19,11 +19,7 @@ const MOBILE_TABS: BottomTab[] = [
   { icon: LayoutList, label: '내 업무 현황', href: '/my-project/milestones' },
 ]
 
-interface Props {
-  userName: string
-}
-
-export function ChampionSidebar({ userName }: Props) {
+export function ChampionSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
