@@ -19,33 +19,12 @@ interface Props {
 
 export function MobileChampionList({ initialData }: Props) {
   const router = useRouter()
-  const [champions, setChampions] = useState<ChampionSummary[]>(initialData)
   const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const filtered = champions.filter(c =>
+  const filtered = initialData.filter(c =>
     c.name.toLowerCase().includes(query.toLowerCase()) ||
     c.department.toLowerCase().includes(query.toLowerCase())
   )
-
-  if (error) {
-    return (
-      <div className="text-sm text-center py-6" style={{ color: 'var(--text-disabled)' }}>
-        {error}
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-16 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
-        ))}
-      </div>
-    )
-  }
 
   return (
     <div className="flex flex-col gap-3">
