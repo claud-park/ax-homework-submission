@@ -155,3 +155,23 @@ export interface KanbanCard {
 
 export type KanbanColumn = 'not_started' | 'in_progress' | 'reviewing' | 'accepted' | 'declined'
 export type KanbanDataV2 = Record<KanbanColumn, KanbanCard[]>
+
+export interface HotlineMessage {
+  id: string
+  champion_user_id: string
+  sender_id: string
+  sender_role: 'champion' | 'admin'
+  body: string
+  read_by_champion: boolean
+  read_by_admin: boolean
+  created_at: string
+}
+
+export interface HotlineThread {
+  champion_user_id: string
+  champion_name: string
+  last_message: string
+  last_message_at: string
+  last_sender_role: 'champion' | 'admin'
+  unread_count: number
+}
