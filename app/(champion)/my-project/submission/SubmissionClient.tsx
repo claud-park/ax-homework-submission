@@ -161,39 +161,68 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
           {submissions.map(sub => (
             <div
               key={sub.id}
-              className="flex items-center justify-between p-4 rounded-xl border"
+              className="flex flex-col p-4 rounded-xl border gap-3"
               style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                {sub.link_url
-                  ? <Link className="h-4 w-4 shrink-0" style={{ color: 'var(--text-secondary)' }} />
-                  : <FileCheck className="h-4 w-4 shrink-0" style={{ color: 'var(--text-secondary)' }} />
-                }
-                <div className="min-w-0">
-                  {sub.link_url ? (
-                    <a
-                      href={sub.link_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-medium truncate block"
-                      style={{ color: 'var(--blue-600)' }}
-                    >
-                      {sub.link_url}
-                    </a>
-                  ) : (
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{sub.file_name}</p>
-                  )}
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    시도 {sub.attempt_number}회 · {new Date(sub.submitted_at).toLocaleDateString('ko-KR')}
+              {/* 파일/링크 + 상태배지 row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  {sub.link_url
+                    ? <Link className="h-4 w-4 shrink-0" style={{ color: 'var(--text-secondary)' }} />
+                    : <FileCheck className="h-4 w-4 shrink-0" style={{ color: 'var(--text-secondary)' }} />
+                  }
+                  <div className="min-w-0">
+                    {sub.link_url ? (
+                      <a
+                        href={sub.link_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium truncate block"
+                        style={{ color: 'var(--blue-600)' }}
+                      >
+                        {sub.link_url}
+                      </a>
+                    ) : (
+                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{sub.file_name}</p>
+                    )}
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      시도 {sub.attempt_number}회 · {new Date(sub.submitted_at).toLocaleDateString('ko-KR')}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className="text-xs font-semibold px-2 py-1 rounded-md shrink-0 ml-3"
+                  style={{ color: STATUS_COLOR[sub.status], background: `${STATUS_COLOR[sub.status]}20` }}
+                >
+                  {STATUS_LABEL[sub.status]}
+                </span>
+              </div>
+
+              {/* 관리자 피드백 블록 (feedback 있을 때만) */}
+              {sub.feedback && (
+                <div
+                  style={{
+                    borderLeft: '3px solid var(--blue-600)',
+                    borderRadius: '0 6px 6px 0',
+                    background: 'rgba(37,99,235,0.04)',
+                    padding: '8px 10px 8px 12px',
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-disabled)' }}>
+                      관리자 피드백
+                    </span>
+                    {sub.feedback_updated_at && (
+                      <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>
+                        · {new Date(sub.feedback_updated_at).toLocaleString('ko-KR')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    {sub.feedback}
                   </p>
                 </div>
-              </div>
-              <span
-                className="text-xs font-semibold px-2 py-1 rounded-md shrink-0 ml-3"
-                style={{ color: STATUS_COLOR[sub.status], background: `${STATUS_COLOR[sub.status]}20` }}
-              >
-                {STATUS_LABEL[sub.status]}
-              </span>
+              )}
             </div>
           ))}
         </div>
