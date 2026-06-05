@@ -19,6 +19,15 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // 조회 시 admin 읽음 처리 (fire-and-forget)
+  void supabase
+    .from('hotline_messages')
+    .update({ read_by_admin: true })
+    .eq('champion_user_id', championUserId)
+    .eq('sender_role', 'champion')
+    .eq('read_by_admin', false)
+
   return NextResponse.json(data as HotlineMessage[])
 }
 
