@@ -83,9 +83,9 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
   const comments = latest?.comments?.slice().sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) ?? []
 
   function openConfirm(newStatus: SubmissionStatus) {
-    if (newStatus === currentStatus) return
+    if (newStatus === currentStatus || !latest) return
     setConfirmingStatus(newStatus)
-    setFeedbackText(latest?.feedback ?? '')
+    setFeedbackText(latest.feedback ?? '')
   }
 
   async function confirmStatusChange() {
