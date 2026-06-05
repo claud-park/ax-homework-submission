@@ -85,18 +85,19 @@ function ProgressChips({ milestones }: { milestones: ReportChampion['milestones'
 }
 
 export function ReportsClient({ initialData }: { initialData: ReportChampion[] }) {
-  const [data, setData] = useState<ReportChampion[] | null>(initialData)
+  const [data, setData] = useState<ReportChampion[]>(initialData)
   const [loading, setLoading] = useState(false)
   const [weekOffset, setWeekOffset] = useState(0)
   const reportRef = useRef<HTMLDivElement>(null)
+  const initialDataConsumed = useRef(false)
 
   useEffect(() => {
-    if (weekOffset === 0 && initialData) {
-      setData(initialData)
+    if (weekOffset === 0 && !initialDataConsumed.current) {
+      initialDataConsumed.current = true
       return
     }
     setLoading(true)
-    apiFetch<ReportChampion[]>('/api/admin/reports/overview')
+    apiFetch<ReportChampion[]>(`/api/admin/reports/overview?weekOffset=${weekOffset}`)
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -105,14 +106,14 @@ export function ReportsClient({ initialData }: { initialData: ReportChampion[] }
   const { start: weekStart, end: weekEnd } = getWeekRange(weekOffset)
   const weekLabel = `${fmt(weekStart)} ~ ${fmt(weekEnd)}`
 
-  const dataWithWeekFilter = data?.map(c => ({
+  const dataWithWeekFilter = data.map(c => ({
     ...c,
     milestones: c.milestones.filter(m => {
       if (!m.due_date) return false
       const due = new Date(m.due_date)
       return due >= weekStart && due <= weekEnd
     }),
-  })) ?? null
+  }))
 
   return (
     <>
@@ -133,7 +134,7 @@ export function ReportsClient({ initialData }: { initialData: ReportChampion[] }
             <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>프로젝트 현황 리포트</h1>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>전체 챔피언 · due_date 기준</p>
           </div>
-          {dataWithWeekFilter && (
+          {dataWithWeekFilter.length > 0 && (
             <button
               type="button"
               onClick={() => window.print()}
@@ -164,7 +165,7 @@ export function ReportsClient({ initialData }: { initialData: ReportChampion[] }
           </div>
         )}
 
-        {dataWithWeekFilter && (
+        {!loading && (
           <>
           <div id="report-printable" ref={reportRef}>
             {/* Report header */}
