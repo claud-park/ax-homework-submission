@@ -47,6 +47,8 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
   const [submissions, setSubmissions] = useState<(Submission & { comments?: Comment[] })[]>([])
   const [loading, setLoading] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState<SubmissionStatus | null>(null)
+  const [confirmingStatus, setConfirmingStatus] = useState<SubmissionStatus | null>(null)
+  const [feedbackText, setFeedbackText] = useState('')
   const [newComment, setNewComment] = useState('')
   const [posting, setPosting] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
@@ -80,15 +82,23 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
   const submissionId = latest?.id ?? card.latestSubmission.id
   const comments = latest?.comments?.slice().sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) ?? []
 
-  async function changeStatus(newStatus: SubmissionStatus) {
+  function openConfirm(newStatus: SubmissionStatus) {
     if (newStatus === currentStatus) return
-    setUpdatingStatus(newStatus)
+    setConfirmingStatus(newStatus)
+    setFeedbackText(latest?.feedback ?? '')
+  }
+
+  async function confirmStatusChange() {
+    if (!confirmingStatus) return
+    setUpdatingStatus(confirmingStatus)
     try {
       await apiFetch(`/api/admin/submissions/${submissionId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: confirmingStatus, feedback: feedbackText }),
       })
       toast.success('상태가 변경되었습니다.')
+      setConfirmingStatus(null)
+      setFeedbackText('')
       fetchDetail()
       onStatusChanged()
     } catch (e) {
@@ -159,14 +169,28 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
                 {(['pending', 'accepted', 'declined'] as SubmissionStatus[]).map(s => {
                   const isActive = s === currentStatus
                   const isUpdating = updatingStatus === s
+                  const needsConfirm = s === 'accepted' || s === 'declined'
                   return (
                     <button
                       key={s}
-                      onClick={() => changeStatus(s)}
-                      disabled={isActive || updatingStatus !== null}
+                      onClick={() => {
+                        if (needsConfirm) {
+                          openConfirm(s)
+                        } else {
+                          setUpdatingStatus(s)
+                          apiFetch(`/api/admin/submissions/${submissionId}`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ status: s }),
+                          })
+                            .then(() => { toast.success('상태가 변경되었습니다.'); fetchDetail(); onStatusChanged() })
+                            .catch(e => toast.error('상태 변경 실패: ' + (e as Error).message))
+                            .finally(() => setUpdatingStatus(null))
+                        }
+                      }}
+                      disabled={isActive || updatingStatus !== null || (confirmingStatus !== null && confirmingStatus !== s)}
                       className="text-xs rounded-md px-3 py-1.5 font-semibold transition-opacity disabled:cursor-default"
                       style={{
-                        background: isActive ? STATUS_COLOR[s] : 'transparent',
+                        background: isActive ? STATUS_COLOR[s] : confirmingStatus === s ? `${STATUS_COLOR[s]}20` : 'transparent',
                         color: isActive ? '#fff' : STATUS_COLOR[s],
                         border: `1px solid ${STATUS_COLOR[s]}`,
                         opacity: !isActive && updatingStatus !== null ? 0.5 : 1,
@@ -178,6 +202,42 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
                   )
                 })}
               </div>
+              {confirmingStatus && (
+                <div
+                  className="mt-3 rounded-lg border p-3 flex flex-col gap-2"
+                  style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-secondary)' }}
+                >
+                  <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                    피드백 <span style={{ color: 'var(--text-disabled)', fontWeight: 400 }}>(선택)</span>
+                  </label>
+                  <textarea
+                    value={feedbackText}
+                    onChange={e => setFeedbackText(e.target.value)}
+                    placeholder="이번 제출에 대한 피드백을 남겨주세요"
+                    rows={3}
+                    className="w-full text-xs rounded-md border p-2 resize-none"
+                    style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => { setConfirmingStatus(null); setFeedbackText('') }}
+                      className="text-xs px-3 py-1.5 rounded-md font-semibold"
+                      style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={confirmStatusChange}
+                      disabled={updatingStatus !== null}
+                      className="text-xs px-3 py-1.5 rounded-md font-semibold disabled:opacity-50"
+                      style={{ background: STATUS_COLOR[confirmingStatus], color: '#fff' }}
+                    >
+                      {updatingStatus ? <Spinner size="sm" className="inline mr-1" /> : null}
+                      {STATUS_LABEL[confirmingStatus]}으로 변경
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* 최신 제출 정보 + 다운로드 */}
