@@ -22,6 +22,7 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
   const fileRef = useRef<HTMLInputElement>(null)
 
   function load() {
+    setLoading(true)
     apiFetch<Submission[]>('/api/submissions/mine')
       .then(setSubmissions)
       .catch((e: Error) => toast.error('로드 실패: ' + e.message))
