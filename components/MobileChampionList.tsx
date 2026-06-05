@@ -1,7 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { apiFetch } from '@/lib/api-client'
 import type { ChampionSummary, MilestoneStatus } from '@/lib/types'
 
 const STATUS_COLOR: Record<MilestoneStatus, string> = {
@@ -14,22 +13,16 @@ const STATUS_LABEL: Record<MilestoneStatus, string> = {
   completed: '완료', in_progress: '진행', delayed: '지연', not_started: '미시작',
 }
 
-export function MobileChampionList() {
-  const router = useRouter()
-  const [champions, setChampions] = useState<ChampionSummary[]>([])
-  const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+interface Props {
+  initialData: ChampionSummary[]
+}
 
-  useEffect(() => {
-    apiFetch<ChampionSummary[]>('/api/champions')
-      .then(setChampions)
-      .catch((err) => {
-        console.error(err)
-        setError('챔피언 목록을 불러오지 못했습니다.')
-      })
-      .finally(() => setLoading(false))
-  }, [])
+export function MobileChampionList({ initialData }: Props) {
+  const router = useRouter()
+  const [champions, setChampions] = useState<ChampionSummary[]>(initialData)
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const filtered = champions.filter(c =>
     c.name.toLowerCase().includes(query.toLowerCase()) ||

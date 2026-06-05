@@ -492,12 +492,19 @@ function CharterDetailPanel({ userId, champMap, onClose }: {
   )
 }
 
-export function ChampionGanttView({ isAdmin = false }: { isAdmin?: boolean }) {
-  const [champions, setChampions] = useState<GanttChampion[]>([])
+interface ChampionGanttViewProps {
+  isAdmin?: boolean
+  initialData?: GanttChampion[]
+}
+
+export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGanttViewProps) {
+  const [champions, setChampions] = useState<GanttChampion[]>(initialData ?? [])
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
-  const [selectedChampions, setSelectedChampions] = useState<Set<string>>(new Set())
+  const [selectedChampions, setSelectedChampions] = useState<Set<string>>(
+    new Set((initialData ?? []).filter(c => c.milestones.length > 0).map(c => c.userId))
+  )
   const [alertCollapsed, setAlertCollapsed] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialData)
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
   const [panelUserId, setPanelUserId] = useState<string | null>(null)
   const [projectW, setProjectW] = useState(PROJECT_W_DEFAULT)
@@ -525,6 +532,7 @@ export function ChampionGanttView({ isAdmin = false }: { isAdmin?: boolean }) {
   }, [projectW])
 
   useEffect(() => {
+    if (initialData) return
     apiFetch<GanttChampion[]>('/api/champions/gantt')
       .then(data => {
         setChampions(data)
@@ -532,7 +540,7 @@ export function ChampionGanttView({ isAdmin = false }: { isAdmin?: boolean }) {
       })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [initialData])
 
   // userId → champion (for charter panel and task list table)
   const champMap = useMemo(() => {
