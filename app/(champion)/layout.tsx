@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createUserServerClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import { ChampionSidebar } from './ChampionSidebar'
+import { HotlineFAB } from '@/components/HotlineFAB'
 
 export default async function ChampionLayout({ children }: { children: React.ReactNode }) {
   const supabase = createUserServerClient()
@@ -40,6 +41,8 @@ export default async function ChampionLayout({ children }: { children: React.Rea
 
         <main className="flex-1 p-6 overflow-auto md:pb-6 pb-20">{children}</main>
       </div>
+
+      <HotlineFAB />
     </div>
   )
 }
