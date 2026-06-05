@@ -23,18 +23,20 @@ interface Props {
   onChampionClick: (userId: string) => void
   onCharterClick: (userId: string) => void
   highlightUserId?: string
+  initialData?: ChampionSummary[]
 }
 
-export function ChampionSummaryTable({ onChampionClick, onCharterClick, highlightUserId }: Props) {
-  const [champions, setChampions] = useState<ChampionSummary[]>([])
-  const [loading, setLoading] = useState(true)
+export function ChampionSummaryTable({ onChampionClick, onCharterClick, highlightUserId, initialData }: Props) {
+  const [champions, setChampions] = useState<ChampionSummary[]>(initialData ?? [])
+  const [loading, setLoading] = useState(!initialData)
 
   useEffect(() => {
+    if (initialData) return  // data provided from server
     apiFetch<ChampionSummary[]>('/api/champions')
       .then(setChampions)
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [])  // Note: initialData intentionally not in deps - it's the initial static value
 
   const allWeeks = Array.from(
     new Set(champions.flatMap(c => Object.keys(c.weeklyStatus).map(Number)))
