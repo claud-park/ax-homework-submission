@@ -16,12 +16,11 @@ const NAV = [
 ]
 
 interface Props {
-  userName: string
   initialPendingBottleneck: number
   initialPendingCharters: number
 }
 
-export function AdminSidebar({ userName, initialPendingBottleneck, initialPendingCharters }: Props) {
+export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
