@@ -1,7 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { apiFetch } from '@/lib/api-client'
 import type { ChampionSummary, MilestoneStatus } from '@/lib/types'
 
 const STATUS_COLOR: Record<MilestoneStatus, string> = {
@@ -14,45 +13,18 @@ const STATUS_LABEL: Record<MilestoneStatus, string> = {
   completed: '완료', in_progress: '진행', delayed: '지연', not_started: '미시작',
 }
 
-export function MobileChampionList() {
+interface Props {
+  initialData: ChampionSummary[]
+}
+
+export function MobileChampionList({ initialData }: Props) {
   const router = useRouter()
-  const [champions, setChampions] = useState<ChampionSummary[]>([])
   const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    apiFetch<ChampionSummary[]>('/api/champions')
-      .then(setChampions)
-      .catch((err) => {
-        console.error(err)
-        setError('챔피언 목록을 불러오지 못했습니다.')
-      })
-      .finally(() => setLoading(false))
-  }, [])
-
-  const filtered = champions.filter(c =>
+  const filtered = initialData.filter(c =>
     c.name.toLowerCase().includes(query.toLowerCase()) ||
     c.department.toLowerCase().includes(query.toLowerCase())
   )
-
-  if (error) {
-    return (
-      <div className="text-sm text-center py-6" style={{ color: 'var(--text-disabled)' }}>
-        {error}
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-16 w-full rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
-        ))}
-      </div>
-    )
-  }
 
   return (
     <div className="flex flex-col gap-3">

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import type { ChampionSummary, MilestoneStatus } from '@/lib/types'
 
@@ -20,21 +21,22 @@ const AMBER_BADGE: React.CSSProperties = {
 }
 
 interface Props {
-  onChampionClick: (userId: string) => void
-  onCharterClick: (userId: string) => void
   highlightUserId?: string
+  initialData?: ChampionSummary[]
 }
 
-export function ChampionSummaryTable({ onChampionClick, onCharterClick, highlightUserId }: Props) {
-  const [champions, setChampions] = useState<ChampionSummary[]>([])
-  const [loading, setLoading] = useState(true)
+export function ChampionSummaryTable({ highlightUserId, initialData }: Props) {
+  const router = useRouter()
+  const [champions, setChampions] = useState<ChampionSummary[]>(initialData ?? [])
+  const [loading, setLoading] = useState(!initialData)
 
   useEffect(() => {
+    if (initialData) return  // data provided from server
     apiFetch<ChampionSummary[]>('/api/champions')
       .then(setChampions)
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [])  // Note: initialData intentionally not in deps - it's the initial static value
 
   const allWeeks = Array.from(
     new Set(champions.flatMap(c => Object.keys(c.weeklyStatus).map(Number)))
@@ -86,7 +88,7 @@ export function ChampionSummaryTable({ onChampionClick, onCharterClick, highligh
               </td>
               <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
                 <button
-                  onClick={() => onChampionClick(c.userId)}
+                  onClick={() => router.push(`/admin/champions/${c.userId}`)}
                   style={{ color: 'var(--blue-600)', fontWeight: 600, cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
                 >
                   {c.name}
@@ -99,7 +101,7 @@ export function ChampionSummaryTable({ onChampionClick, onCharterClick, highligh
                 {c.charterSubmissionId ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <button
-                      onClick={() => onCharterClick(c.userId)}
+                      onClick={() => router.push(`/admin/champions/${c.userId}`)}
                       style={{
                         fontSize: 11,
                         padding: '2px 8px',
