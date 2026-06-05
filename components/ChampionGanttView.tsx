@@ -45,6 +45,53 @@ const STATUS_BG_SELECTED: Record<MilestoneStatus, string> = {
 }
 const FUTURE_BG = 'rgba(203,213,225,0.2)'
 const FUTURE_BG_SELECTED = 'rgba(203,213,225,0.35)'
+
+function getMondayOf(date: Date): Date {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const day = d.getDay()
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d
+}
+
+function calcTodayLineX(tasks: Task[], viewMode: ViewMode, listWidth: number, columnWidth: number): number | null {
+  if (tasks.length === 0) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const earliest = tasks.reduce<Date>((min, t) => t.start < min ? t.start : min, tasks[0].start)
+
+  let chartStart: Date
+  if (viewMode === ViewMode.Week) {
+    chartStart = getMondayOf(earliest)
+    chartStart.setDate(chartStart.getDate() - 7) // preStepsCount=1 → -7 days
+  } else if (viewMode === ViewMode.Month) {
+    chartStart = new Date(earliest.getFullYear(), earliest.getMonth() - 1, 1) // preStepsCount=1 → -1 month
+  } else {
+    chartStart = new Date(earliest)
+    chartStart.setHours(0, 0, 0, 0)
+    chartStart.setDate(chartStart.getDate() - 1) // preStepsCount=1 → -1 day
+  }
+
+  if (today < chartStart) return null
+
+  if (viewMode === ViewMode.Week || viewMode === ViewMode.Day) {
+    const diffDays = (today.getTime() - chartStart.getTime()) / 86400000
+    const pxPerDay = viewMode === ViewMode.Week ? columnWidth / 7 : columnWidth
+    return listWidth + diffDays * pxPerDay
+  }
+
+  // Month mode: sum whole-month columns + fractional day within current month
+  let x = listWidth
+  const cur = new Date(chartStart)
+  while (cur.getFullYear() < today.getFullYear() || cur.getMonth() < today.getMonth()) {
+    x += columnWidth
+    cur.setMonth(cur.getMonth() + 1)
+  }
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  x += (today.getDate() - 1) / daysInMonth * columnWidth
+  return x
+}
 const STATUS_LABEL: Record<MilestoneStatus, string> = {
   not_started: '미시작', in_progress: '진행 중', delayed: '지연', completed: '완료',
 }
@@ -518,6 +565,8 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   const resizeDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const [nudgeState, setNudgeState] = useState<NudgeState | null>(null)
   const lastMousePos = useRef({ x: 0, y: 0 })
+  const ganttWrapperRef = useRef<HTMLDivElement>(null)
+  const [ganttScrollLeft, setGanttScrollLeft] = useState(0)
 
   const listWidth = W.name + W.dept + projectW + W.charter
 
@@ -614,6 +663,24 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
       })
   }, [rawTasks, collapsedIds])
 
+  const columnWidth = viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200
+
+  const todayLineX = useMemo(
+    () => calcTodayLineX(tasks, viewMode, listWidth, columnWidth),
+    [tasks, viewMode, listWidth, columnWidth],
+  )
+
+  // Re-attach scroll listener whenever tasks or viewMode change
+  useEffect(() => {
+    if (!ganttWrapperRef.current) return
+    const scrollEl = ganttWrapperRef.current.querySelector<HTMLElement>('._2k9Ys')
+    if (!scrollEl) return
+    const handler = () => setGanttScrollLeft(scrollEl.scrollLeft)
+    scrollEl.addEventListener('scroll', handler, { passive: true })
+    handler()
+    return () => scrollEl.removeEventListener('scroll', handler)
+  }, [tasks.length, viewMode])
+
   const handleCharterClick = useCallback((userId: string) => {
     setPanelUserId(prev => prev === userId ? null : userId)
   }, [])
@@ -636,7 +703,11 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     if (task.id.startsWith('champ-')) return
     const msId = task.id.startsWith('group-') ? task.id.slice(6) : task.id
     const entry = milestoneMap.get(msId)
-    if (!entry || entry.milestone.status !== 'delayed') return
+    const todayStr = new Date().toISOString().split('T')[0]
+    const isEffectivelyDelayed =
+      entry?.milestone.status === 'delayed' ||
+      (entry?.milestone.status === 'in_progress' && !!entry.milestone.due_date && entry.milestone.due_date < todayStr)
+    if (!entry || !isEffectivelyDelayed) return
     setNudgeState({
       userId: entry.userId,
       name: entry.championName,
@@ -840,13 +911,17 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
         {tasks.length > 0 && (
           <>
-            <div style={{ fontSize: 12 }} onMouseMove={handleGanttMouseMove}>
+            <div
+              ref={ganttWrapperRef}
+              style={{ fontSize: 12, position: 'relative' }}
+              onMouseMove={handleGanttMouseMove}
+            >
               <Gantt
                 tasks={tasks}
                 viewMode={viewMode}
                 onExpanderClick={handleExpandChange}
                 listCellWidth={`${listWidth}px`}
-                columnWidth={viewMode === ViewMode.Day ? 40 : viewMode === ViewMode.Week ? 120 : 200}
+                columnWidth={columnWidth}
                 rowHeight={36}
                 barCornerRadius={4}
                 locale="ko-KR"
@@ -856,6 +931,21 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
                 TooltipContent={GanttTooltip}
                 onClick={handleGanttClick}
               />
+              {/* Today line — clipped to chart area (right of task list) */}
+              {todayLineX !== null && (
+                <div style={{
+                  position: 'absolute', top: 0, bottom: 0,
+                  left: listWidth, right: 0,
+                  overflow: 'hidden', pointerEvents: 'none', zIndex: 5,
+                }}>
+                  <div style={{
+                    position: 'absolute', top: 0, bottom: 0,
+                    left: todayLineX - listWidth - ganttScrollLeft,
+                    width: 2,
+                    background: 'rgba(37,99,235,0.7)',
+                  }} />
+                </div>
+              )}
             </div>
 
             <div className="flex gap-4 mt-3">
