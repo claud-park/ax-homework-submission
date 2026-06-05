@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyHotlineMessage } from '@/lib/notifications'
-import type { HotlineMessage, PendingAttachment } from '@/lib/types'
+import type { HotlineMessage, PendingAttachment, HotlineAttachment } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
   const user = await verifyJWT(req)
@@ -38,6 +38,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'body or attachments required' }, { status: 400 })
   }
 
+  if (hasAttachments) {
+    const invalid = body.attachments!.find(a =>
+      !a.file_name?.trim() || !a.file_path?.trim() ||
+      typeof a.file_size !== 'number' || a.file_size <= 0 ||
+      !a.mime_type?.trim()
+    )
+    if (invalid) return NextResponse.json({ error: 'Invalid attachment fields' }, { status: 400 })
+  }
+
   const supabase = createServiceClient()
 
   const { data: msg, error } = await supabase
@@ -55,9 +64,9 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  let attachments: unknown[] = []
+  let attachments: HotlineAttachment[] = []
   if (hasAttachments) {
-    const { data: inserted } = await supabase
+    const { data: inserted, error: attachmentError } = await supabase
       .from('hotline_attachments')
       .insert(
         body.attachments!.map(a => ({
@@ -69,12 +78,13 @@ export async function POST(req: NextRequest) {
         }))
       )
       .select()
-    attachments = inserted ?? []
+    if (attachmentError) return NextResponse.json({ error: attachmentError.message }, { status: 500 })
+    attachments = (inserted ?? []) as HotlineAttachment[]
   }
 
   const championName = (user.user_metadata?.name as string | undefined) ?? user.email ?? '챔피언'
   notifyHotlineMessage({ champion: { id: user.id, name: championName }, body: body.body ?? '' })
     .catch(() => {})
 
-  return NextResponse.json({ ...msg, attachments } as HotlineMessage, { status: 201 })
+  return NextResponse.json({ ...msg, attachments }, { status: 201 })
 }
