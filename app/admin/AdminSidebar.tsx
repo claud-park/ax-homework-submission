@@ -80,12 +80,16 @@ export function AdminSidebar({ initialPendingBottleneck, initialPendingCharters,
         style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', boxShadow: 'var(--shadow-s)' }}
       >
         <div className="flex items-center justify-between px-3 pb-4 mb-2">
-          <div className="flex items-center gap-2">
+          <Link
+            href="/admin"
+            className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+            onClick={() => setDrawerOpen(false)}
+          >
             <span className="text-flo-body1 font-semibold" style={{ color: 'var(--text-primary)' }}>관리자</span>
             <span className="text-flo-caption2 font-semibold px-1.5 py-0.5 rounded" style={{ background: 'var(--surface-secondary)', color: 'var(--text-disabled)', letterSpacing: '0.06em' }}>
               ADMIN
             </span>
-          </div>
+          </Link>
           <button className="md:hidden p-1 rounded" onClick={() => setDrawerOpen(false)} aria-label="메뉴 닫기" style={{ color: 'var(--text-secondary)' }}>
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
