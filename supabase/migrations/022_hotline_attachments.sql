@@ -28,7 +28,9 @@ CREATE POLICY "champion_read_own_attachments" ON hotline_attachments
 CREATE POLICY "admin_read_all_attachments" ON hotline_attachments
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = TRUE
+      SELECT 1 FROM auth.users
+      WHERE id = auth.uid()
+      AND raw_user_meta_data->>'is_admin' = 'true'
     )
   );
 
