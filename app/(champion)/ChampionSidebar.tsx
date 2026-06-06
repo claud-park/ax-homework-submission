@@ -1,10 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { apiFetch } from '@/lib/api-client'
 import { Users, FileText, LayoutList, Upload, LogOut, Menu, X } from 'lucide-react'
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
+import type { Milestone } from '@/lib/types'
 
 const NAV = [
   { icon: Users,      label: '전체 현황',      href: '/',                      match: (p: string) => p === '/' || p.startsWith('/champions') },
@@ -24,6 +26,20 @@ export function ChampionSidebar() {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [hasDelayed, setHasDelayed] = useState(false)
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    apiFetch<Milestone[]>('/api/milestones')
+      .then(milestones => {
+        setHasDelayed(milestones.some(m =>
+          m.publish_status === 'published' && m.start_date && m.due_date &&
+          m.status !== 'completed' &&
+          (m.due_date < today || (m.start_date < today && m.status === 'not_started'))
+        ))
+      })
+      .catch(() => {})
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -52,9 +68,14 @@ export function ChampionSidebar() {
         style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
       >
         <div className="flex items-center justify-between px-3 pb-4 mb-2">
-          <span className="text-flo-body1 font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <Link
+            href="/"
+            className="text-flo-body1 font-semibold hover:opacity-70 transition-opacity"
+            style={{ color: 'var(--text-primary)' }}
+            onClick={() => setDrawerOpen(false)}
+          >
             AX Champions&apos; League
-          </span>
+          </Link>
           <button
             className="md:hidden p-1 rounded"
             onClick={() => setDrawerOpen(false)}
@@ -88,6 +109,13 @@ export function ChampionSidebar() {
                 )}
                 <item.icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                 {item.label}
+                {item.href === '/my-project/milestones' && hasDelayed && (
+                  <span
+                    className="ml-1 flex-shrink-0 rounded-full"
+                    style={{ width: 6, height: 6, background: '#ef4444' }}
+                    aria-label="지연/미완료 마일스톤 있음"
+                  />
+                )}
               </Link>
             )
           })}
