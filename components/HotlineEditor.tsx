@@ -4,11 +4,10 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
-import { ImageIcon, Paperclip, Send, X } from 'lucide-react'
+import { ImageIcon, Send } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { apiUpload } from '@/lib/api-client'
 import { toast } from 'sonner'
-import type { PendingAttachment } from '@/lib/types'
 
 interface UploadResponse {
   file_path: string
@@ -19,17 +18,16 @@ interface UploadResponse {
 }
 
 interface HotlineEditorProps {
-  onSend: (body: string, attachments: PendingAttachment[]) => Promise<void>
+  onSend: (body: string) => Promise<void>
   disabled?: boolean
   placeholder?: string
 }
 
 export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입력...' }: HotlineEditorProps) {
-  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
   const [uploading, setUploading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [editorIsEmpty, setEditorIsEmpty] = useState(true)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const sendRef = useRef<() => void>(() => {})
 
   const editor = useEditor({
@@ -38,6 +36,9 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
       Image,
       Placeholder.configure({ placeholder }),
     ],
+    onUpdate({ editor }) {
+      setEditorIsEmpty(editor.isEmpty)
+    },
     editorProps: {
       handleKeyDown(_view, event) {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -50,22 +51,19 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
     },
   })
 
-  const canSend = editor ? (!editor.isEmpty || pendingAttachments.length > 0) : false
+  const canSend = !editorIsEmpty
 
   async function handleSend() {
     if (!editor || !canSend || sending || disabled || uploading) return
     const body = editor.getHTML()
-    const atts = [...pendingAttachments]
     setSending(true)
     try {
-      await onSend(body, atts)
+      await onSend(body)
       editor.commands.clearContent()
-      setPendingAttachments([])
     } finally {
       setSending(false)
     }
   }
-  // Always point ref to the latest handleSend (captures current state)
   sendRef.current = handleSend
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -81,29 +79,7 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
         editor.chain().focus().setImage({ src: res.url }).run()
       }
     } catch {
-      toast.error('파일 업로드에 실패했습니다.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  async function handleFileAttach(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await apiUpload<UploadResponse>('/api/hotline/upload', formData)
-      setPendingAttachments(prev => [...prev, {
-        file_name: res.file_name,
-        file_path: res.file_path,
-        file_size: res.file_size,
-        mime_type: res.mime_type,
-      }])
-    } catch {
-      toast.error('파일 업로드에 실패했습니다.')
+      toast.error('이미지 업로드에 실패했습니다.')
     } finally {
       setUploading(false)
     }
@@ -174,24 +150,12 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
         >
           <ImageIcon size={13} />
         </button>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isDisabled}
-          className="p-1 rounded transition-colors"
-          style={{ color: 'var(--text-primary)', opacity: isDisabled ? 0.3 : 0.5 }}
-          title="파일 첨부"
-        >
-          <Paperclip size={13} />
-        </button>
         <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileAttach} />
       </div>
 
       {/* Editor */}
       <EditorContent
         editor={editor}
-        className="text-flo-caption1 px-3 py-2 outline-none"
         style={{
           color: 'var(--text-primary)',
           minHeight: 60,
@@ -199,31 +163,6 @@ export function HotlineEditor({ onSend, disabled, placeholder = '메시지 입�
           overflowY: 'auto',
         }}
       />
-
-      {/* Pending file attachments */}
-      {pendingAttachments.length > 0 && (
-        <div className="flex flex-wrap gap-1 px-3 pb-1.5">
-          {pendingAttachments.map((a, i) => (
-            <div
-              key={a.file_path}
-              className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-              style={{ background: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
-            >
-              <Paperclip size={10} />
-              <span className="max-w-[120px] truncate">{a.file_name}</span>
-              <button
-                type="button"
-                onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
-                aria-label={`파일 제거: ${a.file_name}`}
-                className="opacity-50 hover:opacity-100 ml-0.5"
-                style={{ lineHeight: 1 }}
-              >
-                <X size={10} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Send button */}
       <div className="flex justify-end px-2 pb-2">

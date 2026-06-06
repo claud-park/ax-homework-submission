@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
-import type { HotlineMessage, HotlineThread, PendingAttachment } from '@/lib/types'
+import type { HotlineMessage, HotlineThread } from '@/lib/types'
 import { HotlineEditor } from '@/components/HotlineEditor'
-import { HotlineFileChip } from '@/components/HotlineFileChip'
 import DOMPurify from 'dompurify'
 
 export function HotlineInboxClient() {
@@ -46,11 +45,11 @@ export function HotlineInboxClient() {
     router.replace(`/admin/hotline?champion=${id}`, { scroll: false })
   }
 
-  async function handleSend(body: string, attachments: PendingAttachment[]) {
+  async function handleSend(body: string) {
     if (!selectedId) return
     const msg = await apiFetch<HotlineMessage>('/api/admin/hotline/messages', {
       method: 'POST',
-      body: JSON.stringify({ champion_user_id: selectedId, body, attachments }),
+      body: JSON.stringify({ champion_user_id: selectedId, body }),
     })
     setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
     loadThreads()
@@ -107,7 +106,7 @@ export function HotlineInboxClient() {
                 )}
               </div>
               <p className="text-flo-caption2 truncate" style={{ color: 'var(--text-secondary)' }}>
-                {t.last_sender_role === 'admin' ? '(나) ' : ''}{t.last_message}
+                {t.last_sender_role === 'admin' ? '(나) ' : ''}{t.last_message.replace(/<[^>]*>/g, '').trim()}
               </p>
             </button>
           ))}
@@ -160,15 +159,6 @@ export function HotlineInboxClient() {
                     }
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body) }}
                   />
-                  {msg.attachments && msg.attachments.filter(a => !a.mime_type.startsWith('image/')).length > 0 && (
-                    <div className="flex flex-col gap-1 mt-1" style={{ maxWidth: '70%' }}>
-                      {msg.attachments
-                        .filter(a => !a.mime_type.startsWith('image/'))
-                        .map(a => (
-                          <HotlineFileChip key={a.id} attachment={a} onDark={msg.sender_role === 'admin'} />
-                        ))}
-                    </div>
-                  )}
                 </div>
               ))}
               <div ref={bottomRef} />

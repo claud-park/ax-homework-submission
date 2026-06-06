@@ -4,9 +4,8 @@ import { useEffect, useRef, useState, useMemo } from 'react'
 import { MessageCircle, X } from 'lucide-react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
-import type { HotlineMessage, PendingAttachment } from '@/lib/types'
+import type { HotlineMessage } from '@/lib/types'
 import { HotlineEditor } from './HotlineEditor'
-import { HotlineFileChip } from './HotlineFileChip'
 import DOMPurify from 'dompurify'
 
 export function HotlineFAB() {
@@ -81,10 +80,10 @@ export function HotlineFAB() {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
 
-  async function handleSend(body: string, attachments: PendingAttachment[]) {
+  async function handleSend(body: string) {
     const newMsg = await apiFetch<HotlineMessage>('/api/hotline/messages', {
       method: 'POST',
-      body: JSON.stringify({ body, attachments }),
+      body: JSON.stringify({ body }),
     })
     setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg])
   }
@@ -156,15 +155,6 @@ export function HotlineFAB() {
                   }
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body) }}
                 />
-                {msg.attachments && msg.attachments.filter(a => !a.mime_type.startsWith('image/')).length > 0 && (
-                  <div className="flex flex-col gap-1 mt-1" style={{ maxWidth: '75%' }}>
-                    {msg.attachments
-                      .filter(a => !a.mime_type.startsWith('image/'))
-                      .map(a => (
-                        <HotlineFileChip key={a.id} attachment={a} onDark={msg.sender_role === 'champion'} />
-                      ))}
-                  </div>
-                )}
               </div>
             ))}
             <div ref={bottomRef} />

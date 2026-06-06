@@ -209,11 +209,22 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
 ._2dZTy:nth-child(even) { fill: #ffffff; }
 ._3_ygE, ._3ZbQT { border-color: var(--border); }
 
+/* Tiptap editor content area */
+.ProseMirror {
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+}
+
 /* Tiptap Placeholder extension */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--text-disabled);
   pointer-events: none;
+}
+.ProseMirror:focus p.is-editor-empty:first-child::before {
+  content: none;
 }
 .ProseMirror p.is-editor-empty:first-child {
   min-height: 1.5em;

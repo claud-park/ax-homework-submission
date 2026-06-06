@@ -11,11 +11,11 @@ import type { HotlineThread } from '@/lib/types'
 const NAV = [
   { icon: LayoutDashboard, label: '대시보드',     href: '/admin' },
   { icon: Users,           label: '챔피언 리스트', href: '/admin/champions' },
-  { icon: UserCog,         label: '유저 권한 관리', href: '/admin/users' },
   { icon: Layers,          label: '제출 현황',     href: '/admin/kanban' },
   { icon: AlertTriangle,   label: '지연 신고',     href: '/admin/delay-reports' },
   { icon: FileText,        label: '주간 리포트',   href: '/admin/reports' },
   { icon: MessageCircle,   label: '핫라인',        href: '/admin/hotline' },
+  { icon: UserCog,         label: '유저 권한 관리', href: '/admin/users' },
 ]
 
 interface Props {

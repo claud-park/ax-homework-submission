@@ -53,7 +53,9 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const filePath = `${user.id}/${randomUUID()}/${file.name}`
+  const ext = file.name.includes('.') ? file.name.split('.').pop() : ''
+  const safeFilename = ext ? `file.${ext}` : 'file'
+  const filePath = `${user.id}/${randomUUID()}/${safeFilename}`
   const arrayBuffer = await file.arrayBuffer()
 
   const supabase = createServiceClient()
