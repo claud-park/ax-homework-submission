@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createUserServerClient } from '@/lib/supabase/server'
+import { createUserServerClient, createServiceClient } from '@/lib/supabase/server'
 import type { CharterSubmission } from '@/lib/types'
 import { CharterClient } from './CharterClient'
 
@@ -8,7 +8,8 @@ export default async function CharterPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: submissions } = await supabase
+  const serviceClient = createServiceClient()
+  const { data: submissions } = await serviceClient
     .from('charter_submissions')
     .select('*')
     .eq('user_id', user.id)

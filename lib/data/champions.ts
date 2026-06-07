@@ -10,7 +10,7 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
     { data: charters },
     { data: milestones },
   ] = await Promise.all([
-    supabase.from('users').select('id, name'),
+    supabase.from('users').select('id, name').eq('user_group', 'champion'),
     supabase.from('charter_submissions').select('user_id, id, project_name'),
     supabase.from('milestones')
       .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id')
@@ -44,7 +44,7 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
 export async function fetchSummaryData(): Promise<ChampionSummary[]> {
   const supabase = createServiceClient()
   const [{ data: users }, { data: charters }, { data: milestones }] = await Promise.all([
-    supabase.from('users').select('id, name'),
+    supabase.from('users').select('id, name').eq('user_group', 'champion'),
     supabase.from('charter_submissions').select('user_id, id, project_name, publish_status'),
     supabase.from('milestones').select('user_id, week_number, status').eq('publish_status', 'published'),
   ])

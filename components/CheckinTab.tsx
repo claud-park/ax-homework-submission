@@ -79,10 +79,10 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
   return (
     <div
       style={{
-        border: isDelayed ? '2px solid var(--error)' : '1px solid var(--border)',
+        border: isDelayed ? '1px solid var(--error)' : '1px solid var(--border)',
         borderRadius: '10px',
         padding: '14px 16px',
-        background: 'var(--background)',
+        background: isDelayed ? 'rgba(239,68,68,0.08)' : 'var(--background)',
         opacity: showActions ? 1 : 0.6,
       }}
     >
@@ -124,7 +124,7 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
             <button
               onClick={() => onDeadlineExtension(m, true)}
               className="text-xs"
-              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer', textDecoration: 'underline' }}
             >
               기한 변경
             </button>
@@ -132,7 +132,7 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
             <button
               onClick={() => onDeadlineExtension(m, false)}
               className="text-xs"
-              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer', textDecoration: 'underline' }}
             >
               {m.due_date ? '기한 연장' : '기한 설정'}
             </button>

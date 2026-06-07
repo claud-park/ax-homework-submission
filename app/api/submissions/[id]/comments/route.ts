@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Verify the submission belongs to this user
   const { data: submission } = await supabase
     .from('submissions')
-    .select('id, homework_id, homeworks(title)')
+    .select('id')
     .eq('id', params.id)
     .eq('user_id', user.id)
     .single()
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Fire-and-forget email notification (self-hosted: safe; on serverless move to a background job)
+  // Fire-and-forget email notification
   void (async () => {
     try {
       const recipientEmail = process.env.ADMIN_NOTIFICATION_EMAIL
@@ -35,23 +35,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         console.warn('[email] skipped notifyNewComment: user lookup returned null', { userId: user.id })
         return
       }
-      const hw = submission.homeworks as { title: string } | { title: string }[] | null
-      const hwTitle = Array.isArray(hw) ? hw[0]?.title : hw?.title
-      const contextTitle = submission.homework_id != null
-        ? `#${String(submission.homework_id).padStart(2, '0')} ${hwTitle ?? ''}`
-        : '과제 제출'
-      const link = submission.homework_id != null
-        ? `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/admin/homework/${submission.homework_id}`
-        : `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/admin/kanban`
       await notifyNewComment({
         recipientEmail,
         recipientName: '관리자',
         authorName: userRow.name,
         authorRole: 'user',
-        contextTitle,
+        contextTitle: '과제 제출',
         body: data.body,
         isReply: false,
-        link,
+        link: `${process.env.APP_BASE_URL ?? 'http://localhost:3000'}/admin/champions/${user.id}`,
       })
     } catch (e) {
       console.error('[email] outer catch:', e)

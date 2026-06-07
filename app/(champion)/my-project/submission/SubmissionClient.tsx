@@ -1,10 +1,22 @@
 'use client'
 import { useRef, useState } from 'react'
 import { apiFetch, apiUpload } from '@/lib/api-client'
-import type { Submission } from '@/lib/types'
+import type { Submission, Comment } from '@/lib/types'
 import { toast } from 'sonner'
-import { Upload, FileCheck, Link } from 'lucide-react'
+import { Upload, FileCheck, Link, Download, Send } from 'lucide-react'
 import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return '방금'
+  if (minutes < 60) return `${minutes}분 전`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}시간 전`
+  return `${Math.floor(hours / 24)}일 전`
+}
+
+type SubWithComments = Submission & { comments?: Comment[] }
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '검토 중', accepted: '합격', declined: '불합격',
@@ -13,17 +25,50 @@ const STATUS_COLOR: Record<string, string> = {
   pending: 'var(--amber)', accepted: 'var(--success)', declined: 'var(--error)',
 }
 
-export function SubmissionClient({ initialSubmissions }: { initialSubmissions: Submission[] }) {
-  const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions)
+export function SubmissionClient({ initialSubmissions }: { initialSubmissions: SubWithComments[] }) {
+  const [submissions, setSubmissions] = useState<SubWithComments[]>(initialSubmissions)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [submittingLink, setSubmittingLink] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [newComment, setNewComment] = useState<Record<string, string>>({})
+  const [posting, setPosting] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  async function downloadFile(subId: string) {
+    setDownloadingId(subId)
+    try {
+      const { url } = await apiFetch<{ url: string }>(`/api/submissions/${subId}/download`)
+      window.open(url, '_blank')
+    } catch (e) {
+      toast.error('다운로드 URL 생성 실패: ' + (e as Error).message)
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  async function postComment(subId: string) {
+    const trimmed = (newComment[subId] ?? '').trim()
+    if (!trimmed) return
+    setPosting(subId)
+    try {
+      await apiFetch(`/api/submissions/${subId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ body: trimmed }),
+      })
+      setNewComment(prev => ({ ...prev, [subId]: '' }))
+      load()
+    } catch (e) {
+      toast.error('코멘트 작성 실패: ' + (e as Error).message)
+    } finally {
+      setPosting(null)
+    }
+  }
 
   function load() {
     setLoading(true)
-    apiFetch<Submission[]>('/api/submissions/mine')
+    apiFetch<SubWithComments[]>('/api/submissions/mine')
       .then(setSubmissions)
       .catch((e: Error) => toast.error('로드 실패: ' + e.message))
       .finally(() => setLoading(false))
@@ -183,7 +228,18 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
                         {sub.link_url}
                       </a>
                     ) : (
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{sub.file_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{sub.file_name}</p>
+                        <button
+                          onClick={() => downloadFile(sub.id)}
+                          disabled={downloadingId === sub.id}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium shrink-0"
+                          style={{ color: 'var(--blue-600)', background: 'rgba(37,99,235,0.08)', border: 'none', cursor: 'pointer', opacity: downloadingId === sub.id ? 0.5 : 1 }}
+                        >
+                          <Download className="h-3 w-3" />
+                          {downloadingId === sub.id ? '...' : '다운로드'}
+                        </button>
+                      </div>
                     )}
                     <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                       시도 {sub.attempt_number}회 · {new Date(sub.submitted_at).toLocaleDateString('ko-KR')}
@@ -223,6 +279,66 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
                   </p>
                 </div>
               )}
+
+              {/* 코멘트 */}
+              {(() => {
+                const comments = (sub.comments ?? []).slice().sort(
+                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                )
+                return (
+                  <div className="flex flex-col gap-2 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--text-disabled)' }}>
+                      코멘트{comments.length > 0 ? ` (${comments.length})` : ''}
+                    </p>
+                    {comments.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        {comments.map(c => (
+                          <div
+                            key={c.id}
+                            className="rounded-lg border px-3 py-2 text-xs"
+                            style={{
+                              background: c.author_role === 'admin' ? 'rgba(37,99,235,0.04)' : 'var(--surface-secondary)',
+                              borderColor: c.author_role === 'admin' ? 'rgba(37,99,235,0.15)' : 'var(--border)',
+                            }}
+                          >
+                            <div className="flex justify-between mb-1">
+                              <span className="font-semibold" style={{ color: c.author_role === 'admin' ? 'var(--blue-600)' : 'var(--text-primary)' }}>
+                                {c.author_role === 'admin' ? '관리자' : '나'}
+                              </span>
+                              <span style={{ color: 'var(--text-disabled)' }}>{relativeTime(c.created_at)}</span>
+                            </div>
+                            <p className="whitespace-pre-wrap" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>{c.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <textarea
+                        value={newComment[sub.id] ?? ''}
+                        onChange={e => setNewComment(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                        onKeyDown={e => {
+                          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                            e.preventDefault()
+                            postComment(sub.id)
+                          }
+                        }}
+                        placeholder="코멘트 작성 (Cmd+Enter)"
+                        rows={2}
+                        className="flex-1 text-xs rounded-lg border p-2 resize-none outline-none"
+                        style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+                      />
+                      <button
+                        onClick={() => postComment(sub.id)}
+                        disabled={posting === sub.id || !(newComment[sub.id] ?? '').trim()}
+                        className="inline-flex items-center justify-center rounded-lg px-3 disabled:opacity-40 shrink-0"
+                        style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           ))}
         </div>

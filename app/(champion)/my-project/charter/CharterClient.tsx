@@ -403,11 +403,11 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
               <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="예: 1단계 개발" required style={TIMELINE_INPUT} />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간 (선택)</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>기간</label>
               <DateRangePicker startDate={form.start_date} endDate={form.due_date} onChange={(s, e) => setForm(f => ({ ...f, start_date: s, due_date: e }))} />
             </div>
             <div className="flex justify-end">
-              <button type="submit" disabled={saving || !form.title} className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
+              <button type="submit" disabled={saving || !form.title || !form.start_date || !form.due_date} className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>
                 {saving ? '저장 중...' : '추가'}
               </button>
             </div>
@@ -455,7 +455,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
                         <DateRangePicker startDate={subForm.start_date} endDate={subForm.due_date} onChange={(s, e) => setSubForm(f => ({ ...f, start_date: s, due_date: e }))} />
                         <div className="flex justify-end gap-2">
                           <button type="button" onClick={() => { setSubFormParentId(null); setSubForm({ title: '', start_date: '', due_date: '' }) }} className="text-xs px-3 py-1 rounded-lg font-semibold" style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>취소</button>
-                          <button type="submit" disabled={subSaving || !subForm.title} className="text-xs px-3 py-1 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>{subSaving ? '저장 중...' : '추가'}</button>
+                          <button type="submit" disabled={subSaving || !subForm.title || !subForm.start_date || !subForm.due_date} className="text-xs px-3 py-1 rounded-lg font-semibold disabled:opacity-50" style={{ background: 'var(--blue-600)', color: '#fff' }}>{subSaving ? '저장 중...' : '추가'}</button>
                         </div>
                       </form>
                     </li>
@@ -742,6 +742,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
             </Fragment>
           ))}
           <SectionGroupHeader label="일정" />
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-disabled)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>마일스톤을 드래그하여 순서를 바꿀 수 있습니다</span>
           <TimelineSection
             milestones={milestones}
             onAdded={m => setMilestones(prev => [...prev, m])}

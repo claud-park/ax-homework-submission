@@ -1,4 +1,4 @@
-import { createUserServerClient } from '@/lib/supabase/server'
+import { createUserServerClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Milestone } from '@/lib/types'
 import { MilestonesClient } from './MilestonesClient'
@@ -8,9 +8,10 @@ export default async function WorkStatusPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const serviceClient = createServiceClient()
   const [{ data: milestones }, { data: charters }] = await Promise.all([
-    supabase.from('milestones').select('*').eq('user_id', user.id).order('display_order').order('start_date', { ascending: true, nullsFirst: false }),
-    supabase.from('charter_submissions')
+    serviceClient.from('milestones').select('*').eq('user_id', user.id).order('display_order').order('start_date', { ascending: true, nullsFirst: false }),
+    serviceClient.from('charter_submissions')
       .select('id, admin_approved_at')
       .eq('user_id', user.id),
   ])
