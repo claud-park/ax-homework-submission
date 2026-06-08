@@ -1,6 +1,6 @@
-# Entity Relationship Diagram — v4
+# Entity Relationship Diagram — v5
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-05
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-08
 
 ---
 
@@ -119,11 +119,12 @@ Champion-created weekly WBS items (self-serve).
 | 🔑 id | uuid PK | |
 | 🔗 user_id | uuid FK | → users.id |
 | 🔗 homework_id | int FK | → homeworks.id (nullable; links milestone to a specific 과제) |
+| 🔗 parent_milestone_id | uuid FK nullable | → milestones.id — depth-1 항목은 depth-0 그룹을 가리킴; null이면 depth-0 그룹 |
 | week_number | int | 1-based week index; defaults to homework_id when created from homework context |
 | title | text NOT NULL | |
 | description | text | optional |
-| start_date | date NOT NULL | |
-| due_date | date NOT NULL | |
+| start_date | date nullable | |
+| due_date | date nullable | |
 | status | enum | `not_started` \| `in_progress` \| `completed` \| `delayed` |
 | is_manual_progress | boolean | true = user manually set to in_progress |
 | is_manual_completed | boolean | true = champion declared done without file upload (default false) |
@@ -151,6 +152,9 @@ Champion-created weekly WBS items (self-serve).
 - 기한 연장 검토중: 해당 milestone의 `deadline_change_requests` 중 `status = 'pending'` 존재
 
 ### `milestone_deliverables`
+
+> **DEPRECATED (v2.0)**: milestone_deliverables 테이블은 v2.0에서 제거됨. 마일스톤 완료는 `is_manual_completed` 플래그로 처리.
+
 File uploads that complete a milestone.
 
 | Column | Type | Notes |
@@ -183,6 +187,33 @@ Champion requests a due date extension; admin reviews.
 
 On approve → API route updates `milestones.due_date` to `requested_due_date`.
 
+### `hotline_messages`
+Champion-admin direct messaging. One thread per champion (keyed by champion_user_id).
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 champion_user_id | uuid FK | → users.id — 이 스레드의 챔피언 |
+| 🔗 sender_id | uuid FK | → users.id — 발신자 (챔피언 또는 어드민) |
+| sender_role | text | `champion` \| `admin` (check constraint) |
+| body | text NOT NULL | HTML (Tiptap 출력) |
+| read_by_champion | boolean | default false |
+| read_by_admin | boolean | default false |
+| created_at | timestamptz | |
+
+### `hotline_attachments`
+File attachments linked to a hotline message.
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 message_id | uuid FK | → hotline_messages.id ON DELETE CASCADE |
+| file_name | text NOT NULL | original filename |
+| file_path | text NOT NULL | Supabase Storage path (`hotline` bucket) |
+| file_size | int | bytes |
+| mime_type | text | |
+| created_at | timestamptz | |
+
 ---
 
 ## Relationships
@@ -203,6 +234,9 @@ users             1 ──< N  milestones
 homeworks         1 ──< N  milestones (per user; one 과제 has one or more milestones)
 milestones        1 ──< N  milestone_deliverables
 milestones        1 ──< N  deadline_change_requests
+users             1 ──< N  hotline_messages (via champion_user_id)
+users             1 ──< N  hotline_messages (via sender_id)
+hotline_messages  1 ──< N  hotline_attachments
 ```
 
 ---
@@ -215,6 +249,10 @@ bucket: submissions              (private)
 
 bucket: milestone-deliverables   (private)
   path: {user_id}/{milestone_id}/{filename}
+
+bucket: hotline                  (private)
+  path: {user_id}/{uuid}/{filename}
+  notes: Signed URLs — images: 1-year TTL; documents: 60s TTL
 ```
 
 Both buckets: RLS DENY ALL. Signed URLs generated server-side (60s TTL).

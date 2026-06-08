@@ -1,8 +1,8 @@
 # 디시인사이드 과제 관리 플랫폼 — 제품 요구사항 명세서 (PRD)
 
-> **문서 버전** 2.0 · **최종 업데이트** 2026-06-02 · **작성자** yr.park@dreamus.io
+> **문서 버전** 2.1 · **최종 업데이트** 2026-06-08 · **작성자** yr.park@dreamus.io
 > **상태** 사내 검토 중 · **저장소** `AX/ax-homework-submission`
-> **이전 버전** v1.2 (2026-05-27)
+> **이전 버전** v2.0 (2026-06-02) · v1.2 (2026-05-27)
 
 ---
 
@@ -11,8 +11,8 @@
 | 항목 | 내용 |
 |---|---|
 | 프로젝트명 | 디시인사이드 과제 관리 플랫폼 (ax-homework-submission) |
-| 버전 | v2.0 |
-| 작성일 | 2026-06-02 |
+| 버전 | v2.1 |
+| 작성일 | 2026-06-08 |
 | 작성자 | yr.park@dreamus.io |
 | 검토자 | Strategy Lead · Engineering Lead |
 
@@ -60,10 +60,15 @@ AX 프로그램은 다수의 챔피언(수강생)이 멀티-마일스톤 과제�
 | Champion Nudge (원클릭 이메일 넛지) | ✅ 완료 |
 | 주간 리포트 (PDF 인쇄·주차 네비게이션) | ✅ 완료 |
 | 모바일 UX (챔피언·어드민 주요 페이지) | ✅ 완료 |
+| Charter 서식 툴바 (WYSIWYG B/I/U/S/Link/OL/UL/Quote/Code + DOCX 서식 보존) | ✅ 완료 |
+| 제출물 파일 다운로드 (챔피언·어드민) + 제출 댓글 이력 (챔피언 뷰) | ✅ 완료 |
+| 챔피언-어드민 핫라인 (Tiptap 에디터 + HTML 렌더링 + 파일 첨부 + 안 읽음 배지) | ✅ 완료 |
+| 어드민 챔피언 상세 페이지 제출 피드백 직접 접근 (`/admin/champions/[userId]`) | ✅ 완료 |
+| partner user_group 대시보드·Gantt 제외 | ✅ 완료 |
 | 챔피언 진행 대시보드 (`/progress`) | 🚧 골격만 |
 | 유저 그룹 권한 관리 (champion/partner/admin) | ✅ 완료 |
 
-**전체 기능 완성도**: 핵심 18개 영역 중 17개 완료 (**94%**)
+**전체 기능 완성도**: 핵심 23개 영역 중 22개 완료 (**96%**)
 
 ---
 
@@ -179,8 +184,8 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 |---|---|---|---|
 | C1 | Google OAuth 로그인 | Supabase Auth | ✅ |
 | C2 | 과제 목록 (List 뷰) | Next.js | ✅ |
-| C3 | Charter(과제정의서) 작성·저장·제출 | TipTap WYSIWYG, 6-section | ✅ |
-| C4 | Charter DOCX 내보내기 | `docx` 라이브러리 | ✅ |
+| C3 | Charter(과제정의서) 작성·저장·제출 + WYSIWYG 서식 툴바 (B/I/U/S/Link/OL/UL/Quote/Code) | TipTap WYSIWYG, 6-section | ✅ |
+| C4 | Charter DOCX 내보내기 (서식 보존: Bold/Italic/Underline/Strike/Code) | `docx` 라이브러리 | ✅ |
 | C5 | Charter 초안 저장 / 게시 | publish_status enum | ✅ |
 | C6 | Milestone(WBS) CRUD — 2-depth 트리 | 자동 상태 계산 엔진 | ✅ |
 | C7 | Milestone Gantt 시각화 | `gantt-task-react` | ✅ |
@@ -191,6 +196,8 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 | C12 | 마일스톤 기한 변경 모달 | start_date 경과 미시작 케이스 | ✅ |
 | C13 | 모바일 UX (BottomTabBar + 카드 레이아웃) | 반응형 컴포넌트 | ✅ |
 | C14 | 챔피언 진행 대시보드 | `/progress` | 🚧 골격 |
+| C15 | 제출물 댓글 이력 확인 + 파일 다운로드 (챔피언 뷰) | `/my-project/submission` | ✅ |
+| C16 | 핫라인 FAB (챔피언-어드민 1:1 채팅 + Tiptap 에디터 + 파일 첨부) | HotlineFAB + `/api/hotline/*` | ✅ |
 
 #### Charter 6 섹션 구조
 
@@ -245,6 +252,10 @@ depth-0 (parent_milestone_id IS NULL)  → 과제 그룹 (날짜 선택적)
 | A10 | Champion Nudge (원클릭 이메일 넛지) | NudgePopover + POST /api/admin/nudge | ✅ |
 | A11 | 주간 리포트 (PDF 인쇄·주차 네비게이션) | @media print + 주차별 필터 | ✅ |
 | A12 | 어드민 모바일 UX (BottomTabBar + 카드 레이아웃) | 반응형 컴포넌트 | ✅ |
+| A13 | 챔피언 개별 상세 피드백 (`/admin/champions/[userId]`) — 제출 이력·댓글·파일 다운로드 + Charter 인라인 confirm | `/admin/champions/[userId]` | ✅ |
+| A14 | 핫라인 인박스 (`/admin/hotline`) — 챔피언 스레드 목록·Tiptap 에디터·안 읽음 배지 | `HotlineInboxClient` + `/api/admin/hotline/*` | ✅ |
+
+> **v2.1 추가**: `user_group = 'partner'`인 사용자는 대시보드·Gantt·확인 요함 섹션에서 자동 제외됨 (`user_group = 'champion'` 필터 적용).
 
 #### 칸반 5-컬럼 구조 (단방향)
 
@@ -476,6 +487,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 챔피언 | `/` | 과제 목록 |
 | 챔피언 | `/my-project/charter` | Charter 작성·제출 |
 | 챔피언 | `/my-project/milestones` | WBS 관리 (2-depth 트리 + 체크인) |
+| 챔피언 | `/my-project/submission` | 제출 이력 + 제출별 댓글 + 파일 다운로드 |
 | 챔피언 | `/progress` | 진행 대시보드 (개발 중) |
 | 어드민 | `/admin` | 챔피언 전체 현황 (Gantt + 확인 요함 + Nudge) |
 | 어드민 | `/admin/kanban` | 칸반 판정 보드 |
@@ -484,7 +496,9 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 어드민 | `/admin/requests` | 기한변경 요청 목록 |
 | 어드민 | `/admin/delay-reports` | 지연 신고 검토 |
 | 어드민 | `/admin/reports` | 주간 리포트 (PDF 인쇄·주차 네비) |
-| 어드민 | `/admin/champions/[userId]` | 챔피언 개별 상세 |
+| 어드민 | `/admin/hotline` | 핫라인 인박스 (챔피언별 메시지 스레드) |
+| 어드민 | `/admin/champions` | 챔피언 목록 |
+| 어드민 | `/admin/champions/[userId]` | 챔피언 개별 상세 (제출·댓글·Charter 피드백) |
 
 ---
 
@@ -492,10 +506,11 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 
 | 그룹 | 엔드포인트 수 | 인증 방식 |
 |---|---|---|
-| 챔피언 API | 16 | `verifyJWT` |
-| 어드민 API | 14 | `verifyJWT` + `verifyAdmin` |
+| 챔피언 API | 22 | `verifyJWT` |
+| 어드민 API | 20 | `verifyJWT` + `verifyAdmin` |
 | 인증 | 1 | OAuth 콜백 |
-| **합계** | **31** | — |
+| 핫라인 API | 6 | champion: verifyJWT / admin: verifyAdmin |
+| **합계** | **43** | — |
 
 > v1.2 대비 +4 (milestones 트리 지원, `/api/admin/nudge`, `/api/admin/delay-reports`, `/api/champions/gantt` 개선)
 
@@ -505,7 +520,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 
 > 공수 단위: **MD (Man-Day)**, 1 MD = 1인 1일 기준
 
-### 11.1 완료 구간 (2026-05-14 ~ 2026-06-02) · 실적 12 MD
+### 11.1 완료 구간 (2026-05-14 ~ 2026-06-08) · 실적 14 MD
 
 | WBS # | 날짜 | 주요 작업 | 공수 (MD) | 상태 |
 |---|---|---|:---:|---|
@@ -519,26 +534,28 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 8.0 | 05/30 | Milestone 2-depth 트리 전환 (parent_milestone_id), DB 마이그레이션 | 1 | ✅ |
 | 9.0 | 06/01 | Admin 챔피언 네비, modal UI 개선, 기한 변경 시 status 자동 갱신 | 1 | ✅ |
 | 10.0 | 06/02 | 확인 요함·Nudge·리포트 재설계·모바일 UX·기한 변경 모달 | 2 | ✅ |
-| **완료 소계** | | | **12 MD** | |
+| 11.0 | 06/05 | 핫라인 Tiptap 에디터·파일 첨부, Charter 서식 툴바+DOCX 서식, 제출 피드백 직접 접근, partner 제외, admin sidebar 개선 | 1 | ✅ |
+| 12.0 | 06/08 | 피드백 패널 UI 개선, Gantt 독립 스크롤 영역 (x/y), Obsidian 문서 최신화 | 1 | ✅ |
+| **완료 소계** | | | **14 MD** | |
 
 ### 11.2 예정 구간 (2026-06-03 이후)
 
 | WBS # | 단계 | 주요 작업 | 공수 (MD) | 우선순위 |
 |---|---|---|:---:|---|
-| 11.0 | **P0 — 안정화** | 판정 취소 API, Nudge rate limiting, 이메일 에러 핸들링 | 0.5 | 🔴 긴급 |
-| 12.0 | **P1 — 챔피언 대시보드** | 챔피언 `/progress` 완성 | 0.5 | 🟠 높음 |
-| 13.0 | **P2 — 운영 확장** | 어드민 다중화, SendGrid/SES 마이그레이션 | 1 | 🟡 보통 |
-| 14.0 | **P3 — 분석** | 성과 분석 대시보드, In-app 알림 센터 | 2 | 🟢 낮음 |
-| 15.0 | **P4 — 화이트라벨** | 멀티-테넌트 기반, 타 프로그램 온보딩 | TBD | 📋 검토 |
+| 13.0 | **P0 — 안정화** | 판정 취소 API, Nudge rate limiting, 이메일 에러 핸들링 | 0.5 | 🔴 긴급 |
+| 14.0 | **P1 — 챔피언 대시보드** | 챔피언 `/progress` 완성 | 0.5 | 🟠 높음 |
+| 15.0 | **P2 — 운영 확장** | 어드민 다중화, SendGrid/SES 마이그레이션 | 1 | 🟡 보통 |
+| 16.0 | **P3 — 분석** | 성과 분석 대시보드, In-app 알림 센터 | 2 | 🟢 낮음 |
+| 17.0 | **P4 — 화이트라벨** | 멀티-테넌트 기반, 타 프로그램 온보딩 | TBD | 📋 검토 |
 | **예정 소계** | | | **4 MD** | |
 
 ### 11.3 총 공수 요약
 
 | 구분 | 공수 |
 |---|---|
-| 완료 (05/14 ~ 06/02) | **12 MD** |
+| 완료 (05/14 ~ 06/08) | **14 MD** |
 | 예정 P0~P4 | 4 MD |
-| **총합** | **16 MD (약 0.8 MM)** |
+| **총합** | **18 MD (약 0.9 MM)** |
 
 ---
 
@@ -610,6 +627,8 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 2026-05-30 | Milestone 2-depth 트리 전환, DB 마이그레이션, Gantt 버그 수정 |
 | 2026-06-01 | Admin 챔피언 네비, modal UI 개선, status 자동 갱신 버그 수정 |
 | 2026-06-02 | 확인 요함 섹션, Champion Nudge, 리포트 재설계, 모바일 UX, 기한 변경 모달 |
+| 2026-06-05 | 핫라인 Tiptap 에디터·파일 첨부·안 읽음, Charter 서식 툴바·DOCX 서식 보존, 제출 피드백 직접 접근·파일 다운로드·댓글, partner 대시보드 제외, admin sidebar 홈 링크 |
+| 2026-06-08 | 피드백 패널 접힌 상태 레이블 제거, Gantt 독립 스크롤 영역 |
 
 ---
 
