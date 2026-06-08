@@ -230,6 +230,21 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
   min-height: 1.5em;
 }
 
+/* Charter editor WYSIWYG styles */
+.charter-editor .ProseMirror p { margin: 0; }
+.charter-editor .ProseMirror p + p { margin-top: 0.2rem; }
+.charter-editor .ProseMirror ul { list-style-type: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
+.charter-editor .ProseMirror ol { list-style-type: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
+.charter-editor .ProseMirror li { margin: 0.1rem 0; }
+.charter-editor .ProseMirror li p { margin: 0; }
+.charter-editor .ProseMirror blockquote { border-left: 2px solid var(--border); padding-left: 0.75rem; color: var(--text-secondary); margin: 0.25rem 0; }
+.charter-editor .ProseMirror code { font-family: ui-monospace, monospace; background: var(--surface-secondary); border-radius: 3px; padding: 1px 4px; font-size: 0.85em; }
+.charter-editor .ProseMirror pre { background: var(--surface-secondary); border-radius: 6px; padding: 0.6rem 0.75rem; margin: 0.25rem 0; overflow-x: auto; }
+.charter-editor .ProseMirror pre code { background: none; padding: 0; font-size: 0.8em; }
+.charter-editor .ProseMirror a { color: var(--blue-600); text-decoration: underline; }
+.charter-editor .ProseMirror strong { font-weight: 700; }
+.charter-editor .ProseMirror em { font-style: italic; }
+
 /* Hotline HTML message body */
 .hotline-msg-body p { margin: 0; }
 .hotline-msg-body p + p { margin-top: 4px; }

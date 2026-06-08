@@ -33,7 +33,6 @@ const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: 
   { key: 'build', label: '05. Build · 어떻게 만들 것인가', required: true, tooltip: '어떻게 만들 것인가 — 기술 스택, 구현 접근법', placeholder: '기술 스택, 구현 방식, 예상 일정, 필요한 협업을 정리해주세요.' },
 ]
 
-function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
 
 function fmtMD(s: string): string {
   if (!s) return ''
@@ -625,29 +624,95 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
   async function handleExport() {
     setExporting(true)
     try {
-      const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx')
-      // file-saver may export saveAs as named or default depending on bundler
+      const { Document, Paragraph, TextRun, HeadingLevel, Packer, UnderlineType } = await import('docx')
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { saveAs } = require('file-saver') as { saveAs: typeof import('file-saver').saveAs }
       const src = contentRef.current
       const today = new Date().toLocaleDateString('ko-KR')
 
+      type TR = InstanceType<typeof TextRun>
+      type P = InstanceType<typeof Paragraph>
+      type InlineStyles = { bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean; code?: boolean }
+
+      const inlineNodes = (node: Node, s: InlineStyles): TR[] => {
+        const runs: TR[] = []
+        for (const child of node.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const text = child.textContent || ''
+            if (text) runs.push(new TextRun({
+              text, size: 22,
+              bold: s.bold || undefined,
+              italics: s.italic || undefined,
+              underline: s.underline ? { type: UnderlineType.SINGLE } : undefined,
+              strike: s.strike || undefined,
+              font: s.code ? 'Courier New' : undefined,
+            }))
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const el = child as Element
+            const tag = el.tagName.toLowerCase()
+            const ns: InlineStyles = { ...s }
+            if (tag === 'strong' || tag === 'b') ns.bold = true
+            if (tag === 'em' || tag === 'i') ns.italic = true
+            if (tag === 'u') ns.underline = true
+            if (tag === 's' || tag === 'del' || tag === 'strike') ns.strike = true
+            if (tag === 'code') ns.code = true
+            runs.push(...inlineNodes(el, ns))
+          }
+        }
+        return runs
+      }
+
+      const htmlToParagraphs = (html: string): P[] => {
+        if (!html?.trim()) return [new Paragraph({ children: [new TextRun({ text: '(내용 없음)', size: 22, color: '888888' })] })]
+        const dom = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+        const result: P[] = []
+        let olIdx = 0
+
+        const walk = (node: Node) => {
+          if (node.nodeType !== Node.ELEMENT_NODE) return
+          const el = node as Element
+          const tag = el.tagName.toLowerCase()
+          if (tag === 'p') {
+            const runs = inlineNodes(el, {})
+            result.push(new Paragraph({ children: runs.length ? runs : [new TextRun({ text: '' })] }))
+          } else if (tag === 'ul') {
+            olIdx = 0
+            for (const li of el.children)
+              result.push(new Paragraph({ children: inlineNodes(li, {}), bullet: { level: 0 } }))
+          } else if (tag === 'ol') {
+            olIdx = 0
+            for (const li of el.children) {
+              olIdx++
+              result.push(new Paragraph({ children: [new TextRun({ text: `${olIdx}. `, size: 22 }), ...inlineNodes(li, {})] }))
+            }
+          } else if (tag === 'blockquote') {
+            for (const child of el.childNodes) walk(child)
+          } else if (tag === 'pre') {
+            const text = (el.querySelector('code') ?? el).textContent || ''
+            result.push(new Paragraph({ children: [new TextRun({ text, size: 20, font: 'Courier New' })] }))
+          } else if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
+            result.push(new Paragraph({ children: inlineNodes(el, { bold: true }), spacing: { before: 200, after: 80 } }))
+          } else {
+            for (const child of el.childNodes) walk(child)
+          }
+        }
+
+        for (const child of dom.body.childNodes) walk(child)
+        return result.length ? result : [new Paragraph({ children: [new TextRun({ text: '(내용 없음)', size: 22, color: '888888' })] })]
+      }
+
       const coverChildren = [
-        new Paragraph({
-          children: [new TextRun({ text: 'AX · 과제정의서', size: 24, color: '888888' })],
-        }),
+        new Paragraph({ children: [new TextRun({ text: 'AX · 과제정의서', size: 24, color: '888888' })] }),
         new Paragraph({ text: projectName || '과제정의서', heading: HeadingLevel.HEADING_1 }),
         new Paragraph({ text: '' }),
-        new Paragraph({
-          children: [new TextRun({ text: `작성일: ${today}`, size: 20, color: '666666' })],
-        }),
+        new Paragraph({ children: [new TextRun({ text: `작성일: ${today}`, size: 20, color: '666666' })] }),
         new Paragraph({ text: '' }),
         new Paragraph({ text: '' }),
       ]
 
       const bodyChildren = SECTIONS.flatMap(s => [
         new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
-        new Paragraph({ children: [new TextRun({ text: stripHtml(src[s.key] ?? '') || '(내용 없음)', size: 22 })] }),
+        ...htmlToParagraphs(src[s.key] ?? ''),
         new Paragraph({ text: '' }),
       ])
 
@@ -659,8 +724,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
           : sortedMs.map(m => new Paragraph({
               children: [new TextRun({ text: `${m.title}  ${m.start_date ?? ''} – ${m.due_date ?? ''}`, size: 22 })],
               bullet: { level: 0 },
-            }))
-        ),
+            }))),
         new Paragraph({ text: '' }),
       ]
 
