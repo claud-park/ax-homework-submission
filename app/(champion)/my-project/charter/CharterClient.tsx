@@ -799,7 +799,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
           <button
             onClick={() => window.open('/charter-guide', 'charter-guide', 'width=780,height=720,resizable=yes,scrollbars=yes')}
             className="text-xs font-medium underline flex-shrink-0"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-disabled)', marginRight: 8 }}
           >
             과제정의서란?
           </button>
