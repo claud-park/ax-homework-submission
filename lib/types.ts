@@ -49,6 +49,7 @@ export interface CharterSubmission {
     solution?: string
     build?: string
     timeline?: string
+    closing?: string
   }
   submitted_at: string
   updated_at: string
