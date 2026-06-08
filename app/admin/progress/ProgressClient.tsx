@@ -14,6 +14,7 @@ type CharterContent = {
   solution?: string
   build?: string
   timeline?: string
+  closing?: string
   [key: string]: string | undefined
 }
 type CharterWithUser = {
@@ -34,7 +35,6 @@ const CHARTER_SECTIONS: { key: string; label: string }[] = [
   { key: 'goal', label: '03. Goal · Success Metric' },
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
-  { key: 'timeline', label: '06. Timeline · Milestones' },
 ]
 
 const STATUS_LABEL: Record<string, string> = {
@@ -200,7 +200,7 @@ function CharterCard({ charter, onClick }: { charter: CharterWithUser; onClick: 
 
 // ─── Charter side panel ───────────────────────────────────────────────────────
 
-function CharterPanel({ charter, onClose, onApprove }: { charter: CharterWithUser; onClose: () => void; onApprove: (approvedAt: string) => void }) {
+function CharterPanel({ charter, userMilestones, onClose, onApprove }: { charter: CharterWithUser; userMilestones: MilestoneWithUser[]; onClose: () => void; onApprove: (approvedAt: string) => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [approving, setApproving] = useState(false)
   const [approvedAt, setApprovedAt] = useState<string | null>(charter.admin_approved_at)
@@ -308,6 +308,7 @@ function CharterPanel({ charter, onClose, onApprove }: { charter: CharterWithUse
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {/* 00–05 Text sections */}
             {CHARTER_SECTIONS.map(({ key, label }) => {
               const html = charter.content[key] ?? ''
               const text = stripHtml(html)
@@ -317,29 +318,57 @@ function CharterPanel({ charter, onClose, onApprove }: { charter: CharterWithUse
                     {label}
                   </p>
                   {text ? (
-                    <div
-                      style={{
-                        fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.65,
-                        background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px',
-                        border: '1px solid var(--border-subtle)',
-                      }}
-                    >
+                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.65, background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
                       <div className="charter-editor">
-                        <div
-                          className="ProseMirror"
-                          style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit' }}
-                          dangerouslySetInnerHTML={{ __html: html || '' }}
-                        />
+                        <div className="ProseMirror" style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit' }} dangerouslySetInnerHTML={{ __html: html }} />
                       </div>
                     </div>
                   ) : (
-                    <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>
-                      (내용 없음)
-                    </p>
+                    <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(내용 없음)</p>
                   )}
                 </div>
               )
             })}
+
+            {/* 06. Timeline · Milestones */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px 0', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                06. Timeline · Milestones
+              </p>
+              {userMilestones.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {userMilestones.map(m => (
+                    <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
+                      <div>
+                        <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
+                        {m.due_date && <p style={{ fontSize: '11px', color: 'var(--text-disabled)', margin: '2px 0 0 0' }}>{m.start_date ?? ''} – {m.due_date}</p>}
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px', color: STATUS_COLOR[m.status], background: STATUS_BG[m.status], flexShrink: 0 }}>
+                        {STATUS_LABEL[m.status]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(마일스톤 없음)</p>
+              )}
+            </div>
+
+            {/* 07. 마무리 */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px 0', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                07. 마무리
+              </p>
+              {stripHtml(charter.content.closing ?? '') ? (
+                <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.65, background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
+                  <div className="charter-editor">
+                    <div className="ProseMirror" style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit' }} dangerouslySetInnerHTML={{ __html: charter.content.closing ?? '' }} />
+                  </div>
+                </div>
+              ) : (
+                <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(내용 없음)</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -487,6 +516,7 @@ export function ProgressClient({ initialMilestones, initialCharters }: ClientPro
       {selectedCharter && (
         <CharterPanel
           charter={selectedCharter}
+          userMilestones={milestones.filter(m => m.user_id === selectedCharter.user_id)}
           onClose={() => setSelectedCharter(null)}
           onApprove={approvedAt => {
             const approved = selectedCharter ? { ...selectedCharter, admin_approved_at: approvedAt } : null

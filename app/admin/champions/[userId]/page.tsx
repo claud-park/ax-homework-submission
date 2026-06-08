@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission, Milestone, Comment, SubmissionStatus } from '@/lib/types'
@@ -8,11 +8,6 @@ import { ArrowLeft, Download, ExternalLink, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
 
-function fmtMD(s: string): string {
-  if (!s) return ''
-  const [, m, d] = s.split('-').map(Number)
-  return `${m}/${d}`
-}
 
 const MS_STATUS_LABEL: Record<MilestoneStatus, string> = {
   not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
@@ -44,7 +39,6 @@ const CHARTER_SECTIONS = [
   { key: 'goal', label: '03. Goal · Success Metric' },
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
-  { key: 'timeline', label: '06. Timeline · Milestones' },
 ]
 
 type SubWithComments = Submission & { comments?: Comment[] }
@@ -156,12 +150,7 @@ export default function AdminChampionPage() {
     }
   }
 
-  const allMilestones = useMemo(() => {
-    if (!data) return []
-    return [...(data.milestones ?? [])].sort((a, b) =>
-      (a.start_date ?? '').localeCompare(b.start_date ?? '') || a.display_order - b.display_order
-    )
-  }, [data])
+
 
   if (loading) {
     return (
@@ -403,83 +392,56 @@ export default function AdminChampionPage() {
             )}
           </div>
           <div className="flex flex-col gap-3">
+            {/* 00–05 Text sections */}
             {CHARTER_SECTIONS.map(s => {
               const html = data.charter!.content?.[s.key as keyof CharterSubmission['content']]
               if (!html) return null
               return (
-                <div
-                  key={s.key}
-                  className="p-4 rounded-xl border"
-                  style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
-                >
+                <div key={s.key} className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
                   <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>{s.label}</p>
                   <div className="charter-editor">
-                    <div
-                      className="ProseMirror"
-                      style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }}
-                      dangerouslySetInnerHTML={{ __html: html }}
-                    />
+                    <div className="ProseMirror" style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: html }} />
                   </div>
                 </div>
               )
             })}
+
+            {/* 06. Timeline · Milestones */}
+            <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>06. Timeline · Milestones</p>
+              {(data.milestones ?? []).length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {[...(data.milestones ?? [])].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)).map((m: Milestone) => (
+                    <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
+                      <div>
+                        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
+                        {m.due_date && <p className="text-xs" style={{ color: 'var(--text-disabled)', margin: '2px 0 0 0' }}>{m.start_date ?? ''} – {m.due_date}</p>}
+                      </div>
+                      <span className="text-xs font-semibold px-2 py-1 rounded-md flex-shrink-0" style={{ color: MS_STATUS_COLOR[m.status], background: `${MS_STATUS_COLOR[m.status]}20` }}>
+                        {MS_STATUS_LABEL[m.status]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs italic" style={{ color: 'var(--text-disabled)', margin: 0 }}>(마일스톤 없음)</p>
+              )}
+            </div>
+
+            {/* 07. 마무리 */}
+            {data.charter!.content?.closing && (
+              <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>07. 마무리</p>
+                <div className="charter-editor">
+                  <div className="ProseMirror" style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: data.charter!.content.closing }} />
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}
 
       {/* 마일스톤 그룹 (읽기 전용) */}
-      {(() => {
-        const depth0 = (data.milestones ?? []).filter((m: Milestone) => !m.parent_milestone_id)
-        if (depth0.length === 0) return null
-        return (
-          <section className="mb-8">
-            <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>마일스톤 그룹</h2>
-            <div style={{ marginBottom: 16 }}>
-              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>마일스톤 그룹</p>
-              <div className="flex flex-col gap-2">
-                {depth0.map((g: Milestone) => {
-                  const children = (data.milestones ?? []).filter((m: Milestone) => m.parent_milestone_id === g.id)
-                  return (
-                    <div key={g.id} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: '8px 12px', background: 'var(--surface-secondary)' }}>
-                      <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{g.title}</p>
-                      {g.start_date && (
-                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{g.start_date} ~ {g.due_date}</p>
-                      )}
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>하위 마일스톤 {children.length}개</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
-        )
-      })()}
-
-      {allMilestones.length > 0 && (
-        <section>
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>WBS / 마일스톤</h2>
-          <div className="flex flex-col gap-2">
-            {allMilestones.map(m => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between p-3 rounded-xl border"
-                style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
-              >
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{fmtMD(m.start_date ?? '')} – {fmtMD(m.due_date ?? '')}</p>
-                </div>
-                <span
-                  className="text-xs font-semibold px-2 py-1 rounded-md"
-                  style={{ color: MS_STATUS_COLOR[m.status], background: `${MS_STATUS_COLOR[m.status]}20` }}
-                >
-                  {MS_STATUS_LABEL[m.status]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   )
 }
