@@ -17,6 +17,7 @@ const CHARTER_SECTIONS: { key: keyof CharterSubmission['content']; label: string
   { key: 'solution', label: '04. Solution' },
   { key: 'build',    label: '05. Build' },
   { key: 'timeline', label: '06. Timeline' },
+  { key: 'closing', label: '07. Closing' },
 ]
 
 export default function AdminMobileChartersPage() {

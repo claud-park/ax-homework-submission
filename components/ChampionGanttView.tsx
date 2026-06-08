@@ -104,6 +104,7 @@ const CHARTER_SECTIONS = [
   { key: 'solution', label: '04. Solution' },
   { key: 'build', label: '05. Build' },
   { key: 'timeline', label: '06. Timeline' },
+  { key: 'closing', label: '07. Closing' },
 ] as const
 
 function GanttTooltip({ task }: { task: Task; fontSize: string; fontFamily: string }) {

@@ -35,6 +35,7 @@ const CHARTER_SECTIONS: { key: string; label: string }[] = [
   { key: 'goal', label: '03. Goal · Success Metric' },
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
+  { key: 'closing', label: '07. Closing · 마무리' },
 ]
 
 const STATUS_LABEL: Record<string, string> = {

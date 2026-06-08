@@ -21,6 +21,7 @@ const CHARTER_SECTIONS = [
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
   { key: 'timeline', label: '06. Timeline · Milestones' },
+  { key: 'closing', label: '07. Closing · 마무리' },
 ]
 
 export default function ChampionDetailPage() {
