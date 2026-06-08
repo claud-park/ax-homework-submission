@@ -411,7 +411,7 @@ export default function AdminChampionPage() {
               <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>06. Timeline · Milestones</p>
               {(data.milestones ?? []).length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {[...(data.milestones ?? [])].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)).map((m: Milestone) => (
+                  {(data.milestones ?? []).map((m: Milestone) => (
                     <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
                       <div>
                         <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
@@ -429,14 +429,16 @@ export default function AdminChampionPage() {
             </div>
 
             {/* 07. 마무리 */}
-            {data.charter!.content?.closing && (
-              <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-                <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>07. 마무리</p>
+            <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>07. 마무리</p>
+              {data.charter!.content.closing ? (
                 <div className="charter-editor">
                   <div className="ProseMirror" style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: data.charter!.content.closing }} />
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-xs italic" style={{ color: 'var(--text-disabled)', margin: 0 }}>(내용 없음)</p>
+              )}
+            </div>
           </div>
         </section>
       )}
