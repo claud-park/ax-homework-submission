@@ -895,15 +895,7 @@ export function CharterClient({ initialSubmission }: { initialSubmission: Charte
           >
             {feedbackOpen
               ? <ChevronsRight className="h-3.5 w-3.5 flex-shrink-0" />
-              : <>
-                  <ChevronsLeft className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span
-                    className="text-xs font-semibold flex-shrink-0"
-                    style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: '0.06em', color: 'inherit', fontSize: 10 }}
-                  >
-                    피드백
-                  </span>
-                </>
+              : <ChevronsLeft className="h-3.5 w-3.5 flex-shrink-0" />
             }
           </button>
           {feedbackOpen && (
