@@ -913,7 +913,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
           <>
             <div
               ref={ganttWrapperRef}
-              style={{ fontSize: 12, position: 'relative' }}
+              style={{ fontSize: 12, position: 'relative', overflow: 'auto', height: 'calc(100dvh - 310px)', minHeight: 300 }}
               onMouseMove={handleGanttMouseMove}
             >
               <Gantt
