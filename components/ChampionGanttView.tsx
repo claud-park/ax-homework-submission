@@ -931,10 +931,11 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
                 TooltipContent={GanttTooltip}
                 onClick={handleGanttClick}
               />
-              {/* Today line — clipped to chart area (right of task list) */}
+              {/* Today line — height = full Gantt content height (rowHeight × rows + header) */}
               {todayLineX !== null && (
                 <div style={{
-                  position: 'absolute', top: 0, bottom: 0,
+                  position: 'absolute', top: 0,
+                  height: tasks.length * 36 + 50,
                   left: listWidth, right: 0,
                   overflow: 'hidden', pointerEvents: 'none', zIndex: 5,
                 }}>
