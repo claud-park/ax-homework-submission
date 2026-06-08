@@ -2,10 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─────────────────────────────────────────────
-   FLO Design System 1.0 — Custom Tokens
-   Source: DESIGN.md (generated 2026-06-01)
-   ──────────────────────────────────────────── */
+/* ─── 1. Design Tokens ─────────────────────────────────────────────────────── */
+
 :root {
   /* Surface */
   --background:            #ffffff;
@@ -38,8 +36,6 @@
   --accent-pressed:        #5868ff;
   --accent-disabled:       #e0e1e5;
   --static-accent:         #5868ff;
-
-  /* Backward-compat alias — components referencing --blue-600 get the new accent */
   --blue-600:              var(--accent);
 
   /* Status */
@@ -63,37 +59,28 @@
   --shadow-xl: 0 8px 24px 0 rgba(0,0,0,.16);
 }
 
-* { box-sizing: border-box; }
-html, body { background: var(--background); color: var(--text-primary); font-family: var(--font-pretendard), 'Apple SD Gothic Neo', system-ui, sans-serif; }
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
+/* shadcn/ui HSL tokens — aligned with FLO Design System 1.0 */
 @layer base {
   :root {
-    /* shadcn/ui hsl tokens — aligned with FLO Design System 1.0 */
-    --background: 0 0% 100%;           /* #ffffff */
-    --foreground: 240 3% 14%;          /* #232325 */
+    --background: 0 0% 100%;
+    --foreground: 240 3% 14%;
     --card: 0 0% 100%;
     --card-foreground: 240 3% 14%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 3% 14%;
-    --primary: 240 100% 62%;           /* #3f3fff */
+    --primary: 240 100% 62%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;           /* #f2f2f5 */
+    --secondary: 240 5% 96%;
     --secondary-foreground: 240 3% 14%;
     --muted: 240 5% 96%;
-    --muted-foreground: 240 3% 54%;    /* #8e8e93 */
+    --muted-foreground: 240 3% 54%;
     --accent: 240 5% 96%;
     --accent-foreground: 240 3% 14%;
-    --destructive: 353 88% 49%;        /* #e5172f */
+    --destructive: 353 88% 49%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 93%;              /* #ebebee */
+    --border: 240 6% 93%;
     --input: 240 6% 93%;
-    --ring: 240 100% 62%;              /* #3f3fff */
+    --ring: 240 100% 62%;
     --chart-1: 240 100% 62%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -105,25 +92,25 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
   .dark {
     color-scheme: dark;
     /* shadcn dark tokens */
-    --background: 0 0% 0%;             /* #000000 */
+    --background: 0 0% 0%;
     --foreground: 0 0% 100%;
-    --card: 240 4% 11%;                /* #1c1c1e */
+    --card: 240 4% 11%;
     --card-foreground: 0 0% 100%;
     --popover: 240 4% 11%;
     --popover-foreground: 0 0% 100%;
-    --primary: 233 100% 67%;           /* #5868ff */
+    --primary: 233 100% 67%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 13%;          /* #232325 */
+    --secondary: 240 4% 13%;
     --secondary-foreground: 0 0% 100%;
     --muted: 240 4% 13%;
-    --muted-foreground: 240 2% 55%;    /* #8e8e93 */
+    --muted-foreground: 240 2% 55%;
     --accent: 240 4% 13%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 351 100% 60%;       /* #ff334b */
+    --destructive: 351 100% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 3% 28%;              /* #48484a */
+    --border: 240 3% 28%;
     --input: 240 3% 28%;
-    --ring: 233 100% 67%;              /* #5868ff */
+    --ring: 233 100% 67%;
     --chart-1: 233 100% 67%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -162,93 +149,94 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
     --loading-primary:       #1c1c1e;
     --loading-secondary:     #6c6c70;
   }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+/* ─── 2. Global Reset ──────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+html, body { background: var(--background); color: var(--text-primary); font-family: var(--font-pretendard), 'Apple SD Gothic Neo', system-ui, sans-serif; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── 3. Utilities ─────────────────────────────────────────────────────────── */
+
+.chip-scroll::-webkit-scrollbar { display: none; }
+
+/* ─── 4. Third-party Overrides — Gantt ────────────────────────────────────── */
+@layer components {
+  /* Champion umbrella bar: scale to 8px line */
+  ._1KJ6x ._2RbVy { opacity: 1; transform: scaleY(0.222); transform-box: fill-box; transform-origin: 50% 50%; }
+  ._1KJ6x ._2pZMF { display: none; }
+  ._1KJ6x ~ ._3zRJQ, ._1KJ6x ~ ._3KcaM { display: none; }
+
+  /* Gantt task bar: hide label on bar */
+  ._KxSXS ~ ._3zRJQ, ._KxSXS ~ ._3KcaM { display: none; }
+
+  /* Row background: override default alternating #f5f5f5 */
+  ._34SS0:nth-of-type(even) { background-color: #ffffff; }
+  ._2dZTy { fill: #ffffff; }
+  ._2dZTy:nth-child(even) { fill: #ffffff; }
+  ._3_ygE, ._3ZbQT { border-color: var(--border); }
+}
+
+/* ─── 5. Tiptap / ProseMirror ──────────────────────────────────────────────── */
+@layer components {
+  .ProseMirror {
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+    padding: 0.5rem 0.75rem;
+    outline: none;
   }
-  body {
-    @apply bg-background text-foreground;
+
+  /* Placeholder extension */
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--text-disabled);
+    pointer-events: none;
   }
+  .ProseMirror:focus p.is-editor-empty:first-child::before { content: none; }
+  .ProseMirror p.is-editor-empty:first-child { min-height: 1.5em; }
+
+  /* Charter section editor */
+  .charter-editor .ProseMirror p { margin: 0; }
+  .charter-editor .ProseMirror p + p { margin-top: 0.2rem; }
+  .charter-editor .ProseMirror ul { list-style-type: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
+  .charter-editor .ProseMirror ol { list-style-type: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
+  .charter-editor .ProseMirror li { margin: 0.1rem 0; }
+  .charter-editor .ProseMirror li p { margin: 0; }
+  .charter-editor .ProseMirror blockquote { border-left: 2px solid var(--border); padding-left: 0.75rem; color: var(--text-secondary); margin: 0.25rem 0; }
+  .charter-editor .ProseMirror code { font-family: ui-monospace, monospace; background: var(--surface-secondary); border-radius: 3px; padding: 1px 4px; font-size: 0.85em; }
+  .charter-editor .ProseMirror pre { background: var(--surface-secondary); border-radius: 6px; padding: 0.6rem 0.75rem; margin: 0.25rem 0; overflow-x: auto; }
+  .charter-editor .ProseMirror pre code { background: none; padding: 0; font-size: 0.8em; }
+  .charter-editor .ProseMirror a { color: var(--blue-600); text-decoration: underline; }
+  .charter-editor .ProseMirror strong { font-weight: 700; }
+  .charter-editor .ProseMirror em { font-style: italic; }
+
+  /* Charter editor — Table */
+  .charter-editor .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; table-layout: fixed; }
+  .charter-editor .ProseMirror table td,
+  .charter-editor .ProseMirror table th { border: 1px solid var(--border); padding: 5px 8px; min-width: 80px; vertical-align: top; font-size: 0.85em; position: relative; }
+  .charter-editor .ProseMirror table th { background: var(--surface-secondary); font-weight: 600; color: var(--text-secondary); }
+  .charter-editor .ProseMirror table td p,
+  .charter-editor .ProseMirror table th p { margin: 0; }
+  .charter-editor .ProseMirror table .selectedCell::after { content: ''; position: absolute; inset: 0; background: rgba(37,99,235,0.12); pointer-events: none; z-index: 1; }
+  .charter-editor .ProseMirror table .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: 0; width: 4px; background: var(--blue-600); opacity: 0; cursor: col-resize; z-index: 2; transition: opacity 0.1s; }
+  .charter-editor .ProseMirror table .column-resize-handle:hover { opacity: 0.6; }
 }
 
-/* hide scrollbar on chip scroll rows */
-.chip-scroll::-webkit-scrollbar {
-  display: none;
+/* ─── 6. Hotline Message Body ──────────────────────────────────────────────── */
+@layer components {
+  .hotline-msg-body p { margin: 0; }
+  .hotline-msg-body p + p { margin-top: 4px; }
+  .hotline-msg-body strong, .hotline-msg-body b { font-weight: 700; }
+  .hotline-msg-body em, .hotline-msg-body i { font-style: italic; }
+  .hotline-msg-body code { font-family: ui-monospace, monospace; background: rgba(0,0,0,0.12); border-radius: 3px; padding: 1px 4px; font-size: 0.88em; }
+  .hotline-msg-body img { max-width: 100%; border-radius: 6px; margin-top: 4px; display: block; }
 }
-
-/* Champion umbrella bar: single 8px line — scale background rect only */
-._1KJ6x ._2RbVy {
-  opacity: 1;
-  transform: scaleY(0.222);
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
-}
-
-/* Hide decorative top-half rect and left/right triangles on champion bar */
-._1KJ6x ._2pZMF {
-  display: none;
-}
-
-/* Hide label inside champion bar (8px too thin for text) */
-._1KJ6x ~ ._3zRJQ,
-._1KJ6x ~ ._3KcaM {
-  display: none;
-}
-
-/* Gantt task bar label: hide name on bar */
-._KxSXS ~ ._3zRJQ,
-._KxSXS ~ ._3KcaM {
-  display: none;
-}
-
-/* gantt-task-react: white background (override default #f5f5f5 alternating rows) */
-._34SS0:nth-of-type(even) { background-color: #ffffff; }
-._2dZTy { fill: #ffffff; }
-._2dZTy:nth-child(even) { fill: #ffffff; }
-._3_ygE, ._3ZbQT { border-color: var(--border); }
-
-/* Tiptap editor content area */
-.ProseMirror {
-  font-size: 0.75rem;
-  line-height: 1.125rem;
-  padding: 0.5rem 0.75rem;
-  outline: none;
-}
-
-/* Tiptap Placeholder extension */
-.ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  color: var(--text-disabled);
-  pointer-events: none;
-}
-.ProseMirror:focus p.is-editor-empty:first-child::before {
-  content: none;
-}
-.ProseMirror p.is-editor-empty:first-child {
-  min-height: 1.5em;
-}
-
-/* Charter editor WYSIWYG styles */
-.charter-editor .ProseMirror p { margin: 0; }
-.charter-editor .ProseMirror p + p { margin-top: 0.2rem; }
-.charter-editor .ProseMirror ul { list-style-type: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
-.charter-editor .ProseMirror ol { list-style-type: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
-.charter-editor .ProseMirror li { margin: 0.1rem 0; }
-.charter-editor .ProseMirror li p { margin: 0; }
-.charter-editor .ProseMirror blockquote { border-left: 2px solid var(--border); padding-left: 0.75rem; color: var(--text-secondary); margin: 0.25rem 0; }
-.charter-editor .ProseMirror code { font-family: ui-monospace, monospace; background: var(--surface-secondary); border-radius: 3px; padding: 1px 4px; font-size: 0.85em; }
-.charter-editor .ProseMirror pre { background: var(--surface-secondary); border-radius: 6px; padding: 0.6rem 0.75rem; margin: 0.25rem 0; overflow-x: auto; }
-.charter-editor .ProseMirror pre code { background: none; padding: 0; font-size: 0.8em; }
-.charter-editor .ProseMirror a { color: var(--blue-600); text-decoration: underline; }
-.charter-editor .ProseMirror strong { font-weight: 700; }
-.charter-editor .ProseMirror em { font-style: italic; }
-
-/* Hotline HTML message body */
-.hotline-msg-body p { margin: 0; }
-.hotline-msg-body p + p { margin-top: 4px; }
-.hotline-msg-body strong, .hotline-msg-body b { font-weight: 700; }
-.hotline-msg-body em, .hotline-msg-body i { font-style: italic; }
-.hotline-msg-body code { font-family: ui-monospace, monospace; background: rgba(0,0,0,0.12); border-radius: 3px; padding: 1px 4px; font-size: 0.88em; }
-.hotline-msg-body img { max-width: 100%; border-radius: 6px; margin-top: 4px; display: block; }
