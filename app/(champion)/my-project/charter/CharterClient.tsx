@@ -624,7 +624,8 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
   async function handleExport() {
     setExporting(true)
     try {
-      const { Document, Paragraph, TextRun, HeadingLevel, Packer, UnderlineType } = await import('docx')
+      const { Document, Paragraph, TextRun, HeadingLevel, Packer, UnderlineType,
+        Table: DocxTable, TableRow: DocxTableRow, TableCell: DocxTableCell, WidthType, BorderStyle } = await import('docx')
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { saveAs } = require('file-saver') as { saveAs: typeof import('file-saver').saveAs }
       const src = contentRef.current
@@ -632,7 +633,11 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
 
       type TR = InstanceType<typeof TextRun>
       type P = InstanceType<typeof Paragraph>
+      type DocxChild = P | InstanceType<typeof DocxTable>
       type InlineStyles = { bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean; code?: boolean }
+
+      const cellBorder = { style: BorderStyle.SINGLE, size: 4, color: 'cccccc' }
+      const tableBorders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder, insideH: cellBorder, insideV: cellBorder }
 
       const inlineNodes = (node: Node, s: InlineStyles): TR[] => {
         const runs: TR[] = []
@@ -662,10 +667,10 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
         return runs
       }
 
-      const htmlToParagraphs = (html: string): P[] => {
+      const htmlToChildren = (html: string): DocxChild[] => {
         if (!html?.trim()) return [new Paragraph({ children: [new TextRun({ text: '(내용 없음)', size: 22, color: '888888' })] })]
         const dom = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
-        const result: P[] = []
+        const result: DocxChild[] = []
         let olIdx = 0
 
         const walk = (node: Node) => {
@@ -692,6 +697,27 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
             result.push(new Paragraph({ children: [new TextRun({ text, size: 20, font: 'Courier New' })] }))
           } else if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
             result.push(new Paragraph({ children: inlineNodes(el, { bold: true }), spacing: { before: 200, after: 80 } }))
+          } else if (tag === 'table') {
+            const rows: InstanceType<typeof DocxTableRow>[] = []
+            for (const tr of el.querySelectorAll('tr')) {
+              const cells: InstanceType<typeof DocxTableCell>[] = []
+              for (const cell of tr.children) {
+                const isHeader = cell.tagName.toLowerCase() === 'th'
+                const runs = inlineNodes(cell, { bold: isHeader })
+                cells.push(new DocxTableCell({
+                  children: [new Paragraph({ children: runs.length ? runs : [new TextRun({ text: '' })] })],
+                  borders: tableBorders,
+                  shading: isHeader ? { fill: 'f2f2f5' } : undefined,
+                }))
+              }
+              if (cells.length) rows.push(new DocxTableRow({ children: cells }))
+            }
+            if (rows.length) {
+              result.push(new DocxTable({
+                rows,
+                width: { size: 100, type: WidthType.PERCENTAGE },
+              }))
+            }
           } else {
             for (const child of el.childNodes) walk(child)
           }
@@ -712,7 +738,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
 
       const bodyChildren = SECTIONS.flatMap(s => [
         new Paragraph({ text: s.label, heading: HeadingLevel.HEADING_2 }),
-        ...htmlToParagraphs(src[s.key] ?? ''),
+        ...htmlToChildren(src[s.key] ?? ''),
         new Paragraph({ text: '' }),
       ])
 
