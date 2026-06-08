@@ -219,19 +219,32 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
   .charter-editor .ProseMirror strong { font-weight: 700; }
   .charter-editor .ProseMirror em { font-style: italic; }
 
-  /* Charter editor — Table */
-  .charter-editor .ProseMirror table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; table-layout: fixed; }
-  .charter-editor .ProseMirror table td,
-  .charter-editor .ProseMirror table th { border: 1px solid var(--border); padding: 5px 8px; min-width: 80px; vertical-align: top; font-size: 0.85em; position: relative; }
-  .charter-editor .ProseMirror table th { background: var(--surface-secondary); font-weight: 600; color: var(--text-secondary); }
-  .charter-editor .ProseMirror table td p,
-  .charter-editor .ProseMirror table th p { margin: 0; }
-  .charter-editor .ProseMirror table .selectedCell::after { content: ''; position: absolute; inset: 0; background: rgba(37,99,235,0.12); pointer-events: none; z-index: 1; }
-  .charter-editor .ProseMirror table .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: 0; width: 4px; background: var(--blue-600); opacity: 0; cursor: col-resize; z-index: 2; transition: opacity 0.1s; }
-  .charter-editor .ProseMirror table .column-resize-handle:hover { opacity: 0.6; }
 }
 
-/* ─── 6. Hotline Message Body ──────────────────────────────────────────────── */
+/* ─── 6. Charter Editor — Table (unlayered: must beat Tailwind preflight display resets) ─── */
+/* display values explicit so table layout is never overridden by @layer styles */
+.charter-editor .ProseMirror table { display: table; border-collapse: collapse; border: 1px solid var(--border); width: 100%; margin: 0.5rem 0; table-layout: fixed; }
+.charter-editor .ProseMirror table tr { display: table-row; }
+.charter-editor .ProseMirror table td,
+.charter-editor .ProseMirror table th { display: table-cell; border: 1px solid var(--border); padding: 5px 8px; min-width: 80px; vertical-align: top; font-size: 0.85em; position: relative; }
+.charter-editor .ProseMirror table th { background: var(--surface-secondary); font-weight: 600; color: var(--text-secondary); }
+.charter-editor .ProseMirror table td p,
+.charter-editor .ProseMirror table th p { margin: 0; }
+.charter-editor .ProseMirror table .selectedCell::after { content: ''; position: absolute; inset: 0; background: rgba(37,99,235,0.12); pointer-events: none; z-index: 1; }
+.charter-editor .ProseMirror table .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: 0; width: 4px; background: var(--blue-600); opacity: 0; cursor: col-resize; z-index: 2; transition: opacity 0.1s; }
+.charter-editor .ProseMirror table .column-resize-handle:hover { opacity: 0.6; }
+
+/* ─── 7. Prose (Tailwind Typography) — Table border override ───────────────── */
+/* prose resets table borders by default; restore 1px grid */
+.prose table { border-collapse: collapse; border: 1px solid var(--border); width: 100%; }
+.prose table tr { display: table-row; }
+.prose table td,
+.prose table th { border: 1px solid var(--border); padding: 5px 8px; vertical-align: top; }
+.prose table th { background: var(--surface-secondary); font-weight: 600; color: var(--text-secondary); }
+.prose table td p,
+.prose table th p { margin: 0; }
+
+/* ─── 8. Hotline Message Body ──────────────────────────────────────────────── */
 @layer components {
   .hotline-msg-body p { margin: 0; }
   .hotline-msg-body p + p { margin-top: 4px; }
