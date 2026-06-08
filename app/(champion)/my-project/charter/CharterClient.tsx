@@ -698,8 +698,12 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
           } else if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
             result.push(new Paragraph({ children: inlineNodes(el, { bold: true }), spacing: { before: 200, after: 80 } }))
           } else if (tag === 'table') {
+            const trs = Array.from(el.querySelectorAll('tr'))
+            const colCount = trs.reduce((max, tr) => Math.max(max, tr.children.length), 0)
+            const pageWidthDxa = 9360
+            const colWidthDxa = colCount > 0 ? Math.floor(pageWidthDxa / colCount) : pageWidthDxa
             const rows: InstanceType<typeof DocxTableRow>[] = []
-            for (const tr of el.querySelectorAll('tr')) {
+            for (const tr of trs) {
               const cells: InstanceType<typeof DocxTableCell>[] = []
               for (const cell of tr.children) {
                 const isHeader = cell.tagName.toLowerCase() === 'th'
@@ -708,6 +712,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
                   children: [new Paragraph({ children: runs.length ? runs : [new TextRun({ text: '' })] })],
                   borders: tableBorders,
                   shading: isHeader ? { fill: 'f2f2f5' } : undefined,
+                  width: { size: colWidthDxa, type: WidthType.DXA },
                 }))
               }
               if (cells.length) rows.push(new DocxTableRow({ children: cells }))
@@ -715,7 +720,8 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
             if (rows.length) {
               result.push(new DocxTable({
                 rows,
-                width: { size: 100, type: WidthType.PERCENTAGE },
+                width: { size: pageWidthDxa, type: WidthType.DXA },
+                columnWidths: Array(colCount).fill(colWidthDxa),
               }))
             }
           } else {
