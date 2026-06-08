@@ -323,8 +323,15 @@ function CharterPanel({ charter, onClose, onApprove }: { charter: CharterWithUse
                         background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px',
                         border: '1px solid var(--border-subtle)',
                       }}
-                      dangerouslySetInnerHTML={{ __html: html || '' }}
-                    />
+                    >
+                      <div className="charter-editor">
+                        <div
+                          className="ProseMirror"
+                          style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit' }}
+                          dangerouslySetInnerHTML={{ __html: html || '' }}
+                        />
+                      </div>
+                    </div>
                   ) : (
                     <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>
                       (내용 없음)

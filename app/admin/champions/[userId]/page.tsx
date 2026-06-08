@@ -413,11 +413,13 @@ export default function AdminChampionPage() {
                   style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
                 >
                   <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>{s.label}</p>
-                  <div
-                    className="prose prose-sm max-w-none text-sm"
-                    style={{ color: 'var(--text-primary)' }}
-                    dangerouslySetInnerHTML={{ __html: html }}
-                  />
+                  <div className="charter-editor">
+                    <div
+                      className="ProseMirror"
+                      style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }}
+                      dangerouslySetInnerHTML={{ __html: html }}
+                    />
+                  </div>
                 </div>
               )
             })}
