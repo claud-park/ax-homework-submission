@@ -39,7 +39,6 @@ const CHARTER_SECTIONS = [
   { key: 'goal', label: '03. Goal · Success Metric' },
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
-  { key: 'closing', label: '07. Closing · 마무리' },
 ]
 
 type SubWithComments = Submission & { comments?: Comment[] }
@@ -431,7 +430,7 @@ export default function AdminChampionPage() {
 
             {/* 07. 마무리 */}
             <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>07. 마무리</p>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>07. Closing · 마무리</p>
               {data.charter!.content.closing ? (
                 <div className="charter-editor">
                   <div className="ProseMirror" style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: data.charter!.content.closing }} />

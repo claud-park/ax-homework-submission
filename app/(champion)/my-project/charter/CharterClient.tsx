@@ -31,7 +31,6 @@ const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: 
   { key: 'goal', label: '03. Goal · Success Metric', required: true, tooltip: "목표 한 줄 요약 — 정성/정량 모두 OK ('업무 시간 단축'도 충분해요)", placeholder: '이 프로젝트가 성공했을 때 무엇이 달라지는가? 어떻게 측정할 것인가?' },
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가', required: true, groupHeader: '해결 방법', tooltip: '핵심 기능과 지표 — 무엇을 만들고 무엇으로 측정할지', placeholder: '핵심 기능 3가지와 각 기능이 어떻게 문제를 해결하는지 설명해보세요.' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가', required: true, tooltip: '어떻게 만들 것인가 — 기술 스택, 구현 접근법', placeholder: '기술 스택, 구현 방식, 예상 일정, 필요한 협업을 정리해주세요.' },
-  { key: 'closing', label: '07. Closing · 마무리', required: true, tooltip: '이 시스템이 어떤 의사결정을 지원하는지', placeholder: '이 프로젝트가 완성됐을 때 어떤 의사결정이 달라지는가?', groupHeader: '마무리' },
 ]
 
 
@@ -104,7 +103,7 @@ function InfoTooltip({ text }: { text: string }) {
 }
 
 function SectionEditor({ label, required, tooltip, placeholder, content, onBlur, onDirty }: {
-  label: string; required?: boolean; tooltip?: string; placeholder?: string; content: string; onBlur: (html: string) => void; onDirty?: () => void
+  label: string; required?: boolean; tooltip?: string; placeholder?: string; content: string; onBlur: (html: string) => void; onDirty?: (html: string) => void
 }) {
   return (
     <div
@@ -841,7 +840,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
                 placeholder={s.placeholder}
                 content={(submission?.content ?? {})[s.key] ?? ''}
                 onBlur={html => handleSectionBlur(s.key, html)}
-                onDirty={scheduleAutoSave}
+                onDirty={html => { handleSectionBlur(s.key, html); scheduleAutoSave() }}
               />
             </Fragment>
           ))}
@@ -855,13 +854,13 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
           />
           <SectionGroupHeader label="마무리" />
           <SectionEditor
-            label="07. 마무리"
+            label="07. Closing · 마무리"
             required
             tooltip="이 시스템이 어떤 의사결정을 지원하는지"
             placeholder="이 프로젝트가 완성됐을 때 어떤 의사결정이 달라지는가?"
             content={(submission?.content ?? {}).closing ?? ''}
             onBlur={html => handleSectionBlur('closing', html)}
-            onDirty={scheduleAutoSave}
+            onDirty={html => { handleSectionBlur('closing', html); scheduleAutoSave() }}
           />
         </div>
       </div>

@@ -17,7 +17,7 @@ interface Props {
   content: string
   placeholder?: string
   onBlur: (html: string) => void
-  onDirty?: () => void
+  onDirty?: (html: string) => void
 }
 
 function ToolBtn({ active, onMouseDown, title, children }: {
@@ -176,11 +176,11 @@ export default function SectionEditorInner({ content, placeholder, onBlur, onDir
     ],
     content: content || null,
     onBlur: ({ editor }) => onBlur(editor.getHTML()),
-    onUpdate: () => onDirty?.(),
+    onUpdate: ({ editor }) => onDirty?.(editor.getHTML()),
   })
 
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isFocused) return
     editor.commands.setContent(content || null, { emitUpdate: false })
   }, [editor, content])
 

@@ -35,7 +35,6 @@ const CHARTER_SECTIONS: { key: string; label: string }[] = [
   { key: 'goal', label: '03. Goal · Success Metric' },
   { key: 'solution', label: '04. Solution · 어떻게 풀 것인가' },
   { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
-  { key: 'closing', label: '07. Closing · 마무리' },
 ]
 
 const STATUS_LABEL: Record<string, string> = {
@@ -358,7 +357,7 @@ function CharterPanel({ charter, userMilestones, onClose, onApprove }: { charter
             {/* 07. 마무리 */}
             <div>
               <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px 0', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                07. 마무리
+                07. Closing · 마무리
               </p>
               {stripHtml(charter.content.closing ?? '') ? (
                 <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.65, background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
