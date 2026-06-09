@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 
-// ─── 대한민국 공휴일 + 대체공휴일 (2026–2027) ──────────────────────────────
-const HOLIDAYS: Record<string, string> = {
+// API 키가 없거나 fetch 실패 시 사용하는 fallback 공휴일 목록 (2026–2027)
+const HOLIDAYS_FALLBACK: Record<string, string> = {
   // 2026
   '2026-01-01': '신정',
   '2026-02-16': '설날 연휴',
@@ -57,7 +57,7 @@ function parseKey(s: string): Date {
   return new Date(y, m - 1, d)
 }
 
-export function countWorkingDays(start: string, end: string): number {
+export function countWorkingDays(start: string, end: string, holidays: Record<string, string> = HOLIDAYS_FALLBACK): number {
   if (!start || !end) return 0
   const s = parseKey(start)
   const e = parseKey(end)
@@ -66,7 +66,7 @@ export function countWorkingDays(start: string, end: string): number {
   const cur = new Date(s)
   while (cur <= e) {
     const dow = cur.getDay()
-    if (dow !== 0 && dow !== 6 && !HOLIDAYS[toKey(cur)]) count++
+    if (dow !== 0 && dow !== 6 && !holidays[toKey(cur)]) count++
     cur.setDate(cur.getDate() + 1)
   }
   return count
@@ -96,6 +96,30 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
   const [firstKey, setFirstKey] = useState<string | null>(null)
   const [hoverKey, setHoverKey] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [holidays, setHolidays] = useState<Record<string, string>>(HOLIDAYS_FALLBACK)
+  const fetchedYears = useRef<Set<number>>(new Set())
+
+  // 연도별 공휴일을 API에서 fetch하고 누적 저장 (API 키 없으면 빈 객체 → fallback 유지)
+  useEffect(() => {
+    const thisYear = new Date().getFullYear()
+    const yearsToFetch = [thisYear, thisYear + 1, viewYear]
+    const newYears = yearsToFetch.filter(y => !fetchedYears.current.has(y))
+    if (newYears.length === 0) return
+
+    Promise.all(
+      newYears.map(y =>
+        fetch(`/api/holidays?year=${y}`)
+          .then(r => r.ok ? r.json() : {})
+          .catch(() => ({}))
+      )
+    ).then(results => {
+      const merged: Record<string, string> = {}
+      results.forEach(r => Object.assign(merged, r))
+      if (Object.keys(merged).length === 0) return // API 키 없음 → fallback 유지
+      newYears.forEach(y => fetchedYears.current.add(y))
+      setHolidays(prev => ({ ...prev, ...merged }))
+    })
+  }, [viewYear])
 
   useEffect(() => {
     if (!open) return
@@ -142,7 +166,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay()
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
 
-  const workingDays = startDate && endDate ? countWorkingDays(startDate, endDate) : null
+  const workingDays = startDate && endDate ? countWorkingDays(startDate, endDate, holidays) : null
 
   const triggerText = startDate && endDate
     ? `${formatKo(startDate)}  →  ${formatKo(endDate)}`
@@ -254,7 +278,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: Props)
               const d = new Date(viewYear, viewMonth, day)
               const key = toKey(d)
               const dow = d.getDay()
-              const holiday = HOLIDAYS[key]
+              const holiday = holidays[key]
               const isSat = dow === 6
               const isSun = dow === 0
               const isToday = key === todayKey

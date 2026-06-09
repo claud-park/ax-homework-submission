@@ -223,11 +223,12 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
 
 /* ─── 6. Charter Editor — Table (unlayered: must beat Tailwind preflight display resets) ─── */
 /* display values explicit so table layout is never overridden by @layer styles */
-.charter-editor .ProseMirror table { display: table; border-collapse: collapse; border: 1px solid var(--border); width: 100%; margin: 0.5rem 0; table-layout: fixed; }
+.charter-editor .ProseMirror table { display: table; border-collapse: collapse; border: 1.5px solid #94a3b8; width: 100%; margin: 0.75rem 0; table-layout: fixed; border-radius: 6px; overflow: hidden; }
 .charter-editor .ProseMirror table tr { display: table-row; }
+.charter-editor .ProseMirror table tr:nth-child(even) td { background: #f8fafc; }
 .charter-editor .ProseMirror table td,
-.charter-editor .ProseMirror table th { display: table-cell; border: 1px solid var(--border); padding: 5px 8px; min-width: 80px; vertical-align: top; font-size: 0.85em; position: relative; }
-.charter-editor .ProseMirror table th { background: var(--surface-secondary); font-weight: 600; color: var(--text-secondary); }
+.charter-editor .ProseMirror table th { display: table-cell; border: 1px solid #cbd5e1; padding: 8px 12px; min-width: 80px; vertical-align: top; font-size: 0.875em; position: relative; line-height: 1.6; }
+.charter-editor .ProseMirror table th { background: #1e293b; font-weight: 600; color: #f1f5f9; border-color: #334155; text-align: left; letter-spacing: 0.02em; }
 .charter-editor .ProseMirror table td p,
 .charter-editor .ProseMirror table th p { margin: 0; }
 .charter-editor .ProseMirror table .selectedCell::after { content: ''; position: absolute; inset: 0; background: rgba(37,99,235,0.12); pointer-events: none; z-index: 1; }
@@ -235,12 +236,13 @@ html, body { background: var(--background); color: var(--text-primary); font-fam
 .charter-editor .ProseMirror table .column-resize-handle:hover { opacity: 0.6; }
 
 /* ─── 7. Prose (Tailwind Typography) — Table border override ───────────────── */
-/* prose resets table borders by default; restore 1px grid */
-.prose table { border-collapse: collapse; border: 1px solid var(--border); width: 100%; }
+/* prose resets table borders by default; restore visible grid */
+.prose table { border-collapse: collapse; border: 1.5px solid #94a3b8; width: 100%; }
 .prose table tr { display: table-row; }
+.prose table tr:nth-child(even) td { background: #f8fafc; }
 .prose table td,
-.prose table th { border: 1px solid var(--border); padding: 5px 8px; vertical-align: top; }
-.prose table th { background: var(--surface-secondary); font-weight: 600; color: var(--text-secondary); }
+.prose table th { border: 1px solid #cbd5e1; padding: 8px 12px; vertical-align: top; }
+.prose table th { background: #1e293b; font-weight: 600; color: #f1f5f9; border-color: #334155; }
 .prose table td p,
 .prose table th p { margin: 0; }
 

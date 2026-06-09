@@ -67,7 +67,7 @@ export default function CharterPopupClient({ charter, milestones, isAdmin = fals
     .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
 
   return (
-    <div style={{ fontFamily: 'var(--font-pretendard, sans-serif)', background: 'var(--background)', minHeight: '100vh' }}>
+    <div style={{ fontFamily: 'var(--font-pretendard, sans-serif)', background: '#f1f5f9', minHeight: '100vh' }}>
       {/* Header */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 10,
@@ -113,37 +113,41 @@ export default function CharterPopupClient({ charter, milestones, isAdmin = fals
       </div>
 
       {/* Body */}
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* 00–05 Sections */}
         {SECTIONS.map(({ key, label }) => {
           const html = charter.content[key] ?? ''
+          const [num, ...rest] = label.split('. ')
+          const title = rest.join('. ')
           return (
-            <div key={key}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 8px 0', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                {label}
-              </p>
+            <div key={key} style={{ background: '#ffffff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden', borderLeft: '4px solid var(--blue-600)' }}>
+              <div style={{ padding: '10px 18px 8px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'var(--blue-600)', padding: '1px 7px', borderRadius: 4, letterSpacing: '0.02em', flexShrink: 0 }}>{num}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.01em' }}>{title}</span>
+              </div>
               {stripHtml(html) ? (
-                <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.7, background: 'var(--surface-secondary)', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.75, padding: '14px 18px' }}>
                   <div className="charter-editor">
                     <div className="ProseMirror" style={{ padding: 0 }} dangerouslySetInnerHTML={{ __html: html }} />
                   </div>
                 </div>
               ) : (
-                <p style={{ fontSize: 12, color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(내용 없음)</p>
+                <p style={{ fontSize: 12, color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0, padding: '12px 18px' }}>(내용 없음)</p>
               )}
             </div>
           )
         })}
 
         {/* 06. Timeline */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 8px 0', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            06. Timeline · Milestones
-          </p>
+        <div style={{ background: '#ffffff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden', borderLeft: '4px solid var(--blue-600)' }}>
+          <div style={{ padding: '10px 18px 8px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'var(--blue-600)', padding: '1px 7px', borderRadius: 4, letterSpacing: '0.02em', flexShrink: 0 }}>06</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.01em' }}>Timeline · Milestones</span>
+          </div>
           {depth0.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {depth0.map(m => (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderRadius: 8, background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
                     {(m.start_date || m.due_date) && (
@@ -159,23 +163,24 @@ export default function CharterPopupClient({ charter, milestones, isAdmin = fals
               ))}
             </div>
           ) : (
-            <p style={{ fontSize: 12, color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(마일스톤 없음)</p>
+            <p style={{ fontSize: 12, color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0, padding: '12px 18px' }}>(마일스톤 없음)</p>
           )}
         </div>
 
         {/* 07. Closing */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 8px 0', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            07. Closing · 마무리
-          </p>
+        <div style={{ background: '#ffffff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', overflow: 'hidden', borderLeft: '4px solid var(--blue-600)' }}>
+          <div style={{ padding: '10px 18px 8px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'var(--blue-600)', padding: '1px 7px', borderRadius: 4, letterSpacing: '0.02em', flexShrink: 0 }}>07</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.01em' }}>Closing · 마무리</span>
+          </div>
           {stripHtml(charter.content.closing ?? '') ? (
-            <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.7, background: 'var(--surface-secondary)', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.75, padding: '14px 18px' }}>
               <div className="charter-editor">
                 <div className="ProseMirror" style={{ padding: 0 }} dangerouslySetInnerHTML={{ __html: charter.content.closing ?? '' }} />
               </div>
             </div>
           ) : (
-            <p style={{ fontSize: 12, color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(내용 없음)</p>
+            <p style={{ fontSize: 12, color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0, padding: '12px 18px' }}>(내용 없음)</p>
           )}
         </div>
       </div>
