@@ -32,13 +32,13 @@ const STATUS_COLOR: Record<MilestoneStatus, string> = {
   not_started: '#94a3b8', in_progress: '#3b82f6', delayed: '#ef4444', completed: '#22c55e',
 }
 const STATUS_BG: Record<MilestoneStatus, string> = {
-  not_started: 'rgba(148,163,184,0.2)',
+  not_started: 'rgba(148,163,184,0.45)',
   in_progress: 'rgba(59,130,246,0.18)',
   delayed: 'rgba(239,68,68,0.18)',
   completed: 'rgba(34,197,94,0.18)',
 }
 const STATUS_BG_SELECTED: Record<MilestoneStatus, string> = {
-  not_started: 'rgba(148,163,184,0.35)',
+  not_started: 'rgba(148,163,184,0.62)',
   in_progress: 'rgba(59,130,246,0.32)',
   delayed: 'rgba(239,68,68,0.32)',
   completed: 'rgba(34,197,94,0.32)',
@@ -51,6 +51,15 @@ function getMondayOf(date: Date): Date {
   d.setHours(0, 0, 0, 0)
   const day = d.getDay()
   d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d
+}
+
+function getMondayOfISOWeek(week: number, year: number): Date {
+  const jan4 = new Date(year, 0, 4)
+  const dow = jan4.getDay() || 7
+  const d = new Date(jan4)
+  d.setDate(jan4.getDate() - dow + 1 + (week - 1) * 7)
+  d.setHours(0, 0, 0, 0)
   return d
 }
 
@@ -568,6 +577,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   const lastMousePos = useRef({ x: 0, y: 0 })
   const ganttWrapperRef = useRef<HTMLDivElement>(null)
   const [ganttScrollLeft, setGanttScrollLeft] = useState(0)
+  const [ganttBodyHeight, setGanttBodyHeight] = useState(0)
 
   const listWidth = W.name + W.dept + projectW + W.charter
 
@@ -682,6 +692,35 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     return () => scrollEl.removeEventListener('scroll', handler)
   }, [tasks.length, viewMode])
 
+  // ResizeObserver: calculate ganttBodyHeight to enable internal scroll (sticky header)
+  useEffect(() => {
+    const el = ganttWrapperRef.current
+    if (!el) return
+    const update = () => setGanttBodyHeight(Math.max(100, el.clientHeight - 70)) // 50px header + 20px scrollbar
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Replace "W{n}" week labels with "W{n} M/D" (Monday date) in Week view
+  useEffect(() => {
+    if (viewMode !== ViewMode.Week || !ganttWrapperRef.current) return
+    const year = new Date().getFullYear()
+    const apply = () => {
+      ganttWrapperRef.current?.querySelectorAll<SVGTextElement>('._2q1Kt').forEach(el => {
+        const m = el.textContent?.match(/^W(\d+)$/)
+        if (!m) return
+        const mon = getMondayOfISOWeek(parseInt(m[1], 10), year)
+        el.textContent = `W${m[1]} ${mon.getMonth() + 1}/${mon.getDate()}`
+      })
+    }
+    apply()
+    const observer = new MutationObserver(apply)
+    observer.observe(ganttWrapperRef.current, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [viewMode, tasks.length])
+
   const handleCharterClick = useCallback((userId: string) => {
     setPanelUserId(prev => prev === userId ? null : userId)
   }, [])
@@ -769,6 +808,13 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+      <style>{`
+        ._2k9Ys { overflow-x: scroll !important; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.3) rgba(0,0,0,0.08); }
+        ._2k9Ys::-webkit-scrollbar { height: 8px !important; }
+        ._2k9Ys::-webkit-scrollbar-track { background: rgba(0,0,0,0.06); border-radius: 4px; }
+        ._2k9Ys::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.28) !important; border-radius: 4px; border: none !important; background-clip: padding-box !important; }
+        ._2k9Ys::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.45) !important; }
+      `}</style>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {(noCharter.length > 0 || noMilestone.length > 0) && (
           <div style={{
@@ -914,7 +960,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
           <>
             <div
               ref={ganttWrapperRef}
-              style={{ fontSize: 12, position: 'relative', overflow: 'auto', height: 'calc(100dvh - 310px)', minHeight: 300 }}
+              style={{ fontSize: 12, position: 'relative', overflow: 'hidden', height: 'calc(100dvh - 310px)', minHeight: 300 }}
               onMouseMove={handleGanttMouseMove}
             >
               <Gantt
@@ -931,6 +977,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
                 TaskListTable={TaskListTable}
                 TooltipContent={GanttTooltip}
                 onClick={handleGanttClick}
+                ganttHeight={ganttBodyHeight || undefined}
               />
               {/* Today line — height = full Gantt content height (rowHeight × rows + header) */}
               {todayLineX !== null && (
