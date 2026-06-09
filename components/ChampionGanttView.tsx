@@ -43,8 +43,8 @@ const STATUS_BG_SELECTED: Record<MilestoneStatus, string> = {
   delayed: 'rgba(239,68,68,0.32)',
   completed: 'rgba(34,197,94,0.32)',
 }
-const FUTURE_BG = 'rgba(203,213,225,0.2)'
-const FUTURE_BG_SELECTED = 'rgba(203,213,225,0.35)'
+const FUTURE_BG = 'rgba(203,213,225,0.45)'
+const FUTURE_BG_SELECTED = 'rgba(203,213,225,0.62)'
 
 function getMondayOf(date: Date): Date {
   const d = new Date(date)
@@ -581,6 +581,21 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
   const listWidth = W.name + W.dept + projectW + W.charter
 
+  // Inject scrollbar CSS into document.head so it always wins the cascade over the library's stylesheet
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.id = 'gantt-scrollbar-override'
+    style.textContent = [
+      '._2k9Ys { overflow: scroll !important; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.35) rgba(0,0,0,0.08); }',
+      '._2k9Ys::-webkit-scrollbar { height: 10px !important; width: 10px !important; }',
+      '._2k9Ys::-webkit-scrollbar-track { background: rgba(0,0,0,0.06); border-radius: 5px; }',
+      '._2k9Ys::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.38) !important; border-radius: 5px; border: 2px solid transparent !important; background-clip: padding-box !important; }',
+      '._2k9Ys::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.55) !important; }',
+    ].join('\n')
+    document.head.appendChild(style)
+    return () => { document.getElementById('gantt-scrollbar-override')?.remove() }
+  }, [])
+
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     resizeDragRef.current = { startX: e.clientX, startW: projectW }
@@ -708,11 +723,12 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     if (viewMode !== ViewMode.Week || !ganttWrapperRef.current) return
     const year = new Date().getFullYear()
     const apply = () => {
-      ganttWrapperRef.current?.querySelectorAll<SVGTextElement>('._2q1Kt').forEach(el => {
+      // _9w8d5 = calendarBottomText (week numbers); _2q1Kt = calendarTopText (month names)
+      ganttWrapperRef.current?.querySelectorAll<SVGTextElement>('._9w8d5').forEach(el => {
         const m = el.textContent?.match(/^W(\d+)$/)
         if (!m) return
         const mon = getMondayOfISOWeek(parseInt(m[1], 10), year)
-        el.textContent = `W${m[1]} ${mon.getMonth() + 1}/${mon.getDate()}`
+        el.textContent = `W${m[1]} (${mon.getMonth() + 1}/${mon.getDate()})`
       })
     }
     apply()
@@ -808,13 +824,6 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
-      <style>{`
-        ._2k9Ys { overflow-x: scroll !important; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.3) rgba(0,0,0,0.08); }
-        ._2k9Ys::-webkit-scrollbar { height: 8px !important; }
-        ._2k9Ys::-webkit-scrollbar-track { background: rgba(0,0,0,0.06); border-radius: 4px; }
-        ._2k9Ys::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.28) !important; border-radius: 4px; border: none !important; background-clip: padding-box !important; }
-        ._2k9Ys::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.45) !important; }
-      `}</style>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         {(noCharter.length > 0 || noMilestone.length > 0) && (
           <div style={{
