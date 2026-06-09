@@ -38,7 +38,7 @@ const STATUS_BG: Record<string, string> = {
 
 function stripHtml(html: string) { return html.replace(/<[^>]*>/g, '').trim() }
 
-export default function CharterPopupClient({ charter, milestones }: { charter: Charter; milestones: Milestone[] }) {
+export default function CharterPopupClient({ charter, milestones, isAdmin = false }: { charter: Charter; milestones: Milestone[]; isAdmin?: boolean }) {
   const [approvedAt, setApprovedAt] = useState<string | null>(charter.admin_approved_at)
   const [approving, setApproving] = useState(false)
 
@@ -95,11 +95,12 @@ export default function CharterPopupClient({ charter, milestones }: { charter: C
           <span style={{ fontSize: 11, color: 'var(--text-disabled)' }}>
             {new Date(charter.updated_at).toLocaleString('ko-KR')}
           </span>
-          {approvedAt ? (
+          {approvedAt && (
             <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 999, background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}>
               ✓ 승인됨
             </span>
-          ) : (
+          )}
+          {isAdmin && !approvedAt && (
             <button
               onClick={handleApprove}
               disabled={approving}

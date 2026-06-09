@@ -17,7 +17,8 @@ type CharterWithUser = {
 export default async function CharterPopupPage({ params }: { params: { id: string } }) {
   const userClient = createUserServerClient()
   const { data: { user } } = await userClient.auth.getUser()
-  if (!user?.user_metadata?.is_admin) redirect('/admin/login')
+  if (!user) redirect('/login')
+  const isAdmin = !!user.user_metadata?.is_admin
 
   const supabase = createServiceClient()
 
@@ -46,5 +47,5 @@ export default async function CharterPopupPage({ params }: { params: { id: strin
   const allMilestones = (milestonesResult.data ?? []) as Milestone[]
   const userMilestones = allMilestones.filter(m => m.user_id === charter.user_id)
 
-  return <CharterPopupClient charter={charter} milestones={userMilestones} />
+  return <CharterPopupClient charter={charter} milestones={userMilestones} isAdmin={isAdmin} />
 }
