@@ -10,11 +10,112 @@ import { Spinner } from '@/components/ui/spinner'
 
 
 const MS_STATUS_LABEL: Record<MilestoneStatus, string> = {
-  not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
+  not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연 / 미완료',
 }
 const MS_STATUS_COLOR: Record<MilestoneStatus, string> = {
   not_started: 'var(--text-disabled)', in_progress: 'var(--blue-600)',
   completed: 'var(--success)', delayed: 'var(--error)',
+}
+const MS_STATUS_BG: Record<MilestoneStatus, string> = {
+  not_started: 'rgba(148,163,184,0.12)', in_progress: 'rgba(37,99,235,0.10)',
+  completed: 'rgba(34,197,94,0.12)', delayed: 'rgba(248,113,113,0.12)',
+}
+
+function buildTree(milestones: Milestone[]): Milestone[] {
+  const map = new Map<string, Milestone & { children: Milestone[] }>()
+  milestones.forEach(m => map.set(m.id, { ...m, children: [] }))
+  const roots: (Milestone & { children: Milestone[] })[] = []
+  map.forEach(m => {
+    if (m.parent_milestone_id && map.has(m.parent_milestone_id)) {
+      map.get(m.parent_milestone_id)!.children.push(m)
+    } else {
+      roots.push(m)
+    }
+  })
+  const sort = (arr: Milestone[]) => arr.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+  map.forEach(m => sort(m.children))
+  return sort(roots)
+}
+
+function MilestoneRow({ m, depth = 0 }: { m: Milestone & { children?: Milestone[] }; depth?: number }) {
+  const color = MS_STATUS_COLOR[m.status]
+  const bg = MS_STATUS_BG[m.status]
+  const children = (m.children ?? []) as (Milestone & { children?: Milestone[] })[]
+  const isParent = depth === 0
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0,
+        marginLeft: depth > 0 ? 20 : 0,
+        position: 'relative',
+      }}>
+        {/* Tree connector for children */}
+        {depth > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginRight: 6 }}>
+            <div style={{ width: 12, height: 1, background: '#cbd5e1', flexShrink: 0 }} />
+          </div>
+        )}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: isParent ? '9px 12px' : '6px 10px',
+          borderRadius: isParent ? 8 : 6,
+          background: isParent ? '#ffffff' : '#f8fafc',
+          border: isParent ? `1.5px solid #e2e8f0` : '1px solid #e2e8f0',
+          borderLeft: isParent ? `3px solid ${color}` : `2px solid ${color}40`,
+          boxShadow: isParent ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+        }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {m.week_number != null && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-disabled)', flexShrink: 0 }}>{m.week_number}주차</span>
+              )}
+              <p style={{
+                fontSize: isParent ? 13 : 12,
+                fontWeight: isParent ? 600 : 500,
+                color: 'var(--text-primary)',
+                margin: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>{m.title}</p>
+            </div>
+            {(m.start_date || m.due_date) && (
+              <p style={{ fontSize: 10, color: 'var(--text-disabled)', margin: '2px 0 0 0' }}>
+                {m.start_date ?? ''}{m.start_date && m.due_date ? ' – ' : ''}{m.due_date ?? ''}
+              </p>
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 5, color, background: bg, flexShrink: 0, marginLeft: 8 }}>
+            {MS_STATUS_LABEL[m.status]}
+          </span>
+        </div>
+      </div>
+
+      {/* Children with vertical line */}
+      {children.length > 0 && (
+        <div style={{ position: 'relative', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Vertical connector line */}
+          <div style={{
+            position: 'absolute',
+            left: depth === 0 ? 20 : 20 + 20,
+            top: 0,
+            bottom: 6,
+            width: 1,
+            background: '#cbd5e1',
+          }} />
+          {children.map((c) => (
+            <MilestoneRow key={c.id} m={c as Milestone & { children?: Milestone[] }} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 const SUB_STATUS_LABEL: Record<string, string> = {
   pending: '검토 중', accepted: '합격', declined: '불합격',
@@ -42,6 +143,7 @@ const CHARTER_SECTIONS = [
 ]
 
 type SubWithComments = Submission & { comments?: Comment[] }
+type CharterComment = { id: string; body: string; author_role: 'admin' | 'user'; created_at: string }
 
 export default function AdminChampionPage() {
   const { userId } = useParams<{ userId: string }>()
@@ -50,6 +152,11 @@ export default function AdminChampionPage() {
   const [submissions, setSubmissions] = useState<SubWithComments[]>([])
   const [loading, setLoading] = useState(true)
   const [approving, setApproving] = useState(false)
+
+  // charter comments
+  const [charterComments, setCharterComments] = useState<CharterComment[]>([])
+  const [newCharterComment, setNewCharterComment] = useState('')
+  const [postingCharter, setPostingCharter] = useState(false)
 
   // feedback confirm flow
   const [confirmingSubId, setConfirmingSubId] = useState<string | null>(null)
@@ -66,15 +173,40 @@ export default function AdminChampionPage() {
     return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
   }
 
+  function loadCharterComments(charterId: string) {
+    return apiFetch<CharterComment[]>(`/api/charter/submissions/${charterId}/comments`).then(setCharterComments).catch(() => {})
+  }
+
   useEffect(() => {
     Promise.all([
-      apiFetch<ChampionProject>(`/api/champions/${userId}`).then(setData),
+      apiFetch<ChampionProject>(`/api/champions/${userId}`).then(d => {
+        setData(d)
+        if (d.charter?.id) loadCharterComments(d.charter.id)
+      }),
       loadSubs(),
     ])
       .catch(() => toast.error('데이터 로드 실패'))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
+
+  async function postCharterComment() {
+    if (!data?.charter?.id || !newCharterComment.trim()) return
+    setPostingCharter(true)
+    try {
+      await apiFetch(`/api/charter/submissions/${data.charter.id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ body: newCharterComment.trim() }),
+      })
+      toast.success('코멘트가 작성되었습니다.')
+      setNewCharterComment('')
+      await loadCharterComments(data.charter.id)
+    } catch {
+      toast.error('코멘트 작성 실패')
+    } finally {
+      setPostingCharter(false)
+    }
+  }
 
   async function approveCharter(charterId: string) {
     setApproving(true)
@@ -408,19 +540,11 @@ export default function AdminChampionPage() {
 
             {/* 06. Timeline · Milestones */}
             <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>06. Timeline · Milestones</p>
+              <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>06. Timeline · Milestones</p>
               {(data.milestones ?? []).length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {(data.milestones ?? []).map((m: Milestone) => (
-                    <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
-                      <div>
-                        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
-                        {m.due_date && <p className="text-xs" style={{ color: 'var(--text-disabled)', margin: '2px 0 0 0' }}>{m.start_date ?? ''} – {m.due_date}</p>}
-                      </div>
-                      <span className="text-xs font-semibold px-2 py-1 rounded-md flex-shrink-0" style={{ color: MS_STATUS_COLOR[m.status], background: `${MS_STATUS_COLOR[m.status]}20` }}>
-                        {MS_STATUS_LABEL[m.status]}
-                      </span>
-                    </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {buildTree(data.milestones ?? []).map(m => (
+                    <MilestoneRow key={m.id} m={m as Milestone & { children?: Milestone[] }} depth={0} />
                   ))}
                 </div>
               ) : (
@@ -438,6 +562,63 @@ export default function AdminChampionPage() {
               ) : (
                 <p className="text-xs italic" style={{ color: 'var(--text-disabled)', margin: 0 }}>(내용 없음)</p>
               )}
+            </div>
+
+            {/* 과제정의서 코멘트 */}
+            <div className="rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                  과제정의서 코멘트 {charterComments.length > 0 ? `(${charterComments.length})` : ''}
+                </p>
+              </div>
+              <div className="p-3 flex flex-col gap-2">
+                {charterComments.length > 0 && (
+                  <div className="flex flex-col gap-1.5 mb-1">
+                    {charterComments.map(c => (
+                      <div
+                        key={c.id}
+                        className="rounded-md border p-2 text-xs"
+                        style={{
+                          background: c.author_role === 'admin' ? 'rgba(37,99,235,0.04)' : 'var(--surface-secondary)',
+                          borderColor: 'var(--border-subtle)',
+                        }}
+                      >
+                        <div className="flex justify-between mb-0.5">
+                          <span className="font-semibold" style={{ color: c.author_role === 'admin' ? 'var(--blue-600)' : 'var(--text-primary)' }}>
+                            {c.author_role === 'admin' ? '관리자' : '챔피언'}
+                          </span>
+                          <span style={{ color: 'var(--text-disabled)' }}>{relativeTime(c.created_at)}</span>
+                        </div>
+                        <p className="whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{c.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <textarea
+                    value={newCharterComment}
+                    onChange={e => setNewCharterComment(e.target.value)}
+                    onKeyDown={e => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault()
+                        postCharterComment()
+                      }
+                    }}
+                    placeholder="과제정의서에 대한 코멘트 작성 (Cmd+Enter)"
+                    rows={2}
+                    className="flex-1 text-xs rounded-md border p-2 resize-none"
+                    style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                  />
+                  <button
+                    onClick={postCharterComment}
+                    disabled={postingCharter || !newCharterComment.trim()}
+                    className="text-xs inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-semibold disabled:opacity-40 self-end"
+                    style={{ background: 'var(--blue-600)', color: '#fff', cursor: 'pointer', border: 'none' }}
+                  >
+                    {postingCharter ? <Spinner size="sm" /> : <Send className="h-3 w-3" />}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
