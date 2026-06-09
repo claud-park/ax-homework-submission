@@ -1,11 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-
 export default function AdminLoginPage() {
   const supabase = createSupabaseBrowserClient()
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +19,7 @@ export default function AdminLoginPage() {
       await supabase.auth.signOut()
       return
     }
-    router.push('/admin')
+    window.location.href = '/admin'
   }
 
   return (
