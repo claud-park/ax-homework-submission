@@ -10,7 +10,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data, error } = await supabase
     .from('charter_submissions')
-    .update({ admin_approved_at: new Date().toISOString() })
+    .update({ admin_approved_at: new Date().toISOString(), publish_status: 'published' })
     .eq('id', params.id)
     .select()
     .single()
