@@ -1,7 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
-import { apiFetch } from '@/lib/api-client'
+import { useEffect, useMemo, useState } from 'react'
 import type { Milestone, User } from '@/lib/types'
 
 type MilestoneWithUser = Milestone & { users: User }
@@ -38,7 +36,7 @@ const CHARTER_SECTIONS: { key: string; label: string }[] = [
 ]
 
 const STATUS_LABEL: Record<string, string> = {
-  not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연',
+  not_started: '미시작', in_progress: '진행 중', completed: '완료', delayed: '지연 / 미완료',
 }
 const STATUS_COLOR: Record<string, string> = {
   not_started: 'var(--text-disabled)', in_progress: 'var(--amber)', completed: 'var(--success)', delayed: 'var(--error)',
@@ -198,183 +196,6 @@ function CharterCard({ charter, onClick }: { charter: CharterWithUser; onClick: 
   )
 }
 
-// ─── Charter side panel ───────────────────────────────────────────────────────
-
-function CharterPanel({ charter, userMilestones, onClose, onApprove }: { charter: CharterWithUser; userMilestones: MilestoneWithUser[]; onClose: () => void; onApprove: (approvedAt: string) => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [approving, setApproving] = useState(false)
-  const [approvedAt, setApprovedAt] = useState<string | null>(charter.admin_approved_at)
-
-  async function handleApprove() {
-    setApproving(true)
-    try {
-      const updated = await apiFetch<{ admin_approved_at: string }>(`/api/admin/charters/${charter.id}/approve`, { method: 'POST' })
-      setApprovedAt(updated.admin_approved_at)
-      onApprove(updated.admin_approved_at)
-      toast.success('과제정의서가 승인되었습니다.')
-    } catch {
-      toast.error('승인 처리에 실패했습니다.')
-    } finally {
-      setApproving(false)
-    }
-  }
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.25)',
-        }}
-      />
-      {/* Panel */}
-      <div
-        ref={ref}
-        style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0,
-          width: '480px', zIndex: 201,
-          background: 'var(--surface-primary)',
-          borderLeft: '1px solid var(--border-subtle)',
-          display: 'flex', flexDirection: 'column',
-          boxShadow: '-8px 0 40px rgba(0,0,0,0.15)',
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
-          background: 'var(--surface-secondary)', flexShrink: 0,
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: '16px', color: 'var(--text-secondary)', padding: '2px 6px',
-              borderRadius: '6px', lineHeight: 1,
-            }}
-          >
-            ✕
-          </button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--blue-600)', background: 'rgba(37,99,235,0.12)', padding: '1px 6px', borderRadius: '4px', letterSpacing: '0.04em' }}>
-                과제정의서
-              </span>
-            </div>
-            <p style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {charter.project_name || '(제목 없음)'}
-            </p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {approvedAt ? (
-              <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '999px', background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}>
-                ✓ 승인됨
-              </span>
-            ) : (
-              <button
-                onClick={handleApprove}
-                disabled={approving}
-                style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '999px', background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer', opacity: approving ? 0.6 : 1 }}
-              >
-                {approving ? '처리 중…' : '✓ 승인'}
-              </button>
-            )}
-            <UserAvatar user={charter.users} size={24} />
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{charter.users.name}</span>
-          </div>
-        </div>
-
-        {/* Meta */}
-        <div style={{
-          padding: '8px 18px', borderBottom: '1px solid var(--border-subtle)',
-          display: 'flex', gap: '16px', flexShrink: 0, background: 'var(--surface-secondary)',
-        }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
-            제출: {new Date(charter.submitted_at).toLocaleString('ko-KR')}
-          </span>
-          <span style={{ fontSize: '11px', color: 'var(--text-disabled)' }}>
-            수정: {new Date(charter.updated_at).toLocaleString('ko-KR')}
-          </span>
-        </div>
-
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '18px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {/* 00–05 Text sections */}
-            {CHARTER_SECTIONS.map(({ key, label }) => {
-              const html = charter.content[key] ?? ''
-              const text = stripHtml(html)
-              return (
-                <div key={key}>
-                  <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px 0', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                    {label}
-                  </p>
-                  {text ? (
-                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.65, background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
-                      <div className="charter-editor">
-                        <div className="ProseMirror" style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit' }} dangerouslySetInnerHTML={{ __html: html }} />
-                      </div>
-                    </div>
-                  ) : (
-                    <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(내용 없음)</p>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* 06. Timeline · Milestones */}
-            <div>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px 0', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                06. Timeline · Milestones
-              </p>
-              {userMilestones.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {userMilestones.map(m => (
-                    <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }}>
-                      <div>
-                        <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
-                        {m.due_date && <p style={{ fontSize: '11px', color: 'var(--text-disabled)', margin: '2px 0 0 0' }}>{m.start_date ?? ''} – {m.due_date}</p>}
-                      </div>
-                      <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px', color: STATUS_COLOR[m.status], background: STATUS_BG[m.status], flexShrink: 0 }}>
-                        {STATUS_LABEL[m.status]}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(마일스톤 없음)</p>
-              )}
-            </div>
-
-            {/* 07. 마무리 */}
-            <div>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 6px 0', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                07. Closing · 마무리
-              </p>
-              {stripHtml(charter.content.closing ?? '') ? (
-                <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.65, background: 'var(--surface-secondary)', borderRadius: '8px', padding: '10px 14px', border: '1px solid var(--border-subtle)' }}>
-                  <div className="charter-editor">
-                    <div className="ProseMirror" style={{ padding: 0, fontSize: 'inherit', lineHeight: 'inherit' }} dangerouslySetInnerHTML={{ __html: charter.content.closing ?? '' }} />
-                  </div>
-                </div>
-              ) : (
-                <p style={{ fontSize: '12px', color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0 }}>(내용 없음)</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
 
 // ─── Champion section (user view) ─────────────────────────────────────────────
 
@@ -430,7 +251,19 @@ export function ProgressClient({ initialMilestones, initialCharters }: ClientPro
   const [milestones] = useState(initialMilestones)
   const [charters, setCharters] = useState(initialCharters)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set(initialMilestones.map(m => m.user_id)))
-  const [selectedCharter, setSelectedCharter] = useState<CharterWithUser | null>(null)
+
+  // popup에서 승인 완료 시 postMessage로 상태 동기화
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return
+      if (e.data?.type === 'charter_approved') {
+        const { charterId, approvedAt } = e.data as { charterId: string; approvedAt: string }
+        setCharters(prev => prev.map(c => c.id === charterId ? { ...c, admin_approved_at: approvedAt } : c))
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
 
   const users = useMemo(
     () => Array.from(new Map(milestones.map(m => [m.user_id, m.users])).values()),
@@ -463,6 +296,14 @@ export function ProgressClient({ initialMilestones, initialCharters }: ClientPro
       else next.add(userId)
       return next
     })
+  }
+
+  function openCharterPopup(charter: CharterWithUser) {
+    window.open(
+      `/charter-popup/${charter.id}`,
+      `charter-popup-${charter.id}`,
+      'width=800,height=920,resizable=yes,scrollbars=yes',
+    )
   }
 
   return (
@@ -505,26 +346,12 @@ export function ProgressClient({ initialMilestones, initialCharters }: ClientPro
                 user={user}
                 milestones={ums}
                 charters={ucs}
-                onCharterClick={setSelectedCharter}
+                onCharterClick={openCharterPopup}
               />
             ))
           : <p style={{ color: 'var(--text-disabled)', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>표시할 챔피언이 없습니다.</p>
         }
       </div>
-
-      {/* Charter side panel */}
-      {selectedCharter && (
-        <CharterPanel
-          charter={selectedCharter}
-          userMilestones={milestones.filter(m => m.user_id === selectedCharter.user_id)}
-          onClose={() => setSelectedCharter(null)}
-          onApprove={approvedAt => {
-            const approved = selectedCharter ? { ...selectedCharter, admin_approved_at: approvedAt } : null
-            setSelectedCharter(approved)
-            if (approved) setCharters(prev => prev.map(c => c.id === approved.id ? approved : c))
-          }}
-        />
-      )}
     </div>
   )
 }
