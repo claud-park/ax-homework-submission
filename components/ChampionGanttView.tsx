@@ -395,7 +395,7 @@ function makeTaskListTable(
                     onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
                   >
                     <button
-                      onClick={e => e.stopPropagation()}
+                      onClick={e => { e.stopPropagation(); onExpanderClick(t) }}
                       aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
@@ -448,7 +448,7 @@ function makeTaskListTable(
                 >
                   {isGroupRow && (
                     <button
-                      onClick={e => e.stopPropagation()}
+                      onClick={e => { e.stopPropagation(); onExpand(t) }}
                       aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
                       style={{
                         background: 'none', border: 'none', cursor: 'pointer',
@@ -581,16 +581,13 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
   const listWidth = W.name + W.dept + projectW + W.charter
 
-  // Inject scrollbar CSS into document.head so it always wins the cascade over the library's stylesheet
   useEffect(() => {
     const style = document.createElement('style')
     style.id = 'gantt-scrollbar-override'
     style.textContent = [
-      '._2k9Ys { overflow: scroll !important; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.35) rgba(0,0,0,0.08); }',
-      '._2k9Ys::-webkit-scrollbar { height: 10px !important; width: 10px !important; }',
-      '._2k9Ys::-webkit-scrollbar-track { background: rgba(0,0,0,0.06); border-radius: 5px; }',
-      '._2k9Ys::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.38) !important; border-radius: 5px; border: 2px solid transparent !important; background-clip: padding-box !important; }',
-      '._2k9Ys::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.55) !important; }',
+      '._2k9Ys { overflow: scroll !important; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.5) transparent; }',
+      '._2k9Ys::-webkit-scrollbar { -webkit-appearance: none !important; height: 7px !important; width: 7px !important; }',
+      '._2k9Ys::-webkit-scrollbar-thumb { border-radius: 4px !important; background-color: rgba(0,0,0,0.5) !important; box-shadow: 0 0 1px rgba(255,255,255,0.5) !important; }',
     ].join('\n')
     document.head.appendChild(style)
     return () => { document.getElementById('gantt-scrollbar-override')?.remove() }
@@ -723,7 +720,6 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     if (viewMode !== ViewMode.Week || !ganttWrapperRef.current) return
     const year = new Date().getFullYear()
     const apply = () => {
-      // _9w8d5 = calendarBottomText (week numbers); _2q1Kt = calendarTopText (month names)
       ganttWrapperRef.current?.querySelectorAll<SVGTextElement>('._9w8d5').forEach(el => {
         const m = el.textContent?.match(/^W(\d+)$/)
         if (!m) return
