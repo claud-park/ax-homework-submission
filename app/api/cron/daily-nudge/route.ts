@@ -13,29 +13,16 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // admin 유저 ID 수집 (auth.users metadata 기준)
-  const { data: authUsers, error: authErr } = await supabase.auth.admin.listUsers({ perPage: 1000 })
-  if (authErr) {
-    console.error('[cron/daily-nudge] auth.listUsers error:', authErr)
-    return NextResponse.json({ error: 'Failed to fetch auth users' }, { status: 500 })
-  }
-  const adminIds = new Set(
-    authUsers.users
-      .filter(u => !!u.user_metadata?.is_admin)
-      .map(u => u.id)
-  )
-
-  // 모든 champion 유저 조회 (admin 제외)
-  const { data: users, error: usersErr } = await supabase
+  // user_group = 'champion' 인 유저만 조회
+  const { data: champions, error: usersErr } = await supabase
     .from('users')
     .select('id, email, name')
+    .eq('user_group', 'champion')
 
-  if (usersErr || !users) {
+  if (usersErr || !champions) {
     console.error('[cron/daily-nudge] users fetch error:', usersErr)
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
   }
-
-  const champions = users.filter(u => !adminIds.has(u.id))
 
   // 게시된 과제정의서 & 등록된 마일스톤 현황
   const [chartersResult, milestonesResult] = await Promise.all([
