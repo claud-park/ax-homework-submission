@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/daily-nudge",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}
