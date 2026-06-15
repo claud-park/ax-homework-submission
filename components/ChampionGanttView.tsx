@@ -5,6 +5,7 @@ import type { Task } from 'gantt-task-react'
 import 'gantt-task-react/dist/index.css'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { GanttChampion } from '@/app/api/champions/gantt/route'
 import type { MilestoneStatus } from '@/lib/types'
 import { NudgePopover, type NudgeType } from '@/components/NudgePopover'
@@ -197,11 +198,17 @@ function getMilestoneStyle(
   }
 }
 
+// Format a Date as a local YYYY-MM-DD string (avoids toISOString UTC day-shift in KST)
+function fmtLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 // Row hierarchy:
 //   champion row  : id='champ-{userId}',  type='project', no project
 //   group row     : id='group-{msId}',    type='project', project='champ-{userId}'
 //   task row      : id=msId,              type='task',    project='champ-{userId}' or 'group-{msId}'
-function toTasks(champions: GanttChampion[]): Task[] {
+// editableUserId: only this champion's leaf milestones are drag-editable (others/parents disabled)
+function toTasks(champions: GanttChampion[], editableUserId: string | null): Task[] {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
@@ -236,6 +243,7 @@ function toTasks(champions: GanttChampion[]): Task[] {
       progress: 0,
       hideChildren: false,
       displayOrder: tasks.length + 1,
+      isDisabled: true,
       styles: {
         backgroundColor: 'rgba(63,63,255,0.25)',
         backgroundSelectedColor: 'rgba(63,63,255,0.4)',
@@ -270,6 +278,8 @@ function toTasks(champions: GanttChampion[]): Task[] {
           end: end0,
           ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
           displayOrder: tasks.length + 1,
+          // Parent dates are derived from children (syncParentDates); editing happens on leaves only
+          isDisabled: true,
         })
 
         for (const m of children) {
@@ -287,6 +297,7 @@ function toTasks(champions: GanttChampion[]): Task[] {
             end,
             ...getMilestoneStyle(m.status, m.start_date, m.due_date, isFuture, todayStr),
             displayOrder: tasks.length + 1,
+            isDisabled: c.userId !== editableUserId,
           })
         }
       } else {
@@ -300,6 +311,7 @@ function toTasks(champions: GanttChampion[]): Task[] {
           end: end0,
           ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
           displayOrder: tasks.length + 1,
+          isDisabled: c.userId !== editableUserId,
         })
       }
     }
@@ -489,6 +501,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   const [alertCollapsed, setAlertCollapsed] = useState(false)
   const [loading, setLoading] = useState(!initialData)
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Week)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [projectW, setProjectW] = useState(PROJECT_W_DEFAULT)
   const resizeDragRef = useRef<{ startX: number; startW: number } | null>(null)
@@ -540,6 +553,12 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
       .finally(() => setLoading(false))
   }, [initialData])
 
+  // Identify the logged-in user so only their own milestones become drag-editable
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient()
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null))
+  }, [])
+
   // userId → champion (for charter panel and task list table)
   const champMap = useMemo(() => {
     const m = new Map<string, GanttChampion>()
@@ -575,7 +594,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     [championsWithMilestones, selectedChampions],
   )
 
-  const rawTasks = useMemo(() => toTasks(filteredChampions), [filteredChampions])
+  const rawTasks = useMemo(() => toTasks(filteredChampions, currentUserId), [filteredChampions, currentUserId])
 
   const tasks = useMemo(() => {
     const collapsedChamps = new Set<string>()
@@ -694,6 +713,62 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
       anchorY: lastMousePos.current.y + 12,
     })
   }, [isAdmin, milestoneMap])
+
+  // Drag taskbar on timeline → persist new start/due. Returns false to make the
+  // chart undo the drag when the save fails (gantt-task-react contract).
+  const handleDateChange = useCallback(async (task: Task): Promise<boolean> => {
+    const entry = milestoneMap.get(task.id)
+    if (!entry) return false
+    if (currentUserId == null || entry.userId !== currentUserId) return false
+
+    const start_date = fmtLocal(task.start)
+    const due_date = fmtLocal(task.end)
+    const snapshot = champions
+
+    // Optimistic update so the bar settles immediately
+    setChampions(prev => prev.map(c =>
+      c.userId === entry.userId
+        ? { ...c, milestones: c.milestones.map(m => m.id === task.id ? { ...m, start_date, due_date } : m) }
+        : c,
+    ))
+
+    try {
+      const res = await apiFetch<{
+        milestone: { id: string; start_date: string | null; due_date: string | null; status: MilestoneStatus }
+        parentUpdated: { id: string; start_date: string | null; due_date: string | null; status?: MilestoneStatus } | null
+      }>(`/api/milestones/${task.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ start_date, due_date }),
+      })
+
+      // Apply server truth: recomputed status on the dragged milestone + synced parent dates
+      setChampions(prev => prev.map(c => {
+        if (c.userId !== entry.userId) return c
+        return {
+          ...c,
+          milestones: c.milestones.map(m => {
+            if (m.id === res.milestone.id) {
+              return { ...m, start_date: res.milestone.start_date, due_date: res.milestone.due_date, status: res.milestone.status }
+            }
+            if (res.parentUpdated && m.id === res.parentUpdated.id) {
+              return {
+                ...m,
+                start_date: res.parentUpdated.start_date,
+                due_date: res.parentUpdated.due_date,
+                ...(res.parentUpdated.status ? { status: res.parentUpdated.status } : {}),
+              }
+            }
+            return m
+          }),
+        }
+      }))
+      return true
+    } catch (err) {
+      console.error('milestone date change failed', err)
+      setChampions(snapshot) // revert optimistic update
+      return false
+    }
+  }, [milestoneMap, currentUserId, champions])
 
   const TaskListHeader = useMemo(
     () => makeTaskListHeader(projectW, listWidth, handleResizeStart),
@@ -907,6 +982,8 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
                 TaskListTable={TaskListTable}
                 TooltipContent={GanttTooltip}
                 onClick={handleGanttClick}
+                onDateChange={handleDateChange}
+                timeStep={86400000}
                 ganttHeight={ganttBodyHeight || undefined}
               />
               {/* Today line — height = full Gantt content height (rowHeight × rows + header) */}
