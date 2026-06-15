@@ -371,6 +371,7 @@ function makeTaskListTable(
   listWidth: number,
   collapsedIds: Set<string>,
   onExpand: (t: Task) => void,
+  selfUserId: string | null,
 ) {
   function TaskListTable({ tasks, rowHeight, onExpanderClick, selectedTaskId, setSelectedTask, fontFamily, fontSize }: {
     rowHeight: number; rowWidth: string; fontFamily: string; fontSize: string; locale: string
@@ -385,17 +386,20 @@ function makeTaskListTable(
 
           const userId = isChampRow ? t.id.slice(6) : null
           const champ = userId ? champMap.get(userId) : null
+          const isSelf = isChampRow && !!selfUserId && userId === selfUserId
 
           return (
             <div
               key={t.id}
               role="row"
               tabIndex={0}
+              data-task-id={t.id}
+              data-task-project={t.project || ''}
               onClick={() => setSelectedTask(t.id)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTask(t.id) } }}
               style={{
                 display: 'flex', height: rowHeight, alignItems: 'center',
-                background: isSelected ? 'rgba(37,99,235,0.06)' : 'var(--background)',
+                background: isSelf ? 'rgba(37,99,235,0.10)' : isSelected ? 'rgba(37,99,235,0.06)' : 'var(--background)',
                 borderBottom: '1px solid var(--border-subtle)',
                 cursor: 'pointer',
               }}
@@ -423,6 +427,16 @@ function makeTaskListTable(
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {champ?.name ?? t.name}
                     </span>
+                    {isSelf && (
+                      <span style={{
+                        marginLeft: 6, flexShrink: 0, whiteSpace: 'nowrap',
+                        fontSize: 9, fontWeight: 700, lineHeight: 1.4,
+                        padding: '1px 6px', borderRadius: 10,
+                        background: 'var(--blue-600)', color: '#fff',
+                      }}>
+                        내 과제
+                      </span>
+                    )}
                   </div>
                   <div style={cell(W.dept, { color: 'var(--text-secondary)', fontSize: 11 })}>
                     {champ?.department || '—'}
@@ -584,10 +598,17 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     () => champions.filter(c => !!c.charterSubmissionId && c.milestones.length === 0),
     [champions],
   )
-  const championsWithMilestones = useMemo(
-    () => champions.filter(c => c.milestones.length > 0),
-    [champions],
-  )
+  const championsWithMilestones = useMemo(() => {
+    const list = champions.filter(c => c.milestones.length > 0)
+    // Champion view only: pin the current user's own section to the top (chips + gantt rows).
+    // This also keeps the user's own row near the top of the scroll area so expanding it
+    // reveals its sub-milestones in view (a bottom-row expand would render them below the fold).
+    if (isAdmin || !currentUserId) return list
+    const self = list.filter(c => c.userId === currentUserId)
+    if (self.length === 0) return list
+    const others = list.filter(c => c.userId !== currentUserId)
+    return [...self, ...others]
+  }, [champions, isAdmin, currentUserId])
 
   const filteredChampions = useMemo(
     () => championsWithMilestones.filter(c => selectedChampions.has(c.userId)),
@@ -776,18 +797,57 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   )
 
   const TaskListTable = useMemo(
-    () => makeTaskListTable(champMap, handleCharterClick, projectW, listWidth, collapsedIds, handleExpandChange),
+    () => makeTaskListTable(champMap, handleCharterClick, projectW, listWidth, collapsedIds, handleExpandChange, isAdmin ? null : currentUserId),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [champMap, handleCharterClick, projectW, listWidth, collapsedIds],
+    [champMap, handleCharterClick, projectW, listWidth, collapsedIds, isAdmin, currentUserId],
   )
 
+  // After expanding a row, scroll its newly-revealed children into view if they fall below
+  // the gantt's visible area. Dispatching a wheel event on the gantt wrapper keeps the task-list
+  // and chart panes in sync (gantt drives both panes from a single scrollY via its wheel handler).
+  const revealChildren = useCallback((taskId: string) => {
+    const outer = ganttWrapperRef.current
+    if (!outer) return
+    // Wait for the expanded rows to commit + lay out (double rAF) before measuring/scrolling.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const wrapper = outer.querySelector<HTMLElement>('div[tabindex="0"]')
+      const domRows = Array.from(outer.querySelectorAll<HTMLElement>('[data-task-id]'))
+      const idx = domRows.findIndex(r => r.dataset.taskId === taskId)
+      if (!wrapper || idx < 0) return
+
+      const isChamp = taskId.startsWith('champ-')
+      let last = domRows[idx]
+      for (let i = idx + 1; i < domRows.length; i++) {
+        const id = domRows[i].dataset.taskId || ''
+        if (isChamp) { if (id.startsWith('champ-')) break }
+        else if (domRows[i].dataset.taskProject !== taskId) break
+        last = domRows[i]
+      }
+      if (last === domRows[idx]) return // no children rendered
+
+      const wrapBox = wrapper.getBoundingClientRect()
+      const overflow = last.getBoundingClientRect().bottom - wrapBox.bottom
+      if (overflow <= 0) return // children already visible
+
+      // Scroll down just enough to reveal the children, but never push the parent above the header.
+      const HEADER = 52
+      const maxDelta = Math.max(0, domRows[idx].getBoundingClientRect().top - (wrapBox.top + HEADER))
+      const delta = Math.min(overflow + 12, maxDelta)
+      if (delta > 1) {
+        wrapper.dispatchEvent(new WheelEvent('wheel', { deltaY: delta, bubbles: true, cancelable: true }))
+      }
+    }))
+  }, [])
+
   function handleExpandChange(task: Task) {
+    const willExpand = collapsedIds.has(task.id)
     setCollapsedIds(prev => {
       const next = new Set(prev)
       if (next.has(task.id)) next.delete(task.id)
       else next.add(task.id)
       return next
     })
+    if (willExpand) revealChildren(task.id)
   }
 
   function toggleChampion(userId: string) {
@@ -906,6 +966,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
         >
           {championsWithMilestones.map(c => {
             const active = selectedChampions.has(c.userId)
+            const isSelf = !isAdmin && !!currentUserId && c.userId === currentUserId
             return (
               <button
                 key={c.userId}
@@ -914,10 +975,10 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
                 style={{
                   display: 'flex', alignItems: 'center', gap: '5px',
                   padding: '4px 10px', borderRadius: '20px',
-                  border: `1px solid ${active ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
+                  border: `1px solid ${active || isSelf ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
                   background: active ? 'rgba(37,99,235,0.1)' : 'var(--surface-primary)',
-                  color: active ? 'var(--blue-600)' : 'var(--text-secondary)',
-                  fontSize: '12px', fontWeight: active ? 600 : 400,
+                  color: active || isSelf ? 'var(--blue-600)' : 'var(--text-secondary)',
+                  fontSize: '12px', fontWeight: active || isSelf ? 600 : 400,
                   cursor: 'pointer',
                 }}
               >
@@ -931,6 +992,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
                   {c.name[0]}
                 </span>
                 {c.name}
+                {isSelf && <span style={{ marginLeft: 2, fontSize: 9, fontWeight: 700 }}>· 나</span>}
               </button>
             )
           })}
