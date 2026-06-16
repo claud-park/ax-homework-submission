@@ -1,4 +1,5 @@
 'use client'
+import type { CSSProperties } from 'react'
 import DateRangePicker from '@/components/DateRangePicker'
 
 export interface DraftMilestone {
@@ -11,7 +12,7 @@ export interface DraftMilestone {
   children?: DraftMilestone[]
 }
 
-const INPUT: React.CSSProperties = {
+const INPUT: CSSProperties = {
   fontSize: 13, padding: '6px 8px', borderRadius: 6,
   border: '1px solid var(--border)', background: 'var(--background)',
   color: 'var(--text-primary)', width: '100%',

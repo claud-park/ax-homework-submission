@@ -58,11 +58,13 @@ export async function POST(req: NextRequest) {
       }
     }
     return NextResponse.json({ milestones: created }, { status: 201 })
-  } catch {
+  } catch (err) {
     // Roll back everything created in this batch so the user never sees a partial save.
     if (createdIds.length) {
-      await supabase.from('milestones').delete().in('id', createdIds).eq('user_id', user.id)
+      const { error: rollbackError } = await supabase.from('milestones').delete().in('id', createdIds).eq('user_id', user.id)
+      if (rollbackError) console.error('milestone batch rollback failed', { userId: user.id, createdIds, rollbackError })
     }
+    console.error('milestone batch insert failed', err)
     return NextResponse.json({ error: 'batch_failed' }, { status: 500 })
   }
 }

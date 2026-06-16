@@ -18,7 +18,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const prompt: string | undefined = body?.prompt
   const useCharter: boolean = body?.useCharter !== false
-  const startDate: string = body?.startDate || new Date().toISOString().slice(0, 10)
+  const rawStart: unknown = body?.startDate
+  const startDate: string =
+    typeof rawStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawStart)
+      ? rawStart
+      : new Date().toISOString().slice(0, 10)
 
   let charter: CharterContent = {}
   if (useCharter) {

@@ -42,6 +42,7 @@ export default function MilestoneDraftDrawer({
 
   const hasInvalid = rows.length === 0 || rows.some(r => !r.title.trim() ||
     (r.children ?? []).some(c => !c.title.trim()))
+  const totalCount = rows.reduce((sum, r) => sum + 1 + (r.children?.length ?? 0), 0)
 
   async function handleGenerate() {
     setGenerating(true)
@@ -193,7 +194,7 @@ export default function MilestoneDraftDrawer({
           <button type="button" onClick={handleSave} disabled={hasInvalid || saving}
             className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
             style={{ background: 'var(--blue-600)', color: '#fff' }}>
-            {saving ? '저장 중…' : `${rows.length}개 마일스톤 저장`}
+            {saving ? '저장 중…' : `${totalCount}개 마일스톤 저장`}
           </button>
         </div>
       </div>
