@@ -173,9 +173,10 @@ ALTER TABLE milestones
 
 | 라이브러리 | 용도 |
 |---|---|
-| `ai` (Vercel AI SDK v6) | `generateText` + `Output.object` 구조화 출력, `gateway()` 프로바이더 |
+| `ai` (Vercel AI SDK v6) | `generateText` + `Output.object` 구조화 출력 |
+| `@ai-sdk/anthropic` | Anthropic 프로바이더 직접 연결 (`claude-haiku-4-5` 기본) |
 | `zod` | AI 출력 스키마 검증 |
 
-**환경변수 추가**: `AI_GATEWAY_API_KEY`(로컬; 운영 Vercel은 OIDC 자동 주입) + `MILESTONE_AI_MODEL`(선택, 기본 `anthropic/claude-haiku-4-5`).
+**환경변수 추가**: `ANTHROPIC_API_KEY`(필수, 서버 전용) + `MILESTONE_AI_MODEL`(선택, 기본 `claude-haiku-4-5`).
 
-> 구현 메모: `generateObject`는 AI SDK v6에서 deprecated → `generateText` + `Output.object({ schema })`로 구현. LLM 연결은 **Vercel AI Gateway**(`gateway(MODEL)`)를 채택 — Vercel 전용 배포라 운영에서 OIDC 토큰 자동 주입(키 불필요), 관측성·프로바이더 failover 확보.
+> 구현 메모: `generateObject`는 AI SDK v6에서 deprecated → `generateText` + `Output.object({ schema })`로 구현. LLM 연결은 **Anthropic 직접 연결**(`@ai-sdk/anthropic`)을 채택 — Vercel AI Gateway는 카드 등록(검증)을 요구해서, 그걸 피하려 직접 연결로 결정. 키는 서버 라우트에서만 읽히고 클라이언트에 노출되지 않음. 비용 보호는 Anthropic 콘솔의 spend limit으로.
