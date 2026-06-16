@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateObject, gateway } from 'ai'
+import { generateText, Output, gateway } from 'ai'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import {
@@ -37,12 +37,12 @@ export async function POST(req: NextRequest) {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const { object } = await generateObject({
+      const { output } = await generateText({
         model: gateway(MODEL),
-        schema: GenerationOutputSchema,
+        output: Output.object({ schema: GenerationOutputSchema }),
         prompt: fullPrompt,
       })
-      const scheduled = scheduleRelativeMilestones(startDate, object.milestones)
+      const scheduled = scheduleRelativeMilestones(startDate, output.milestones)
       return NextResponse.json({ milestones: scheduled })
     } catch {
       if (attempt === 1) {
