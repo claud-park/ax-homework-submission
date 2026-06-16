@@ -6,6 +6,7 @@ import type { Milestone } from '@/lib/types'
 import { TEMPLATES } from '@/lib/milestone-templates'
 import { scheduleRelativeMilestones } from '@/lib/milestone-schedule'
 import MilestoneDraftRow, { type DraftMilestone } from './MilestoneDraftRow'
+import { Spinner } from '@/components/ui/spinner'
 
 type Tab = 'ai' | 'template' | 'direct'
 type Scheduled = { title: string; description?: string; start_date: string; due_date: string; children?: Scheduled[] }
@@ -134,9 +135,9 @@ export default function MilestoneDraftDrawer({
         <div className="px-4 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
           {tab === 'ai' && (
             <div className="flex flex-col gap-2">
-              <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={2}
+              <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={5}
                 placeholder="(선택) 예: 8주 출시 일정, 격주 데모 포함"
-                style={{ fontSize: 13, padding: 8, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }} />
+                style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)', width: '100%', resize: 'none' }} />
               <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 <input type="checkbox" checked={useCharter} onChange={e => setUseCharter(e.target.checked)} />
                 Charter 내용 활용
@@ -146,10 +147,15 @@ export default function MilestoneDraftDrawer({
                   style={{ fontSize: 13, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }} />
               </label>
               <button type="button" onClick={handleGenerate} disabled={generating}
-                className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50 self-start"
+                className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50 self-start flex items-center gap-1.5"
                 style={{ background: 'var(--blue-600)', color: '#fff' }}>
-                {generating ? '생성 중…' : '✨ 생성'}
+                {generating ? (<><Spinner size="sm" className="text-white" /> 생성 중…</>) : '✨ 생성'}
               </button>
+              {generating && (
+                <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                  <Spinner size="sm" /> AI가 Charter를 읽고 마일스톤을 구성하고 있어요…
+                </p>
+              )}
             </div>
           )}
           {tab === 'template' && (
