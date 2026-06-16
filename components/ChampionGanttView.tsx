@@ -10,6 +10,7 @@ import type { GanttChampion } from '@/app/api/champions/gantt/route'
 import type { MilestoneStatus } from '@/lib/types'
 import { NudgePopover, type NudgeType } from '@/components/NudgePopover'
 import type { GanttMilestone } from '@/app/api/champions/gantt/route'
+import { orderMilestonesForGantt } from '@/lib/gantt-order'
 
 interface NudgeState {
   userId: string
@@ -217,8 +218,11 @@ function toTasks(champions: GanttChampion[], editableUserId: string | null): Tas
   for (const c of champions) {
     if (c.milestones.length === 0) continue
 
-    const depth0 = c.milestones.filter(m => !m.parent_milestone_id)
-    const depth1 = c.milestones.filter(m => !!m.parent_milestone_id)
+    // Deterministically order by display_order (mirrors charter drag order);
+    // the raw payload order relies on fragile SQL tie-breaking, so re-sort here.
+    const ordered = orderMilestonesForGantt(c.milestones)
+    const depth0 = ordered.filter(m => !m.parent_milestone_id)
+    const depth1 = ordered.filter(m => !!m.parent_milestone_id)
 
     // Compute champion row date range from all milestones that have dates
     const allDated = c.milestones.filter(m => m.start_date && m.due_date)
