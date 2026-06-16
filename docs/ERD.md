@@ -1,6 +1,6 @@
-# Entity Relationship Diagram — v5
+# Entity Relationship Diagram — v6
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-08
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-16
 
 ---
 
@@ -133,6 +133,7 @@ Champion-created weekly WBS items (self-serve).
 | bottleneck_admin_comment | text nullable | 관리자 답변 텍스트 (null = 미검토 또는 빈 답변) |
 | bottleneck_reviewed_at | timestamptz nullable | 관리자가 지연 신고를 확인한 시각 |
 | display_order | int | ordering within same week |
+| source | text | `manual` \| `ai` \| `template` — 생성 출처. default `manual` (migration 023). "smart" 입력 채택률 분석용 |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 | publish_status | enum | `draft` \| `published` — default `published` |

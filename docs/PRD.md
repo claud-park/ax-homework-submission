@@ -1,8 +1,8 @@
 # AX Homework Submission Platform — PRD
 
-> **Version** 2.0 · **Updated** 2026-06-02 · **Author** yr.park@dreamus.io
+> **Version** 2.2 · **Updated** 2026-06-16 · **Author** yr.park@dreamus.io
 > **Status** Internal Review · **Repo** `AX/ax-homework-submission`
-> **Previous** v1.1 (2026-05-21)
+> **Previous** v2.0 (2026-06-02) · v1.1 (2026-05-21)
 
 ---
 
@@ -147,6 +147,18 @@ Admin    = user_metadata.is_admin === true
 | C12 | **Milestone due date change modal** | start+end for expired not_started | ✅ |
 | C13 | **Mobile UX** (BottomTabBar + card layouts) | Responsive components | ✅ |
 | C14 | Champion progress dashboard | `/progress` | 🚧 Skeletal |
+| C15 | **Smart milestone input** — AI generate (Charter-grounded) / template presets / direct, editable draft staging → batch save | AI SDK v6 + Claude, `MilestoneDraftDrawer` | 📋 Designed (v2.2) |
+
+#### Smart Milestone Input (C15)
+Single entry `+ 마일스톤 추가 ▾` → three methods converge into one **editable draft (staging) list**, committed in one batch save. Addresses the "add one-by-one" pain.
+
+| Method | Engine |
+|---|---|
+| ✨ AI generate | `POST /api/milestones/generate` reads Charter content (problem·goal·solution) → `generateObject` → relative-duration milestones. **AI returns structure only; dates computed deterministically** (working-days, holiday-aware) |
+| 📋 Template | Built-in presets (product launch / research→MVP→validate / sprint), anchored to a start date |
+| ✏️ Direct | Empty draft row (existing inline logic) |
+
+Batch commit: `POST /api/milestones/batch` (parents → children → `syncParentDates`), each row records `source`. Design: [`docs/superpowers/specs/2026-06-16-milestone-input-ux-design.md`](superpowers/specs/2026-06-16-milestone-input-ux-design.md)
 
 #### Charter 6-Section Structure
 1. **Problem Definition (AS-IS)** ⭐ Required
@@ -290,7 +302,7 @@ Browser ──O──→ Next.js API Routes (verifyJWT + verifyAdmin)
 | `comments` | Submission comments | id(PK), submission_id, body, author_role, author_id |
 | `charter_submissions` | Champion task definition docs | id(PK), user_id, homework_id, project_name, content(jsonb 6 sections), publish_status |
 | `charter_comments` | Charter comments/replies (max depth 2) | id(PK), charter_submission_id, parent_id, body, author_role, is_resolved |
-| `milestones` | Champion WBS items (**2-depth tree**) | id(PK), user_id, homework_id, **parent_milestone_id**(FK→self), week_number, start_date?, due_date?, status, publish_status, bottleneck_type |
+| `milestones` | Champion WBS items (**2-depth tree**) | id(PK), user_id, homework_id, **parent_milestone_id**(FK→self), week_number, start_date?, due_date?, status, publish_status, bottleneck_type, **source**(manual·ai·template, v2.2) |
 | `deadline_change_requests` | Deadline extension requests | id(PK), milestone_id, user_id, original_due_date, requested_due_date, status(pending·approved·rejected) |
 | `bottleneck_replies` | Admin responses to delay reports | id(PK), milestone_id, admin_id, body |
 
@@ -343,6 +355,9 @@ Browser ──O──→ Next.js API Routes (verifyJWT + verifyAdmin)
 | docx | ^9.6.1 | Charter export |
 | gantt-task-react | ^0.3.9 | WBS visualization |
 | sonner | ^2.0.7 | Toast UI |
+| ai (Vercel AI SDK) | v6 | `generateText` + `Output.object` — Charter-grounded milestone generation |
+| @ai-sdk/anthropic | ^3 | Anthropic provider (Claude `claude-haiku-4-5`) — direct connection |
+| zod | ^4 | AI structured-output schema validation |
 
 ### 7.2 Environment Variables
 ```
@@ -353,6 +368,8 @@ GMAIL_USER
 GMAIL_APP_PASSWORD
 ADMIN_NOTIFICATION_EMAIL
 APP_BASE_URL
+ANTHROPIC_API_KEY             # milestone AI generation (direct Anthropic, server-only)
+MILESTONE_AI_MODEL            # optional, default claude-haiku-4-5
 ```
 
 ### 7.3 Deployment
