@@ -761,15 +761,31 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
         new Paragraph({ text: '' }),
       ])
 
-      const sortedMs = [...milestones].sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
+      const sortByStart = (a: Milestone, b: Milestone) => (a.start_date ?? '').localeCompare(b.start_date ?? '')
+      const childrenByParent = new Map<string, Milestone[]>()
+      for (const m of milestones) {
+        if (m.parent_milestone_id) {
+          const arr = childrenByParent.get(m.parent_milestone_id) ?? []
+          arr.push(m)
+          childrenByParent.set(m.parent_milestone_id, arr)
+        }
+      }
+      const msParagraph = (m: Milestone, level: number) => new Paragraph({
+        children: [new TextRun({ text: `${m.title}  ${m.start_date ?? ''} – ${m.due_date ?? ''}`, size: 22 })],
+        bullet: { level },
+      })
+      const milestoneParagraphs = [...milestones]
+        .filter(m => !m.parent_milestone_id)
+        .sort(sortByStart)
+        .flatMap(m => [
+          msParagraph(m, 0),
+          ...(childrenByParent.get(m.id) ?? []).sort(sortByStart).map(c => msParagraph(c, 1)),
+        ])
       const timelineChildren = [
         new Paragraph({ text: '06. Timeline · Milestones', heading: HeadingLevel.HEADING_2 }),
-        ...(sortedMs.length === 0
+        ...(milestoneParagraphs.length === 0
           ? [new Paragraph({ children: [new TextRun({ text: '(마일스톤 없음)', size: 22, color: '888888' })] })]
-          : sortedMs.map(m => new Paragraph({
-              children: [new TextRun({ text: `${m.title}  ${m.start_date ?? ''} – ${m.due_date ?? ''}`, size: 22 })],
-              bullet: { level: 0 },
-            }))),
+          : milestoneParagraphs),
         new Paragraph({ text: '' }),
       ]
 
