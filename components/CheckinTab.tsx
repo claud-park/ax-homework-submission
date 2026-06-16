@@ -322,7 +322,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
       {isEmpty ? (
         <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>체크인할 마일스톤이 없습니다.</p>
-          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>Charter 페이지에서 마일스톤을 추가해보세요.</p>
+          <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>과제정의서 페이지에서 마일스톤을 추가해보세요.</p>
         </div>
       ) : (
         <>
