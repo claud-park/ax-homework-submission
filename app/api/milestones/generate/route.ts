@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText, Output } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { generateText, Output, gateway } from 'ai'
 import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import {
@@ -10,7 +9,7 @@ import {
 } from '@/lib/milestone-ai'
 import { scheduleRelativeMilestones } from '@/lib/milestone-schedule'
 
-const MODEL = process.env.MILESTONE_AI_MODEL ?? 'claude-haiku-4-5'
+const MODEL = process.env.MILESTONE_AI_MODEL ?? 'anthropic/claude-haiku-4-5'
 
 export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
@@ -43,7 +42,7 @@ export async function POST(req: NextRequest) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const { output } = await generateText({
-        model: anthropic(MODEL),
+        model: gateway(MODEL),
         output: Output.object({ schema: GenerationOutputSchema }),
         prompt: fullPrompt,
       })

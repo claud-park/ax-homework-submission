@@ -467,8 +467,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 이메일 | nodemailer | ^8.0.7 | SMTP 발송 |
 | DOCX | docx | ^9.6.1 | Charter 내보내기 |
 | 알림 | sonner | ^2.0.7 | 토스트 UI |
-| AI | ai (Vercel AI SDK) | v6 | `generateText` + `Output.object` — Charter 기반 마일스톤 생성 |
-| AI 프로바이더 | @ai-sdk/anthropic | ^3 | Anthropic 직접 연결 (Claude `claude-haiku-4-5`) |
+| AI | ai (Vercel AI SDK) | v6 | `generateText` + `Output.object` — AI Gateway 경유 Charter 기반 마일스톤 생성 (Claude `anthropic/claude-haiku-4-5`) |
 | 스키마 검증 | zod | ^4 | AI 구조화 출력 검증 |
 | 패키지 관리 | bun | 1.x | 의존성·빌드 |
 
@@ -483,8 +482,8 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | `GMAIL_APP_PASSWORD` | Gmail 앱 비밀번호 | 런타임 |
 | `ADMIN_NOTIFICATION_EMAIL` | 알림 수신 어드민 이메일 | 런타임 |
 | `APP_BASE_URL` | 이메일 본문 링크 기반 URL | 런타임 |
-| `ANTHROPIC_API_KEY` | 마일스톤 AI 생성용 (Anthropic 직접 연결) | 런타임 전용 |
-| `MILESTONE_AI_MODEL` | 마일스톤 생성 모델 (선택, 기본 `claude-haiku-4-5`) | 런타임 |
+| `AI_GATEWAY_API_KEY` | 마일스톤 AI 생성용 (Vercel AI Gateway; 운영은 OIDC 자동 주입) | 런타임 전용 |
+| `MILESTONE_AI_MODEL` | 마일스톤 생성 모델 (선택, 기본 `anthropic/claude-haiku-4-5`) | 런타임 |
 
 ### 8.3 인프라 및 CI/CD
 
