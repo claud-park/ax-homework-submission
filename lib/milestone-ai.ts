@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { RelativeMilestone } from '@/lib/milestone-schedule'
 
 const ChildSchema = z.object({
   title: z.string().min(1),
@@ -57,5 +58,21 @@ export function buildGenerationPrompt(charter: CharterContent, userPrompt?: stri
   if (userPrompt && userPrompt.trim()) {
     lines.push('', `[추가 요청] ${userPrompt.trim()}`)
   }
+  return lines.join('\n')
+}
+
+export function buildRefinePrompt(milestones: RelativeMilestone[], instruction: string): string {
+  const lines: string[] = [
+    '당신은 프로젝트 매니저입니다. 아래 기존 마일스톤 계획을 사용자 요청에 맞게 수정하세요.',
+    '규칙:',
+    '- 절대 날짜를 만들지 마세요. offset_days(프로젝트 시작 기준 시작 오프셋, working days)와 duration_days(기간, working days)로만 표현합니다.',
+    '- 변경이 없는 항목도 포함해 전체 마일스톤 목록을 반환합니다.',
+    '- 제목은 한국어로 간결하게. children은 1단계 깊이까지.',
+    '',
+    '[현재 마일스톤]',
+    JSON.stringify(milestones, null, 2),
+    '',
+    `[수정 요청] ${instruction.trim()}`,
+  ]
   return lines.join('\n')
 }

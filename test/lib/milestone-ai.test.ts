@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { GenerationOutputSchema, buildGenerationPrompt } from '@/lib/milestone-ai'
+import { GenerationOutputSchema, buildGenerationPrompt, buildRefinePrompt } from '@/lib/milestone-ai'
 
 describe('milestone-ai', () => {
   it('schema accepts valid AI output', () => {
@@ -30,5 +30,14 @@ describe('milestone-ai', () => {
     const p = buildGenerationPrompt({}, undefined)
     expect(typeof p).toBe('string')
     expect(p.length).toBeGreaterThan(0)
+  })
+  it('buildRefinePrompt includes the instruction and current milestone titles', () => {
+    const p = buildRefinePrompt(
+      [{ title: '베타 테스트', offset_days: 5, duration_days: 5 }],
+      '베타를 2주로 늘려줘',
+    )
+    expect(p).toContain('베타 테스트')
+    expect(p).toContain('베타를 2주로 늘려줘')
+    expect(p).toContain('offset_days')
   })
 })

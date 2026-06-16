@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { nextWorkingDay, addWorkingDays, scheduleRelativeMilestones } from '@/lib/milestone-schedule'
+import { nextWorkingDay, addWorkingDays, scheduleRelativeMilestones, draftToRelative } from '@/lib/milestone-schedule'
 
 describe('milestone schedule', () => {
   it('nextWorkingDay rolls a Saturday to Monday', () => {
@@ -29,5 +29,24 @@ describe('milestone schedule', () => {
     ])
     expect(out[0].children?.[0].start_date).toBe('2026-06-16')
     expect(out[0].children?.[0].due_date).toBe('2026-06-17')
+  })
+  it('draftToRelative is the inverse of scheduleRelativeMilestones (round-trip)', () => {
+    const rel = [
+      { title: 'A', offset_days: 0, duration_days: 5, children: [{ title: 'A1', offset_days: 0, duration_days: 2 }] },
+      { title: 'B', offset_days: 5, duration_days: 3 },
+    ]
+    const scheduled = scheduleRelativeMilestones('2026-06-16', rel)
+    const back = draftToRelative(scheduled, '2026-06-16')
+    expect(back[0].offset_days).toBe(0)
+    expect(back[0].duration_days).toBe(5)
+    expect(back[0].children?.[0].offset_days).toBe(0)
+    expect(back[0].children?.[0].duration_days).toBe(2)
+    expect(back[1].offset_days).toBe(5)
+    expect(back[1].duration_days).toBe(3)
+  })
+  it('draftToRelative handles null dates with safe defaults', () => {
+    const back = draftToRelative([{ title: 'X', start_date: null, due_date: null }], '2026-06-16')
+    expect(back[0].offset_days).toBe(0)
+    expect(back[0].duration_days).toBe(1)
   })
 })
