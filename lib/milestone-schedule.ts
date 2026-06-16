@@ -1,4 +1,4 @@
-import { HOLIDAYS_FALLBACK, toKey, parseKey, isWorkingDay } from '@/lib/holidays'
+import { HOLIDAYS_FALLBACK, toKey, parseKey, isWorkingDay, countWorkingDays } from '@/lib/holidays'
 
 type Holidays = Record<string, string>
 
@@ -55,4 +55,36 @@ export function scheduleRelativeMilestones(
 ): ScheduledMilestone[] {
   const projectStart = nextWorkingDay(startDate, holidays)
   return milestones.map(m => scheduleOne(projectStart, m, holidays))
+}
+
+export interface DraftLike {
+  title: string
+  description?: string
+  start_date: string | null
+  due_date: string | null
+  children?: DraftLike[]
+}
+
+// Inverse of scheduleRelativeMilestones: absolute-dated draft → working-day relative form.
+export function draftToRelative(
+  milestones: DraftLike[],
+  startDate: string,
+  holidays: Holidays = HOLIDAYS_FALLBACK,
+): RelativeMilestone[] {
+  const projectStart = nextWorkingDay(startDate, holidays)
+  const one = (m: DraftLike): RelativeMilestone => {
+    const start = m.start_date ?? projectStart
+    const offset_days = Math.max(0, countWorkingDays(projectStart, start, holidays) - 1)
+    const duration_days = m.start_date && m.due_date
+      ? Math.max(1, countWorkingDays(m.start_date, m.due_date, holidays))
+      : 1
+    return {
+      title: m.title,
+      description: m.description,
+      offset_days,
+      duration_days,
+      children: m.children?.map(one),
+    }
+  }
+  return milestones.map(one)
 }
