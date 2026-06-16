@@ -228,8 +228,8 @@ export default function MilestoneDraftDrawer({
               </button>
             </div>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              ✓ 기간·구조·순서 조정 (예: &ldquo;베타 2주 늘려&rdquo;, &ldquo;리서치 빼&rdquo;)<br />
-              ✗ 특정 날짜·휴가 지정은 아직 안 돼요 — 시작일을 직접 바꿔 주세요
+              ✓ 기간·구조·순서를 바꿀 수 있어요 (예: &ldquo;베타 2주 늘려&rdquo;, &ldquo;리서치 빼&rdquo;)<br />
+              ✗ 특정 날짜·휴가는 시작일을 바꿔 조정해요
             </p>
             {recentInstructions.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
