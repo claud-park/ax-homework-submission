@@ -227,10 +227,10 @@ export default function MilestoneDraftDrawer({
                 {refining ? (<><Spinner size="sm" className="text-white" /> 수정 중…</>) : '수정 ▸'}
               </button>
             </div>
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              ✓ 기간·구조·순서를 바꿀 수 있어요 (예: &ldquo;베타 2주 늘려&rdquo;, &ldquo;리서치 빼&rdquo;)<br />
-              ✗ 특정 날짜·휴가는 시작일을 바꿔 조정해요
-            </p>
+            <div className="text-xs leading-relaxed flex flex-col gap-0.5">
+              <span style={{ color: 'var(--success)' }}>✓ 기간·구조·순서를 바꿀 수 있어요 (예: &ldquo;베타 2주 늘려&rdquo;, &ldquo;리서치 빼&rdquo;)</span>
+              <span style={{ color: 'var(--error)' }}>✗ 특정 날짜·휴가는 시작일을 바꿔 직접 조정해 주세요</span>
+            </div>
             {recentInstructions.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {recentInstructions.map((t, i) => (
