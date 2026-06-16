@@ -11,6 +11,9 @@ describe('milestone schedule', () => {
   it('addWorkingDays skips the weekend', () => {
     expect(addWorkingDays('2026-06-19', 1)).toBe('2026-06-22') // Fri +1 -> Mon
   })
+  it('addWorkingDays skips a non-weekend holiday (어린이날 Tue 2026-05-05)', () => {
+    expect(addWorkingDays('2026-05-04', 1)).toBe('2026-05-06') // Mon +1 skips Tue holiday -> Wed
+  })
   it('schedules a top-level milestone: offset 0, duration 5 working days', () => {
     const out = scheduleRelativeMilestones('2026-06-16', [
       { title: 'A', offset_days: 0, duration_days: 5 },
