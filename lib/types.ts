@@ -1,5 +1,6 @@
 export type SubmissionStatus = 'pending' | 'accepted' | 'declined'
 export type MilestoneStatus = 'not_started' | 'in_progress' | 'completed' | 'delayed'
+export type MilestoneSource = 'manual' | 'ai' | 'template'
 export type RequestStatus = 'pending' | 'approved' | 'rejected'
 export type PublishStatus = 'draft' | 'published'
 export type BottleneckType = 'technical' | 'resource' | 'external' | 'other'
@@ -83,6 +84,7 @@ export interface Milestone {
   bottleneck_reviewed_at: string | null
   parent_milestone_id: string | null
   display_order: number
+  source: MilestoneSource
   created_at: string
   updated_at: string
   publish_status: PublishStatus
