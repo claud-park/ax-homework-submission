@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
       description: description ?? null,
       publish_status: status,
       parent_milestone_id: parent_milestone_id ?? null,
+      source: 'manual',
     })
     .select()
     .single()
