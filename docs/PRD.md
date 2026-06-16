@@ -355,8 +355,9 @@ Browser ──O──→ Next.js API Routes (verifyJWT + verifyAdmin)
 | docx | ^9.6.1 | Charter export |
 | gantt-task-react | ^0.3.9 | WBS visualization |
 | sonner | ^2.0.7 | Toast UI |
-| ai (Vercel AI SDK) | v6 | `generateObject` — Charter-grounded milestone generation (Claude `claude-haiku-4-5`) |
-| zod | ^3 | AI structured-output schema validation |
+| ai (Vercel AI SDK) | v6 | `generateText` + `Output.object` — Charter-grounded milestone generation |
+| @ai-sdk/anthropic | ^3 | Anthropic provider (Claude `claude-haiku-4-5`) — direct connection |
+| zod | ^4 | AI structured-output schema validation |
 
 ### 7.2 Environment Variables
 ```
@@ -367,8 +368,8 @@ GMAIL_USER
 GMAIL_APP_PASSWORD
 ADMIN_NOTIFICATION_EMAIL
 APP_BASE_URL
+ANTHROPIC_API_KEY             # milestone AI generation (direct Anthropic)
 MILESTONE_AI_MODEL            # optional, default claude-haiku-4-5
-# + AI provider API key (gateway or provider) for milestone generation
 ```
 
 ### 7.3 Deployment
