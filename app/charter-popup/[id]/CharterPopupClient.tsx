@@ -145,22 +145,51 @@ export default function CharterPopupClient({ charter, milestones, isAdmin = fals
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.01em' }}>Timeline · Milestones</span>
           </div>
           {depth0.length > 0 ? (
-            <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {depth0.map(m => (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
-                    {(m.start_date || m.due_date) && (
-                      <p style={{ fontSize: 11, color: 'var(--text-disabled)', margin: '2px 0 0' }}>
-                        {m.start_date ?? ''}{m.start_date && m.due_date ? ' – ' : ''}{m.due_date ?? ''}
-                      </p>
+            <div style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {depth0.map(m => {
+                const children = milestones
+                  .filter(c => c.parent_milestone_id === m.id)
+                  .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                return (
+                  <div key={m.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <div>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{m.title}</p>
+                        {(m.start_date || m.due_date) && (
+                          <p style={{ fontSize: 11, color: 'var(--text-disabled)', margin: '2px 0 0' }}>
+                            {m.start_date ?? ''}{m.start_date && m.due_date ? ' – ' : ''}{m.due_date ?? ''}
+                          </p>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, color: STATUS_COLOR[m.status], background: STATUS_BG[m.status], flexShrink: 0 }}>
+                        {STATUS_LABEL[m.status]}
+                      </span>
+                    </div>
+                    {children.length > 0 && (
+                      <div style={{ marginTop: 6, marginLeft: 16, paddingLeft: 12, borderLeft: '2px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {children.map(c => (
+                          <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 12px', borderRadius: 6, background: '#ffffff', border: '1px solid #eef2f7' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                              <span style={{ color: 'var(--text-disabled)', fontSize: 11, flexShrink: 0 }}>↳</span>
+                              <div style={{ minWidth: 0 }}>
+                                <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</p>
+                                {(c.start_date || c.due_date) && (
+                                  <p style={{ fontSize: 10, color: 'var(--text-disabled)', margin: '1px 0 0' }}>
+                                    {c.start_date ?? ''}{c.start_date && c.due_date ? ' – ' : ''}{c.due_date ?? ''}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 5, color: STATUS_COLOR[c.status], background: STATUS_BG[c.status], flexShrink: 0 }}>
+                              {STATUS_LABEL[c.status]}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, color: STATUS_COLOR[m.status], background: STATUS_BG[m.status], flexShrink: 0 }}>
-                    {STATUS_LABEL[m.status]}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p style={{ fontSize: 12, color: 'var(--text-disabled)', fontStyle: 'italic', margin: 0, padding: '12px 18px' }}>(마일스톤 없음)</p>
