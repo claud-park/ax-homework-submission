@@ -38,6 +38,9 @@ export default function MilestoneDraftDrawer({
   const [startDate, setStartDate] = useState(today())
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [instruction, setInstruction] = useState('')
+  const [refining, setRefining] = useState(false)
+  const [recentInstructions, setRecentInstructions] = useState<string[]>([])
 
   if (!open) return null
 
@@ -104,6 +107,24 @@ export default function MilestoneDraftDrawer({
       toast.error('저장에 실패했어요. 잠시 후 다시 시도해 주세요.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleRefine() {
+    if (!instruction.trim()) return
+    setRefining(true)
+    try {
+      const { milestones } = await apiFetch<{ milestones: Scheduled[] }>('/api/milestones/refine', {
+        method: 'POST',
+        body: JSON.stringify({ milestones: rows, startDate, instruction }),
+      })
+      setRows(milestones.map(m => toDraft(m, 'ai')))
+      setRecentInstructions(prev => [instruction.trim(), ...prev].slice(0, 2))
+      setInstruction('')
+    } catch {
+      toast.error('수정에 실패했어요. 다시 시도해 주세요.')
+    } finally {
+      setRefining(false)
     }
   }
 
@@ -188,6 +209,34 @@ export default function MilestoneDraftDrawer({
             className="text-xs px-3 py-1.5 rounded-full mt-3"
             style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>+ 행 추가</button>
         </div>
+
+        {rows.length > 0 && (
+          <div className="px-4 py-3 border-t flex flex-col gap-2" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={instruction}
+                onChange={e => setInstruction(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !refining && instruction.trim()) handleRefine() }}
+                placeholder="수정 요청 (예: 베타를 2주로 늘려줘)"
+                style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)', width: '100%' }}
+              />
+              <button type="button" onClick={handleRefine} disabled={refining || !instruction.trim()}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                style={{ background: 'var(--blue-600)', color: '#fff' }}>
+                {refining ? (<><Spinner size="sm" className="text-white" /> 수정 중…</>) : '수정 ▸'}
+              </button>
+            </div>
+            {recentInstructions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {recentInstructions.map((t, i) => (
+                  <span key={i} className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: 'var(--surface-secondary, #eef2f7)', color: 'var(--text-secondary)' }}>↺ {t}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
           <button type="button" onClick={onClose} className="text-xs px-3 py-1.5 rounded-lg"

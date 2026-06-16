@@ -29,4 +29,17 @@ describe('MilestoneDraftDrawer', () => {
     const saveBtn = screen.getByRole('button', { name: /저장/ })
     expect(saveBtn).toBeDisabled()
   })
+
+  it('shows the refine bar only after a draft exists, with refine disabled until an instruction is typed', () => {
+    render(<MilestoneDraftDrawer open onClose={() => {}} onSaved={() => {}} />)
+    expect(screen.queryByPlaceholderText('수정 요청 (예: 베타를 2주로 늘려줘)')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('템플릿에서'))
+    fireEvent.click(screen.getByText('스프린트 / 해커톤'))
+    const refineInput = screen.getByPlaceholderText('수정 요청 (예: 베타를 2주로 늘려줘)')
+    expect(refineInput).toBeInTheDocument()
+    const refineBtn = screen.getByRole('button', { name: /수정/ })
+    expect(refineBtn).toBeDisabled()
+    fireEvent.change(refineInput, { target: { value: '리서치 단계 빼줘' } })
+    expect(refineBtn).not.toBeDisabled()
+  })
 })
