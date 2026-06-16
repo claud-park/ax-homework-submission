@@ -12,6 +12,7 @@ const SectionEditorInner = dynamic(() => import('./SectionEditorInner'), {
 })
 import type { ProjectCharter, CharterSubmission, Milestone } from '@/lib/types'
 import DateRangePicker from '@/components/DateRangePicker'
+import MilestoneDraftDrawer from '@/components/milestones/MilestoneDraftDrawer'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
@@ -170,6 +171,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
   const [subSaving, setSubSaving] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const depth0 = [...milestones]
     .filter(m => !m.parent_milestone_id)
@@ -379,18 +381,24 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
           <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>06. Timeline · Milestones</span>
           <InfoTooltip text="주별 마일스톤 — WBS 탭과 연동됩니다" />
         </div>
-        <button
-          type="button"
-          onClick={() => setShowForm(v => !v)}
-          className="text-xs px-2.5 py-1 rounded font-semibold"
-          style={{
-            background: showForm ? 'transparent' : 'var(--blue-600)',
-            color: showForm ? 'var(--text-secondary)' : '#fff',
-            border: showForm ? '1px solid var(--border)' : 'none',
-          }}
-        >
-          {showForm ? '취소' : '+ 추가'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="text-xs px-2.5 py-1 rounded font-semibold"
+            style={{ background: 'var(--blue-600)', color: '#fff', border: 'none' }}
+          >
+            + 마일스톤 추가
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowForm(v => !v)}
+            className="text-xs px-2.5 py-1 rounded"
+            style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+          >
+            {showForm ? '취소' : '직접 입력'}
+          </button>
+        </div>
       </div>
 
       {/* Inline add form (depth-0) */}
@@ -465,6 +473,11 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
           </ul>
         )}
       </div>
+      <MilestoneDraftDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onSaved={created => created.forEach(onAdded)}
+      />
     </div>
   )
 }
