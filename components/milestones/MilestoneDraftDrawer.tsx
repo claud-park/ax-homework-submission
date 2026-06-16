@@ -151,11 +151,6 @@ export default function MilestoneDraftDrawer({
                 style={{ background: 'var(--blue-600)', color: '#fff' }}>
                 {generating ? (<><Spinner size="sm" className="text-white" /> 생성 중…</>) : '✨ 생성'}
               </button>
-              {generating && (
-                <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                  <Spinner size="sm" /> AI가 Charter를 읽고 마일스톤을 구성하고 있어요…
-                </p>
-              )}
             </div>
           )}
           {tab === 'template' && (
