@@ -9,8 +9,8 @@ describe('holidays primitives', () => {
     expect(isWorkingDay(parseKey('2026-06-20'))).toBe(false) // Saturday
     expect(isWorkingDay(parseKey('2026-06-21'))).toBe(false) // Sunday
   })
-  it('Korean holiday is not a working day (현충일 2026-06-06)', () => {
-    expect(isWorkingDay(parseKey('2026-06-06'))).toBe(false)
+  it('Korean holiday is not a working day (어린이날 2026-05-05)', () => {
+    expect(isWorkingDay(parseKey('2026-05-05'))).toBe(false)
   })
   it('a normal weekday is a working day', () => {
     expect(isWorkingDay(parseKey('2026-06-16'))).toBe(true) // Tuesday

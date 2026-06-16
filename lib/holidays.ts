@@ -68,8 +68,7 @@ export function countWorkingDays(start: string, end: string, holidays: Record<st
   let count = 0
   const cur = new Date(s)
   while (cur <= e) {
-    const dow = cur.getDay()
-    if (dow !== 0 && dow !== 6 && !holidays[toKey(cur)]) count++
+    if (isWorkingDay(cur, holidays)) count++
     cur.setDate(cur.getDate() + 1)
   }
   return count
