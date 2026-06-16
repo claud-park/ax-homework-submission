@@ -13,7 +13,7 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
     supabase.from('users').select('id, name').eq('user_group', 'champion'),
     supabase.from('charter_submissions').select('user_id, id, project_name'),
     supabase.from('milestones')
-      .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id')
+      .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id, display_order')
       .eq('publish_status', 'published')
       .order('week_number', { nullsFirst: false })
       .order('display_order'),
@@ -26,6 +26,7 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
     msMap.get(m.user_id)!.push({
       id: m.id, title: m.title, start_date: m.start_date, due_date: m.due_date,
       status: m.status, week_number: m.week_number, parent_milestone_id: m.parent_milestone_id ?? null,
+      display_order: m.display_order ?? null,
     })
   }
 

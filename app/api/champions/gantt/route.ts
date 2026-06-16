@@ -12,6 +12,7 @@ export interface GanttMilestone {
   status: MilestoneStatus
   week_number: number | null
   parent_milestone_id: string | null
+  display_order: number | null
 }
 
 export interface GanttChampion {
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
       .select('user_id, id, project_name'),
     supabase
       .from('milestones')
-      .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id')
+      .select('id, user_id, title, start_date, due_date, status, week_number, parent_milestone_id, display_order')
       .eq('publish_status', 'published')
       .order('week_number', { nullsFirst: false })
       .order('display_order'),
@@ -63,6 +64,7 @@ export async function GET(req: NextRequest) {
       status: m.status as MilestoneStatus,
       week_number: m.week_number,
       parent_milestone_id: m.parent_milestone_id ?? null,
+      display_order: m.display_order ?? null,
     })
   }
 
