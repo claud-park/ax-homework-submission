@@ -1,8 +1,8 @@
 # 디시인사이드 과제 관리 플랫폼 — 제품 요구사항 명세서 (PRD)
 
-> **문서 버전** 2.1 · **최종 업데이트** 2026-06-08 · **작성자** yr.park@dreamus.io
+> **문서 버전** 2.2 · **최종 업데이트** 2026-06-16 · **작성자** yr.park@dreamus.io
 > **상태** 사내 검토 중 · **저장소** `AX/ax-homework-submission`
-> **이전 버전** v2.0 (2026-06-02) · v1.2 (2026-05-27)
+> **이전 버전** v2.1 (2026-06-08) · v2.0 (2026-06-02) · v1.2 (2026-05-27)
 
 ---
 
@@ -11,8 +11,8 @@
 | 항목 | 내용 |
 |---|---|
 | 프로젝트명 | 디시인사이드 과제 관리 플랫폼 (ax-homework-submission) |
-| 버전 | v2.1 |
-| 작성일 | 2026-06-08 |
+| 버전 | v2.2 |
+| 작성일 | 2026-06-16 |
 | 작성자 | yr.park@dreamus.io |
 | 검토자 | Strategy Lead · Engineering Lead |
 
@@ -198,6 +198,19 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 | C14 | 챔피언 진행 대시보드 | `/progress` | 🚧 골격 |
 | C15 | 제출물 댓글 이력 확인 + 파일 다운로드 (챔피언 뷰) | `/my-project/submission` | ✅ |
 | C16 | 핫라인 FAB (챔피언-어드민 1:1 채팅 + Tiptap 에디터 + 파일 첨부) | HotlineFAB + `/api/hotline/*` | ✅ |
+| C17 | **스마트 마일스톤 입력** — AI 생성(Charter 기반)·템플릿·직접 입력을 단일 진입점으로, 편집 가능한 초안 목록 → 일괄 저장 | AI SDK v6 + Claude, `MilestoneDraftDrawer` | 📋 설계 완료 (v2.2) |
+
+#### 스마트 마일스톤 입력 (C17)
+
+기존 `+ 추가`를 `+ 마일스톤 추가 ▾`로 교체. 세 방법이 하나의 **편집 가능한 초안(Staging) 목록**으로 수렴하고, **한 번에 일괄 저장**해 "하나씩 클릭" 페인포인트를 제거한다.
+
+| 방법 | 엔진 |
+|---|---|
+| ✨ AI 생성 | `POST /api/milestones/generate` — Charter 내용(문제·목표·솔루션)을 읽어 `generateObject`로 마일스톤 초안 생성. **AI는 구조·상대 기간만, 날짜는 결정론적 코드가 계산**(작업일·공휴일 인지) |
+| 📋 템플릿 | 내장 프리셋(제품 출시 / 리서치→MVP→검증 / 스프린트), 시작일 기준 자동 날짜화 |
+| ✏️ 직접 입력 | 빈 초안 행 (기존 인라인 로직 재사용) |
+
+일괄 커밋: `POST /api/milestones/batch` (부모 → 자식 → `syncParentDates`), 각 행에 `source` 기록. 설계: [`docs/superpowers/specs/2026-06-16-milestone-input-ux-design.md`](superpowers/specs/2026-06-16-milestone-input-ux-design.md)
 
 #### Charter 6 섹션 구조
 
@@ -387,7 +400,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | `comments` | 제출물 댓글 | id(PK), submission_id, body, author_role, author_id |
 | `charter_submissions` | 챔피언의 과제정의서 | id(PK), user_id, homework_id, project_name, content(jsonb 6섹션), publish_status |
 | `charter_comments` | Charter 댓글·답글 (최대 depth 2) | id(PK), charter_submission_id, parent_id, body, author_role, is_resolved |
-| `milestones` | 챔피언의 WBS 항목 (2-depth 트리) | id(PK), user_id, homework_id, parent_milestone_id(FK→milestones), week_number, start_date?, due_date?, status, publish_status, bottleneck_type, bottleneck_note |
+| `milestones` | 챔피언의 WBS 항목 (2-depth 트리) | id(PK), user_id, homework_id, parent_milestone_id(FK→milestones), week_number, start_date?, due_date?, status, publish_status, bottleneck_type, bottleneck_note, **source**(manual·ai·template, v2.2) |
 | `deadline_change_requests` | 기한변경 요청 | id(PK), milestone_id, user_id, original_due_date, requested_due_date, status(pending·approved·rejected) |
 | `bottleneck_replies` | 지연 신고 어드민 답변 | id(PK), milestone_id, admin_id, body |
 
@@ -454,6 +467,8 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 이메일 | nodemailer | ^8.0.7 | SMTP 발송 |
 | DOCX | docx | ^9.6.1 | Charter 내보내기 |
 | 알림 | sonner | ^2.0.7 | 토스트 UI |
+| AI | ai (Vercel AI SDK) | v6 | `generateObject` — Charter 기반 마일스톤 생성 (Claude `claude-haiku-4-5`) |
+| 스키마 검증 | zod | ^3 | AI 구조화 출력 검증 |
 | 패키지 관리 | bun | 1.x | 의존성·빌드 |
 
 ### 8.2 환경변수 목록
@@ -467,6 +482,8 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | `GMAIL_APP_PASSWORD` | Gmail 앱 비밀번호 | 런타임 |
 | `ADMIN_NOTIFICATION_EMAIL` | 알림 수신 어드민 이메일 | 런타임 |
 | `APP_BASE_URL` | 이메일 본문 링크 기반 URL | 런타임 |
+| `MILESTONE_AI_MODEL` | 마일스톤 생성 모델 (선택, 기본 `claude-haiku-4-5`) | 런타임 |
+| AI 프로바이더 API 키 | 마일스톤 AI 생성용 (게이트웨이 또는 프로바이더) | 런타임 전용 |
 
 ### 8.3 인프라 및 CI/CD
 
