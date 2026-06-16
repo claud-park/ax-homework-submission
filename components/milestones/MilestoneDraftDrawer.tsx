@@ -161,7 +161,7 @@ export default function MilestoneDraftDrawer({
                 style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)', width: '100%', resize: 'none' }} />
               <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 <input type="checkbox" checked={useCharter} onChange={e => setUseCharter(e.target.checked)} />
-                Charter 내용 활용
+                과제정의서 내용 활용
               </label>
               <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 시작일 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
