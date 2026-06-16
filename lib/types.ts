@@ -82,6 +82,7 @@ export interface Milestone {
   bottleneck_note: string | null
   bottleneck_admin_comment: string | null
   bottleneck_reviewed_at: string | null
+  note: string | null
   parent_milestone_id: string | null
   display_order: number
   source: MilestoneSource

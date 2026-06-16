@@ -54,11 +54,41 @@ interface MilestoneCardProps {
   onIssueClick: (m: Milestone) => void
   onDeadlineExtension: (m: Milestone, isReschedule?: boolean) => void
   onInProgress: (id: string) => void
+  onNoteUpdate: (id: string, note: string | null) => Promise<void>
 }
 
-function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIssueClick, onDeadlineExtension, onInProgress }: MilestoneCardProps) {
+function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIssueClick, onDeadlineExtension, onInProgress, onNoteUpdate }: MilestoneCardProps) {
   const statusColor = STATUS_COLOR[m.status] ?? 'var(--text-disabled)'
   const statusLabel = STATUS_LABEL[m.status] ?? m.status
+
+  const [noteEditing, setNoteEditing] = useState(false)
+  const [noteValue, setNoteValue] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+
+  const canEditNote = m.status === 'in_progress'
+
+  function openNoteEdit() {
+    setNoteValue(m.note ?? '')
+    setNoteEditing(true)
+  }
+
+  async function handleNoteSave() {
+    const trimmed = noteValue.trim()
+    const next = trimmed === '' ? null : trimmed
+    if (next === (m.note ?? null)) { setNoteEditing(false); return }
+    setNoteSaving(true)
+    try {
+      await onNoteUpdate(m.id, next)
+    } finally {
+      setNoteSaving(false)
+      setNoteEditing(false)
+    }
+  }
+
+  function handleNoteKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSave() }
+    if (e.key === 'Escape') { setNoteEditing(false) }
+  }
 
   const todayStr = new Date().toISOString().split('T')[0]
   const isReschedule = (m.start_date ?? '') < todayStr && m.status === 'not_started'
@@ -177,6 +207,76 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
         </div>
       )}
 
+      {/* 진행 노트 */}
+      {noteEditing ? (
+        <div className="flex flex-col gap-1.5 mb-3">
+          <textarea
+            autoFocus
+            value={noteValue}
+            onChange={e => setNoteValue(e.target.value)}
+            onKeyDown={handleNoteKeyDown}
+            placeholder="진행 상황을 간단히 메모해주세요"
+            rows={2}
+            style={{
+              background: 'var(--background)',
+              border: '1px solid var(--blue-600)',
+              borderRadius: '6px',
+              color: 'var(--text-primary)',
+              padding: '7px 10px',
+              fontSize: '12px',
+              resize: 'none',
+              width: '100%',
+              outline: 'none',
+            }}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleNoteSave}
+              disabled={noteSaving}
+              className="text-xs px-3 py-1 rounded-md font-semibold"
+              style={{ background: 'var(--blue-600)', color: '#fff', opacity: noteSaving ? 0.7 : 1 }}
+            >
+              저장
+            </button>
+            <button
+              onClick={() => setNoteEditing(false)}
+              className="text-xs px-3 py-1 rounded-md"
+              style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      ) : m.note ? (
+        <div
+          className="flex items-start gap-2 mb-3"
+          style={{ background: 'rgba(37,99,235,0.04)', borderRadius: '6px', padding: '7px 10px' }}
+        >
+          <p className="text-xs flex-1" style={{ color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+            {m.note}
+          </p>
+          {canEditNote && (
+            <button
+              onClick={openNoteEdit}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer', flexShrink: 0 }}
+              title="노트 편집"
+            >
+              ✏️
+            </button>
+          )}
+        </div>
+      ) : canEditNote ? (
+        <div className="mb-3">
+          <button
+            onClick={openNoteEdit}
+            className="text-xs"
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-disabled)', cursor: 'pointer' }}
+          >
+            + 진행 노트 추가
+          </button>
+        </div>
+      ) : null}
+
       {showActions ? (
         <div className="flex flex-wrap items-center gap-2">
           {showComplete && (
@@ -221,10 +321,11 @@ export interface CheckinTabProps {
   onIssueReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
   onInProgress: (id: string) => Promise<void>
   onDeadlineExtension: (m: Milestone, isReschedule?: boolean) => void
+  onNoteUpdate: (id: string, note: string | null) => Promise<void>
   showOverdue?: boolean
 }
 
-export function CheckinTab({ milestones, charterApproved, onComplete, onIssueReport, onInProgress, onDeadlineExtension, showOverdue = true }: CheckinTabProps) {
+export function CheckinTab({ milestones, charterApproved, onComplete, onIssueReport, onInProgress, onDeadlineExtension, onNoteUpdate, showOverdue = true }: CheckinTabProps) {
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null)
   const [issueMilestone, setIssueMilestone] = useState<Milestone | null>(null)
   const [issueForm, setIssueForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })
@@ -313,6 +414,7 @@ export function CheckinTab({ milestones, charterApproved, onComplete, onIssueRep
     onIssueClick: (m: Milestone) => { setIssueMilestone(m); setIssueForm({ type: '', note: '' }) },
     onDeadlineExtension,
     onInProgress,
+    onNoteUpdate,
   })
 
   const isEmpty = thisWeek.length === 0 && overdue.length === 0 && upcoming.length === 0 && noDueDate.length === 0

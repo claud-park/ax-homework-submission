@@ -56,6 +56,18 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
     }
   }
 
+  async function handleNoteUpdate(id: string, note: string | null) {
+    try {
+      const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ note }),
+      })
+      setMilestones(prev => prev.map(m => m.id === id ? updated : m))
+    } catch (e: unknown) {
+      toast.error('노트 저장에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }
+
   async function handleCheckinInProgress(id: string) {
     try {
       const { milestone: updated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
@@ -138,6 +150,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
     onIssueReport: handleCheckinIssueReport,
     onInProgress: handleCheckinInProgress,
     onDeadlineExtension: openDeadlineForCheckin,
+    onNoteUpdate: handleNoteUpdate,
   }
 
   return (
@@ -174,6 +187,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
                       onComplete={handleCheckinComplete}
                       onIssueReport={(id) => handleCheckinIssueReport(id, 'other', null)}
                       onDeadlineExtension={openDeadlineForCheckin}
+                      onNoteUpdate={handleNoteUpdate}
                     />
                   ))}
                 </div>

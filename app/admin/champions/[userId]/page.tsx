@@ -90,6 +90,19 @@ function MilestoneRow({ m, depth = 0 }: { m: Milestone & { children?: Milestone[
                 {m.start_date ?? ''}{m.start_date && m.due_date ? ' – ' : ''}{m.due_date ?? ''}
               </p>
             )}
+            {m.note && (
+              <p style={{
+                fontSize: 10,
+                color: 'var(--text-secondary)',
+                margin: '3px 0 0 0',
+                fontStyle: 'italic',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                📝 {m.note}
+              </p>
+            )}
           </div>
           <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 5, color, background: bg, flexShrink: 0, marginLeft: 8 }}>
             {MS_STATUS_LABEL[m.status]}
