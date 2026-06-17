@@ -27,14 +27,15 @@ export async function POST(req: NextRequest) {
 
   let charter: CharterContent = {}
   if (useCharter) {
+    const charter_id: string | undefined = body?.charter_id
     const supabase = createServiceClient()
-    const { data } = await supabase
+    let charterQuery = supabase
       .from('charter_submissions')
       .select('content')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    if (charter_id) charterQuery = charterQuery.eq('id', charter_id)
+    const { data } = await charterQuery.limit(1).maybeSingle()
     charter = (data?.content as CharterContent) ?? {}
   }
 
