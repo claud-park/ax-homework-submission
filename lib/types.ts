@@ -41,6 +41,7 @@ export interface Comment {
 export interface CharterSubmission {
   id: string
   user_id: string
+  title: string | null
   project_name: string | null
   content: {
     summary?: string
@@ -61,6 +62,7 @@ export interface CharterSubmission {
 export interface ProjectCharter {
   id: string
   user_id: string
+  charter_submission_id: string | null
   project_name: string | null
   content: CharterSubmission['content']
   updated_at: string
@@ -70,6 +72,7 @@ export interface ProjectCharter {
 export interface Milestone {
   id: string
   user_id: string
+  charter_submission_id: string | null
   week_number: number | null
   title: string
   description: string | null
@@ -136,7 +139,7 @@ export interface ChampionSummary {
 
 export interface ChampionProject {
   user: User
-  charter: (CharterSubmission & { comments: CharterComment[] }) | null
+  charters: (CharterSubmission & { comments: CharterComment[] })[]
   milestones: Milestone[]
   latestSubmission: Submission | null
 }
@@ -154,7 +157,8 @@ export interface KanbanCard {
   } | null
   milestoneTotal: number
   milestoneCompleted: number
-  hasCharter: boolean
+  charterCount: number
+  approvedCharterCount: number
   pendingDeadlineRequests: number
 }
 
