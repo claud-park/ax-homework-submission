@@ -483,9 +483,10 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
 }
 
 // Keyed by submission id or 'new' — remounts when switching between items
-function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
+function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAutoSaved }: {
   mode: 'new' | 'edit'
   submission?: CharterSubmission
+  charterId?: string
   onCreated: (sub: CharterSubmission) => void
   onUpdated: (sub: CharterSubmission) => void
   onAutoSaved?: (sub: CharterSubmission) => void
@@ -576,10 +577,11 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
 
   useEffect(() => {
     if (mode !== 'edit') return
-    apiFetch<Milestone[]>('/api/milestones')
+    const url = charterId ? `/api/milestones?charter_id=${charterId}` : '/api/milestones'
+    apiFetch<Milestone[]>(url)
       .then(data => setMilestones(data.filter(m => m.publish_status === 'published')))
       .catch(() => {})
-  }, [mode])
+  }, [mode, charterId])
 
   useEffect(() => {
     return () => {
@@ -898,7 +900,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
   )
 }
 
-export function CharterClient({ initialSubmission }: { initialSubmission: CharterSubmission | null }) {
+export function CharterClient({ initialSubmission, charterId }: { initialSubmission: CharterSubmission | null; charterId?: string }) {
   const [sidePanel, setSidePanel] = useState<SidePanel>(initialSubmission)
   const [feedbackOpen, setFeedbackOpen] = useState(true)
 
@@ -949,6 +951,7 @@ export function CharterClient({ initialSubmission }: { initialSubmission: Charte
           key={panelKey}
           mode={sidePanel === 'new' ? 'new' : 'edit'}
           submission={sidePanel !== 'new' ? sidePanel : undefined}
+          charterId={charterId}
           onCreated={handleCreated}
           onUpdated={handleUpdated}
           onAutoSaved={() => {}}
