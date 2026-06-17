@@ -613,7 +613,7 @@ export default function AdminChampionPage() {
               </div>
 
               {/* 코멘트 목록 (스크롤) */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {charterComments.length === 0 ? (
                   <p className="text-xs" style={{ color: 'var(--text-disabled)', textAlign: 'center', padding: '16px 0' }}>
                     아직 코멘트가 없습니다
@@ -652,7 +652,7 @@ export default function AdminChampionPage() {
                     }
                   }}
                   placeholder="코멘트 작성 (Cmd+Enter)"
-                  rows={30}
+                  rows={20}
                   className="w-full text-xs rounded-md border p-2 resize-none"
                   style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
                 />
