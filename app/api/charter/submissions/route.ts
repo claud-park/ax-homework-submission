@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { project_name, content, publish_status } = await req.json()
+  const { title, project_name, content, publish_status } = await req.json()
   const status = publish_status === 'published' ? 'published' : 'draft'
 
   if (status === 'published') {
@@ -62,16 +62,14 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('charter_submissions')
-    .upsert(
-      {
-        user_id: user.id,
-        project_name: project_name ?? null,
-        content: content ?? {},
-        publish_status: status,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    )
+    .insert({
+      user_id: user.id,
+      title: title ?? null,
+      project_name: project_name ?? null,
+      content: content ?? {},
+      publish_status: status,
+      updated_at: new Date().toISOString(),
+    })
     .select()
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
