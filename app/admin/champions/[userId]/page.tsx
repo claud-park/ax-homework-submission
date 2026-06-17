@@ -595,7 +595,7 @@ export default function AdminChampionPage() {
                 width: 300,
                 flexShrink: 0,
                 position: 'sticky',
-                top: 80,
+                top: 0,
                 maxHeight: 'calc(100vh - 120px)',
                 display: 'flex',
                 flexDirection: 'column',

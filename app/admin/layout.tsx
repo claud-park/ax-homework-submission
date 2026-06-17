@@ -35,7 +35,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const pendingCharters = (chartersResult.data ?? []).filter(c => !c.admin_approved_at).length
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'hsl(var(--background))' }}>
+    <div className="flex h-screen" style={{ background: 'hsl(var(--background))' }}>
       <AdminSidebar
         initialPendingBottleneck={pendingBottleneck}
         initialPendingCharters={pendingCharters}
