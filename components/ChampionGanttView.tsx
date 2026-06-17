@@ -667,7 +667,9 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     return () => scrollEl.removeEventListener('scroll', handler)
   }, [tasks.length, viewMode])
 
-  // ResizeObserver: calculate ganttBodyHeight to enable internal scroll (sticky header)
+  // ResizeObserver: calculate ganttBodyHeight to enable internal scroll (sticky header).
+  // Deps include filteredChampions.length so the observer re-attaches whenever the wrapper
+  // mounts/unmounts (all chips off → wrapper unmounts → chips on → wrapper remounts).
   useEffect(() => {
     const el = ganttWrapperRef.current
     if (!el) return
@@ -676,7 +678,8 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     const ro = new ResizeObserver(update)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredChampions.length])
 
   // Replace "W{n}" week labels with "W{n} M/D" (Monday date) in Week view
   useEffect(() => {
@@ -1031,7 +1034,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
           <>
             <div
               ref={ganttWrapperRef}
-              style={{ fontSize: 12, position: 'relative', overflow: 'hidden', height: 'calc(100dvh - 310px)', minHeight: 300 }}
+              style={{ fontSize: 12, position: 'relative', overflow: 'hidden', minHeight: 'calc(100dvh - 310px)', flexShrink: 0 }}
               onMouseMove={handleGanttMouseMove}
             >
               <Gantt
