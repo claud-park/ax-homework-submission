@@ -32,7 +32,13 @@ function buildTree(milestones: Milestone[]): Milestone[] {
       roots.push(m)
     }
   })
-  const sort = (arr: Milestone[]) => arr.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+  const sort = (arr: Milestone[]) => arr.sort((a, b) => {
+    const orderDiff = (a.display_order ?? 0) - (b.display_order ?? 0)
+    if (orderDiff !== 0) return orderDiff
+    const aDate = a.start_date ?? a.due_date ?? ''
+    const bDate = b.start_date ?? b.due_date ?? ''
+    return aDate.localeCompare(bDate)
+  })
   map.forEach(m => sort(m.children))
   return sort(roots)
 }
