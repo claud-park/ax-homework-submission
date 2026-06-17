@@ -641,7 +641,7 @@ export default function AdminChampionPage() {
               </div>
 
               {/* 입력창 (하단 고정) */}
-              <div style={{ padding: 12, borderTop: '1px solid var(--border-subtle)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ padding: 12, borderTop: '2px solid var(--border-subtle)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface-secondary)' }}>
                 <textarea
                   value={newCharterComment}
                   onChange={e => setNewCharterComment(e.target.value)}
@@ -654,7 +654,7 @@ export default function AdminChampionPage() {
                   placeholder="코멘트 작성 (Cmd+Enter)"
                   rows={20}
                   className="w-full text-xs rounded-md border p-2 resize-none"
-                  style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+                  style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
                 />
                 <button
                   onClick={postCharterComment}
