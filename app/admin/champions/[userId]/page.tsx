@@ -499,7 +499,7 @@ export default function AdminChampionPage() {
                           }
                         }}
                         placeholder="코멘트 작성 (Cmd+Enter)"
-                        rows={2}
+                        rows={3}
                         className="flex-1 text-xs rounded-md border p-2 resize-none"
                         style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
                       />
@@ -652,7 +652,7 @@ export default function AdminChampionPage() {
                     }
                   }}
                   placeholder="코멘트 작성 (Cmd+Enter)"
-                  rows={3}
+                  rows={30}
                   className="w-full text-xs rounded-md border p-2 resize-none"
                   style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
                 />

@@ -323,7 +323,7 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
                           }
                         }}
                         placeholder="코멘트 작성 (Cmd+Enter)"
-                        rows={2}
+                        rows={3}
                         className="flex-1 text-xs rounded-lg border p-2 resize-none outline-none"
                         style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
                       />
