@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { CheckinTab } from '@/components/CheckinTab'
 import { MobileMilestoneCard } from '@/components/MobileMilestoneCard'
-import type { BottleneckType } from '@/lib/types'
+import type { BottleneckType, CharterSubmission } from '@/lib/types'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
 const inputStyle = { background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
@@ -17,9 +17,11 @@ const inputStyle = { background: 'var(--background)', border: '1px solid var(--b
 interface Props {
   initialMilestones: Milestone[]
   charterApproved: boolean
+  charters: Pick<CharterSubmission, 'id' | 'title' | 'project_name' | 'admin_approved_at'>[]
+  currentCharterId: string | null
 }
 
-export function MilestonesClient({ initialMilestones, charterApproved: initialCharterApproved }: Props) {
+export function MilestonesClient({ initialMilestones, charterApproved: initialCharterApproved, charters, currentCharterId }: Props) {
   const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones)
   const charterApproved = initialCharterApproved
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; start_date: string; isReschedule: boolean } | null>(null)
@@ -146,6 +148,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
 
   const checkinProps = {
     charterApproved,
+    charterId: currentCharterId ?? undefined,
     onComplete: handleCheckinComplete,
     onIssueReport: handleCheckinIssueReport,
     onInProgress: handleCheckinInProgress,
@@ -155,6 +158,29 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
 
   return (
     <>
+      {charters.length > 1 && (
+        <div style={{ marginBottom: 16 }}>
+          <select
+            value={currentCharterId ?? ''}
+            onChange={e => {
+              const url = new URL(window.location.href)
+              url.searchParams.set('charter_id', e.target.value)
+              window.location.href = url.toString()
+            }}
+            style={{
+              padding: '8px 12px', borderRadius: 8, fontSize: 14,
+              border: '1.5px solid var(--border-subtle)', background: 'var(--surface-secondary)',
+              color: 'var(--text-primary)', cursor: 'pointer',
+            }}
+          >
+            {charters.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.title ?? c.project_name ?? 'Charter'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {/* 모바일: 마일스톤 카드 */}
       <div className="md:hidden flex flex-col gap-3">
         {(() => {
