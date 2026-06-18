@@ -13,7 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function CharterListClient({ initialCharters }: { initialCharters: CharterSubmission[] }) {
   const router = useRouter()
-  const [charters, setCharters] = useState(initialCharters)
+  const charters = initialCharters
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [showModal, setShowModal] = useState(false)
