@@ -17,7 +17,8 @@ import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ChevronsLeft, ChevronsRight, FileText, FileDown } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, FileText, FileDown, ChevronLeft } from 'lucide-react'
+import Link from 'next/link'
 import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 
 type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build' | 'closing'
@@ -809,6 +810,15 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
     <div className="flex flex-col h-full">
       {/* Page header */}
       <div className="flex items-center gap-4 px-6 py-3.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--background)' }}>
+        <Link
+          href="/my-project/charter"
+          title="목록으로"
+          style={{ display: 'flex', alignItems: 'center', color: 'var(--text-tertiary)', flexShrink: 0 }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Link>
         <div className="flex-1 min-w-0">
           <label htmlFor="charter-project-name" className="sr-only">프로젝트명</label>
           <input
