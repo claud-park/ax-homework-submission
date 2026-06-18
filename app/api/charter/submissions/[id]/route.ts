@@ -63,3 +63,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await verifyJWT(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = createServiceClient()
+  const { data: existing } = await supabase
+    .from('charter_submissions').select('id').eq('id', params.id).eq('user_id', user.id).single()
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const { error } = await supabase
+    .from('charter_submissions').delete().eq('id', params.id).eq('user_id', user.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return new NextResponse(null, { status: 204 })
+}
