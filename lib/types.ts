@@ -71,6 +71,7 @@ export interface ProjectCharter {
 export interface Milestone {
   id: string
   user_id: string
+  charter_submission_id: string | null
   week_number: number | null
   title: string
   description: string | null
@@ -137,7 +138,7 @@ export interface ChampionSummary {
 
 export interface ChampionProject {
   user: User
-  charter: (CharterSubmission & { comments: CharterComment[] }) | null
+  charters: (CharterSubmission & { comments: CharterComment[] })[]
   milestones: Milestone[]
   latestSubmission: Submission | null
 }

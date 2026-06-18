@@ -66,17 +66,17 @@ export default function ChampionDetailPage() {
       <div className="mb-6">
         <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{displayName}</h1>
         {department && <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{department}</p>}
-        {data.charter?.project_name && (
-          <p className="text-sm mt-1 font-medium" style={{ color: 'var(--text-primary)' }}>{data.charter.project_name}</p>
+        {data.charters[0]?.project_name && (
+          <p className="text-sm mt-1 font-medium" style={{ color: 'var(--text-primary)' }}>{data.charters[0].project_name}</p>
         )}
       </div>
 
-      {data.charter && (
+      {data.charters.length > 0 && (
         <section id="charter" className="mb-8">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>과제정의서</h2>
           <div className="flex flex-col gap-3">
             {CHARTER_SECTIONS.map(s => {
-              const html = data.charter!.content?.[s.key as keyof CharterSubmission['content']]
+              const html = data.charters[0]!.content?.[s.key as keyof CharterSubmission['content']]
               if (!html) return null
               return (
                 <div

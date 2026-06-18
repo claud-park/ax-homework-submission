@@ -24,8 +24,7 @@ export async function GET(
       .from('charter_submissions')
       .select('*')
       .eq('user_id', userId)
-      .order('submitted_at', { ascending: false })
-      .limit(1),
+      .order('submitted_at', { ascending: false }),
     supabase
       .from('milestones')
       .select('*')
@@ -46,21 +45,21 @@ export async function GET(
   if (msErr) return NextResponse.json({ error: msErr.message }, { status: 500 })
   if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 })
 
-  const charter = charterRows?.[0] ?? null
-  let charterWithComments = null
-  if (charter) {
-    const { data: comments } = await supabase
-      .from('charter_comments')
-      .select('*, replies:charter_comments!parent_id(*)')
-      .eq('charter_submission_id', charter.id)
-      .is('parent_id', null)
-      .order('created_at')
-    charterWithComments = { ...charter, comments: comments ?? [] }
-  }
+  const chartersWithComments = await Promise.all(
+    (charterRows ?? []).map(async charter => {
+      const { data: comments } = await supabase
+        .from('charter_comments')
+        .select('*, replies:charter_comments!parent_id(*)')
+        .eq('charter_submission_id', charter.id)
+        .is('parent_id', null)
+        .order('created_at')
+      return { ...charter, comments: comments ?? [] }
+    })
+  )
 
   const result: ChampionProject = {
     user: userRow,
-    charter: charterWithComments,
+    charters: chartersWithComments,
     milestones: milestones ?? [],
     latestSubmission: submissions?.[0] ?? null,
   }

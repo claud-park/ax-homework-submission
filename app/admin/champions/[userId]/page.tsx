@@ -172,6 +172,9 @@ export default function AdminChampionPage() {
   const [loading, setLoading] = useState(true)
   const [approving, setApproving] = useState(false)
 
+  // active charter tab state
+  const [activeCharterId, setActiveCharterId] = useState<string | null>(null)
+
   // charter comments
   const [charterComments, setCharterComments] = useState<CharterComment[]>([])
   const [newCharterComment, setNewCharterComment] = useState('')
@@ -200,7 +203,9 @@ export default function AdminChampionPage() {
     Promise.all([
       apiFetch<ChampionProject>(`/api/champions/${userId}`).then(d => {
         setData(d)
-        if (d.charter?.id) loadCharterComments(d.charter.id)
+        const firstId = d.charters[0]?.id ?? null
+        setActiveCharterId(firstId)
+        if (firstId) loadCharterComments(firstId)
       }),
       loadSubs(),
     ])
@@ -209,17 +214,29 @@ export default function AdminChampionPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
+  // Derived: active charter and filtered milestones
+  const activeCharter = data?.charters.find(c => c.id === activeCharterId) ?? data?.charters[0] ?? null
+  const activeCharterMilestones = (data?.milestones ?? []).filter(m =>
+    activeCharterId ? m.charter_submission_id === activeCharterId : true
+  )
+
+  function handleTabChange(charterId: string) {
+    setActiveCharterId(charterId)
+    setCharterComments([])
+    loadCharterComments(charterId)
+  }
+
   async function postCharterComment() {
-    if (!data?.charter?.id || !newCharterComment.trim()) return
+    if (!activeCharter?.id || !newCharterComment.trim()) return
     setPostingCharter(true)
     try {
-      await apiFetch(`/api/charter/submissions/${data.charter.id}/comments`, {
+      await apiFetch(`/api/charter/submissions/${activeCharter.id}/comments`, {
         method: 'POST',
         body: JSON.stringify({ body: newCharterComment.trim() }),
       })
       toast.success('코멘트가 작성되었습니다.')
       setNewCharterComment('')
-      await loadCharterComments(data.charter.id)
+      await loadCharterComments(activeCharter.id)
     } catch {
       toast.error('코멘트 작성 실패')
     } finally {
@@ -231,7 +248,15 @@ export default function AdminChampionPage() {
     setApproving(true)
     try {
       const updated = await apiFetch<CharterSubmission>(`/api/admin/charters/${charterId}/approve`, { method: 'POST' })
-      setData(prev => prev ? { ...prev, charter: prev.charter ? { ...prev.charter, admin_approved_at: updated.admin_approved_at } : null } : null)
+      setData(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          charters: prev.charters.map(c =>
+            c.id === charterId ? { ...c, admin_approved_at: updated.admin_approved_at } : c
+          ),
+        }
+      })
       toast.success('과제정의서가 승인되었습니다.')
     } catch {
       toast.error('승인 처리에 실패했습니다.')
@@ -329,8 +354,8 @@ export default function AdminChampionPage() {
       <div className="mb-6">
         <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{displayName}</h1>
         {department && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{department}</p>}
-        {data.charter?.project_name && (
-          <p className="text-sm font-medium mt-1" style={{ color: 'var(--text-primary)' }}>{data.charter.project_name}</p>
+        {data.charters[0]?.project_name && (
+          <p className="text-sm font-medium mt-1" style={{ color: 'var(--text-primary)' }}>{data.charters[0].project_name}</p>
         )}
       </div>
 
@@ -520,28 +545,49 @@ export default function AdminChampionPage() {
         )}
       </section>
 
-      {data.charter && (
+      {data.charters.length > 0 && (
         <section id="charter" className="mb-8">
+          {/* Charter 탭 (2개 이상일 때만 표시) */}
+          {data.charters.length > 1 && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1.5px solid var(--border-subtle)', paddingBottom: 0 }}>
+              {data.charters.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => handleTabChange(c.id)}
+                  style={{
+                    padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
+                    fontSize: 14, fontWeight: activeCharterId === c.id ? 700 : 400,
+                    color: activeCharterId === c.id ? 'var(--primary)' : 'var(--text-secondary)',
+                    borderBottom: activeCharterId === c.id ? '2px solid var(--primary)' : '2px solid transparent',
+                    marginBottom: -1.5,
+                  }}
+                >
+                  {c.title ?? c.project_name ?? 'Charter'}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* 헤더: 제목 + 승인 버튼 */}
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</h2>
-            {data.charter.admin_approved_at ? (
+            {activeCharter?.admin_approved_at ? (
               <span
                 className="text-xs font-semibold px-2.5 py-1 rounded-full"
                 style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}
               >
-                ✓ 승인됨 · {new Date(data.charter.admin_approved_at).toLocaleDateString('ko-KR')}
+                ✓ 승인됨 · {new Date(activeCharter.admin_approved_at).toLocaleDateString('ko-KR')}
               </span>
-            ) : (
+            ) : activeCharter ? (
               <button
-                onClick={() => approveCharter(data.charter!.id)}
+                onClick={() => approveCharter(activeCharter.id)}
                 disabled={approving}
                 className="text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-50"
                 style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer' }}
               >
                 {approving ? '처리 중…' : '✓ 승인'}
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* 2-column: 좌(과제정의서) + 우(코멘트 패널) */}
@@ -550,7 +596,7 @@ export default function AdminChampionPage() {
             {/* 좌측: 과제정의서 내용 */}
             <div className="flex flex-col gap-3 flex-1 min-w-0">
               {CHARTER_SECTIONS.map(s => {
-                const html = data.charter!.content?.[s.key as keyof CharterSubmission['content']]
+                const html = activeCharter?.content?.[s.key as keyof CharterSubmission['content']]
                 if (!html) return null
                 return (
                   <div key={s.key} className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
@@ -565,9 +611,9 @@ export default function AdminChampionPage() {
               {/* 06. Timeline · Milestones */}
               <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
                 <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>06. Timeline · Milestones</p>
-                {(data.milestones ?? []).length > 0 ? (
+                {activeCharterMilestones.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {buildTree(data.milestones ?? []).map(m => (
+                    {buildTree(activeCharterMilestones).map(m => (
                       <MilestoneRow key={m.id} m={m as Milestone & { children?: Milestone[] }} depth={0} />
                     ))}
                   </div>
@@ -579,9 +625,9 @@ export default function AdminChampionPage() {
               {/* 07. 마무리 */}
               <div className="p-4 rounded-xl border" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
                 <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>07. Closing · 마무리</p>
-                {data.charter!.content.closing ? (
+                {activeCharter?.content.closing ? (
                   <div className="charter-editor">
-                    <div className="ProseMirror" style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: data.charter!.content.closing }} />
+                    <div className="ProseMirror" style={{ padding: 0, fontSize: '0.8125rem', lineHeight: 1.65, color: 'var(--text-primary)' }} dangerouslySetInnerHTML={{ __html: activeCharter.content.closing }} />
                   </div>
                 ) : (
                   <p className="text-xs italic" style={{ color: 'var(--text-disabled)', margin: 0 }}>(내용 없음)</p>
