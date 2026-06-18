@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
-import type { GanttChampion } from '@/app/api/champions/gantt/route'
+import type { GanttChampion, GanttMilestone } from '@/app/api/champions/gantt/route'
 import type { ChampionSummary, MilestoneStatus } from '@/lib/types'
 
 export async function fetchGanttData(): Promise<GanttChampion[]> {
@@ -27,16 +27,22 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
   }
 
   // charter_id → milestone[]
-  type RawMs = { id: string; user_id: string; title: string; start_date: string | null; due_date: string | null; status: string; week_number: number | null; parent_milestone_id: string | null; display_order: number | null; charter_submission_id: string | null }
-  const msByCharter = new Map<string, RawMs[]>()
-  const orphanMsByUser = new Map<string, RawMs[]>()
-  for (const m of (milestones ?? []) as RawMs[]) {
+  const msByCharter = new Map<string, GanttMilestone[]>()
+  const orphanMsByUser = new Map<string, GanttMilestone[]>()
+  for (const m of milestones ?? []) {
+    const ms: GanttMilestone = {
+      id: m.id, title: m.title, start_date: m.start_date, due_date: m.due_date,
+      status: m.status as MilestoneStatus, week_number: m.week_number,
+      parent_milestone_id: m.parent_milestone_id ?? null,
+      display_order: m.display_order ?? null,
+      charter_submission_id: m.charter_submission_id ?? null,
+    }
     if (m.charter_submission_id) {
       if (!msByCharter.has(m.charter_submission_id)) msByCharter.set(m.charter_submission_id, [])
-      msByCharter.get(m.charter_submission_id)!.push(m)
+      msByCharter.get(m.charter_submission_id)!.push(ms)
     } else {
       if (!orphanMsByUser.has(m.user_id)) orphanMsByUser.set(m.user_id, [])
-      orphanMsByUser.get(m.user_id)!.push(m)
+      orphanMsByUser.get(m.user_id)!.push(ms)
     }
   }
 
@@ -47,36 +53,16 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
 
     const charterRows = userCharters.map((c, idx) => ({
       id: c.id,
-      title: (c as { title?: string | null }).title ?? null,
+      title: c.title ?? null,
       projectName: c.project_name ?? null,
       milestones: [
-        ...(msByCharter.get(c.id) ?? []).map(m => ({
-          id: m.id, title: m.title, start_date: m.start_date, due_date: m.due_date,
-          status: m.status as import('@/lib/types').MilestoneStatus,
-          week_number: m.week_number, parent_milestone_id: m.parent_milestone_id ?? null,
-          display_order: m.display_order ?? null, charter_submission_id: m.charter_submission_id,
-        })),
-        ...(idx === 0 ? orphans : []).map(m => ({
-          id: m.id, title: m.title, start_date: m.start_date, due_date: m.due_date,
-          status: m.status as import('@/lib/types').MilestoneStatus,
-          week_number: m.week_number, parent_milestone_id: m.parent_milestone_id ?? null,
-          display_order: m.display_order ?? null, charter_submission_id: m.charter_submission_id,
-        })),
+        ...(msByCharter.get(c.id) ?? []),
+        ...(idx === 0 ? orphans : []),
       ],
     }))
 
     if (charterRows.length === 0 && orphans.length > 0) {
-      charterRows.push({
-        id: '__orphan__' + u.id,
-        title: null,
-        projectName: null,
-        milestones: orphans.map(m => ({
-          id: m.id, title: m.title, start_date: m.start_date, due_date: m.due_date,
-          status: m.status as import('@/lib/types').MilestoneStatus,
-          week_number: m.week_number, parent_milestone_id: m.parent_milestone_id ?? null,
-          display_order: m.display_order ?? null, charter_submission_id: m.charter_submission_id,
-        })),
-      })
+      charterRows.push({ id: '__orphan__' + u.id, title: null, projectName: null, milestones: orphans })
     }
 
     return { userId: u.id, name: displayName, department, charters: charterRows }
@@ -91,7 +77,13 @@ export async function fetchSummaryData(): Promise<ChampionSummary[]> {
     supabase.from('milestones').select('user_id, week_number, status').eq('publish_status', 'published'),
   ])
 
-  const charterMap = new Map((charters ?? []).map(c => [c.user_id, c]))
+  // user_id → charter[] (1:N)
+  const chartersByUser = new Map<string, NonNullable<typeof charters>[0][]>()
+  for (const c of charters ?? []) {
+    if (!chartersByUser.has(c.user_id)) chartersByUser.set(c.user_id, [])
+    chartersByUser.get(c.user_id)!.push(c)
+  }
+
   const msMap = new Map<string, { week: number; status: string }[]>()
   for (const m of milestones ?? []) {
     if (!msMap.has(m.user_id)) msMap.set(m.user_id, [])
@@ -100,7 +92,8 @@ export async function fetchSummaryData(): Promise<ChampionSummary[]> {
 
   return (users ?? []).map(u => {
     const { displayName, department } = parseName(u.name)
-    const charter = charterMap.get(u.id)
+    // ChampionSummary: 첫 번째 charter 기준 유지 (향후 확장 가능)
+    const charter = chartersByUser.get(u.id)?.[0]
     const weeklyStatus: Record<number, MilestoneStatus> = {}
     for (const { week, status } of msMap.get(u.id) ?? []) {
       weeklyStatus[week] = status as MilestoneStatus

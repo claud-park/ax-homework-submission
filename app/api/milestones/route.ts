@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
   const targetUserId = req.nextUrl.searchParams.get('user_id')
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 
+  const charter_id = req.nextUrl.searchParams.get('charter_id')
+
   const supabase = createServiceClient()
   let query = supabase
     .from('milestones')
@@ -51,6 +53,7 @@ export async function GET(req: NextRequest) {
     .order('start_date', { ascending: true, nullsFirst: false })
 
   if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
+  if (charter_id) query = query.eq('charter_submission_id', charter_id)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const { title, start_date, due_date, description, publish_status, parent_milestone_id } = body
+  const { title, start_date, due_date, description, publish_status, parent_milestone_id, charter_submission_id } = body
   const status = publish_status === 'published' ? 'published' : 'draft'
 
   if (status === 'published' && !title) {
@@ -81,6 +84,7 @@ export async function POST(req: NextRequest) {
     .from('milestones')
     .insert({
       user_id: user.id,
+      charter_submission_id: charter_submission_id ?? null,
       title: title ?? '',
       start_date: start_date ?? null,
       due_date: due_date ?? null,

@@ -62,6 +62,7 @@ export interface CharterSubmission {
 export interface ProjectCharter {
   id: string
   user_id: string
+  charter_submission_id: string | null
   project_name: string | null
   content: CharterSubmission['content']
   updated_at: string

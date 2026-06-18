@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
+  const charter_submission_id: string | null = body?.charter_submission_id ?? null
   const result = normalizeBatch((body?.milestones ?? []) as BatchInput[])
   if (!result.ok) {
     return NextResponse.json({ error: 'validation_failed', message: result.error }, { status: 400 })
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
         .from('milestones')
         .insert({
           user_id: user.id,
+          charter_submission_id,
           title: parent.title,
           description: parent.description ?? null,
           start_date: parent.start_date ?? null,
@@ -42,6 +44,7 @@ export async function POST(req: NextRequest) {
           .from('milestones')
           .insert({
             user_id: user.id,
+            charter_submission_id,
             title: child.title,
             description: child.description ?? null,
             start_date: child.start_date ?? null,
