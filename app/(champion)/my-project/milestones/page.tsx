@@ -30,9 +30,14 @@ export default async function WorkStatusPage({
   const charters = (chartersData ?? []) as Pick<CharterSubmission, 'id' | 'title' | 'project_name' | 'admin_approved_at'>[]
   const charterId = searchParams.charter_id ?? charters[0]?.id ?? null
 
-  const milestones = (milestonesData ?? []).filter(m =>
-    charterId ? m.charter_submission_id === charterId : true
-  ) as Milestone[]
+  const firstCharterId = charters[0]?.id ?? null
+  const milestones = (milestonesData ?? []).filter(m => {
+    if (!charterId) return true
+    if (m.charter_submission_id === charterId) return true
+    // orphan 마일스톤(FK null)은 첫 번째 charter에 표시 (Gantt와 동일)
+    if (m.charter_submission_id === null && charterId === firstCharterId) return true
+    return false
+  }) as Milestone[]
 
   const charterApproved = charters.some(c => !!c.admin_approved_at)
 
