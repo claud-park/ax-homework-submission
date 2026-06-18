@@ -17,10 +17,5 @@ export default async function CharterPage() {
 
   const charters = (submissions ?? []) as CharterSubmission[]
 
-  // charter가 정확히 1개이면 기존과 동일하게 바로 편집기로 리다이렉트 (하위 호환)
-  if (charters.length === 1) {
-    redirect(`/my-project/charter/${charters[0].id}`)
-  }
-
   return <CharterListClient initialCharters={charters} />
 }
