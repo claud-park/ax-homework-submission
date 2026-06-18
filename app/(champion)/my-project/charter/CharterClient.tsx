@@ -153,11 +153,12 @@ const TIMELINE_INPUT: React.CSSProperties = {
   width: '100%',
 }
 
-function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
+function TimelineSection({ milestones, onAdded, onUpdated, onDeleted, charterId }: {
   milestones: Milestone[]
   onAdded: (m: Milestone) => void
   onUpdated: (m: Milestone) => void
   onDeleted: (id: string) => void
+  charterId?: string
 }) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', start_date: '', due_date: '' })
@@ -230,6 +231,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
           start_date: form.start_date || null,
           due_date: form.due_date || null,
           publish_status: 'published',
+          charter_submission_id: charterId ?? null,
         }),
       })
       onAdded(created)
@@ -255,6 +257,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
           start_date: subForm.start_date || null,
           due_date: subForm.due_date || null,
           publish_status: 'published',
+          charter_submission_id: charterId ?? null,
         }),
       })
       onAdded(created)
@@ -477,6 +480,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted }: {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onSaved={created => created.forEach(onAdded)}
+        charterId={charterId}
       />
     </div>
   )
@@ -882,6 +886,7 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
             onAdded={m => setMilestones(prev => [...prev, m])}
             onUpdated={m => setMilestones(prev => prev.map(x => x.id === m.id ? m : x))}
             onDeleted={id => setMilestones(prev => prev.filter(x => x.id !== id))}
+            charterId={charterId}
           />
           <SectionGroupHeader label="마무리" />
           <SectionEditor

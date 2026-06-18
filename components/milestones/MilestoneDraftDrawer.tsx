@@ -25,11 +25,12 @@ function toDraft(s: Scheduled, source: DraftMilestone['source']): DraftMilestone
 function today(): string { return new Date().toISOString().slice(0, 10) }
 
 export default function MilestoneDraftDrawer({
-  open, onClose, onSaved,
+  open, onClose, onSaved, charterId,
 }: {
   open: boolean
   onClose: () => void
   onSaved: (created: Milestone[]) => void
+  charterId?: string
 }) {
   const [tab, setTab] = useState<Tab>('ai')
   const [rows, setRows] = useState<DraftMilestone[]>([])
@@ -53,7 +54,7 @@ export default function MilestoneDraftDrawer({
     try {
       const { milestones } = await apiFetch<{ milestones: Scheduled[] }>('/api/milestones/generate', {
         method: 'POST',
-        body: JSON.stringify({ prompt, useCharter, startDate }),
+        body: JSON.stringify({ prompt, useCharter, startDate, charter_id: charterId }),
       })
       setRows(milestones.map(m => toDraft(m, 'ai')))
     } catch {
@@ -97,7 +98,7 @@ export default function MilestoneDraftDrawer({
       }))
       const { milestones } = await apiFetch<{ milestones: Milestone[] }>('/api/milestones/batch', {
         method: 'POST',
-        body: JSON.stringify({ milestones: payload }),
+        body: JSON.stringify({ milestones: payload, charter_submission_id: charterId ?? null }),
       })
       toast.success(`${milestones.length}개 마일스톤을 저장했어요.`)
       onSaved(milestones)
