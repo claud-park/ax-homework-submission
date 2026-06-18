@@ -57,7 +57,7 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
       {charters.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-tertiary)' }}>
           <p>아직 작성된 과제정의서가 없습니다.</p>
-          <p style={{ marginTop: 8, fontSize: 14 }}>"새로 만들기"를 눌러 첫 번째 Charter를 시작하세요.</p>
+          <p style={{ marginTop: 8, fontSize: 14 }}>&quot;새로 만들기&quot;를 눌러 첫 번째 Charter를 시작하세요.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

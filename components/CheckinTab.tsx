@@ -317,7 +317,6 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
 export interface CheckinTabProps {
   milestones: Milestone[]
   charterApproved: boolean
-  charterId?: string
   onComplete: (id: string) => Promise<void>
   onIssueReport: (id: string, type: BottleneckType, note: string | null) => Promise<void>
   onInProgress: (id: string) => Promise<void>
@@ -326,7 +325,7 @@ export interface CheckinTabProps {
   showOverdue?: boolean
 }
 
-export function CheckinTab({ milestones, charterApproved, charterId, onComplete, onIssueReport, onInProgress, onDeadlineExtension, onNoteUpdate, showOverdue = true }: CheckinTabProps) {
+export function CheckinTab({ milestones, charterApproved, onComplete, onIssueReport, onInProgress, onDeadlineExtension, onNoteUpdate, showOverdue = true }: CheckinTabProps) {
   const [completeConfirmId, setCompleteConfirmId] = useState<string | null>(null)
   const [issueMilestone, setIssueMilestone] = useState<Milestone | null>(null)
   const [issueForm, setIssueForm] = useState<{ type: BottleneckType | ''; note: string }>({ type: '', note: '' })

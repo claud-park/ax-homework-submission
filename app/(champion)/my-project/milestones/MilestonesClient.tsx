@@ -148,7 +148,6 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
 
   const checkinProps = {
     charterApproved,
-    charterId: currentCharterId ?? undefined,
     onComplete: handleCheckinComplete,
     onIssueReport: handleCheckinIssueReport,
     onInProgress: handleCheckinInProgress,
