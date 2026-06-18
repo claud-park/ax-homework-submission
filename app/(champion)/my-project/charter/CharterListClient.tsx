@@ -51,10 +51,11 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', padding: '48px 24px' }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 24 }}>
-        내 과제정의서
-      </h1>
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>내 과제정의서</h1>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>작성한 과제정의서를 확인하고 새로 추가할 수 있습니다.</p>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {charters.map(charter => (
