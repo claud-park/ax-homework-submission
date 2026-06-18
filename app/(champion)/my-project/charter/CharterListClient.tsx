@@ -25,27 +25,19 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
   const router = useRouter()
   const charters = initialCharters
   const [creating, setCreating] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [showModal, setShowModal] = useState(false)
   const [hovered, setHovered] = useState<string | null>(null)
 
   async function handleCreate() {
-    if (!newTitle.trim()) {
-      toast.error('Charter 제목을 입력해주세요.')
-      return
-    }
+    if (creating) return
     setCreating(true)
     try {
       const data = await apiFetch<CharterSubmission>('/api/charter/submissions', {
         method: 'POST',
-        body: JSON.stringify({ title: newTitle.trim(), publish_status: 'draft', content: {} }),
+        body: JSON.stringify({ title: '', publish_status: 'draft', content: {} }),
       })
-      setShowModal(false)
-      setNewTitle('')
       router.push(`/my-project/charter/${data.id}`)
     } catch {
       toast.error('Charter 생성에 실패했습니다.')
-    } finally {
       setCreating(false)
     }
   }
@@ -84,7 +76,7 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
 
         {/* Add button — always visible, styled as a list row */}
         <div
-          onClick={() => setShowModal(true)}
+          onClick={handleCreate}
           onMouseEnter={() => setHovered('__add__')}
           onMouseLeave={() => setHovered(null)}
           style={{
@@ -96,54 +88,11 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
         >
           <span style={{ width: 16, textAlign: 'center', fontSize: 14, color: 'var(--text-tertiary)', opacity: 0.6, flexShrink: 0 }}>+</span>
           <span style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>
-            {charters.length === 0 ? '첫 번째 과제정의서 작성' : '과제정의서 추가'}
+            {creating ? '생성 중...' : charters.length === 0 ? '첫 번째 과제정의서 작성' : '과제정의서 추가'}
           </span>
         </div>
       </div>
 
-      {showModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{
-            background: 'var(--surface-primary)', borderRadius: 12, padding: 28, width: 400, maxWidth: '90vw',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.16)',
-          }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 14, color: 'var(--text-primary)' }}>
-              새 과제정의서
-            </h2>
-            <input
-              autoFocus
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              placeholder="제목 (예: AI 헬스케어 플랫폼)"
-              style={{
-                width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 14,
-                border: '1px solid var(--border-subtle)', outline: 'none', marginBottom: 16,
-                background: 'var(--surface-secondary)', color: 'var(--text-primary)',
-                boxSizing: 'border-box',
-              }}
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => { setShowModal(false); setNewTitle('') }}
-                style={{ padding: '7px 16px', borderRadius: 6, fontSize: 14, border: '1px solid var(--border-subtle)', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}
-              >
-                취소
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={creating || !newTitle.trim()}
-                style={{ padding: '7px 16px', borderRadius: 6, fontSize: 14, fontWeight: 500, background: 'var(--primary)', color: '#fff', border: 'none', cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1 }}
-              >
-                {creating ? '생성 중...' : '만들기'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
