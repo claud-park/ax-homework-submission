@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     .order('start_date', { ascending: true, nullsFirst: false })
 
   if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
-  if (charter_id) query = query.eq('charter_submission_id', charter_id)
+  if (charter_id) query = query.or(`charter_submission_id.eq.${charter_id},charter_submission_id.is.null`)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
