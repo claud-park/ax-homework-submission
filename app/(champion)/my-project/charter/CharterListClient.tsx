@@ -11,12 +11,23 @@ const STATUS_LABEL: Record<string, string> = {
   published: '제출됨',
 }
 
+function DocIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.45 }}>
+      <path d="M3 2.5A1.5 1.5 0 0 1 4.5 1h5.086a1.5 1.5 0 0 1 1.06.44l2.915 2.914A1.5 1.5 0 0 1 14 5.414V13.5A1.5 1.5 0 0 1 12.5 15h-8A1.5 1.5 0 0 1 3 13.5v-11Z" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M9.5 1v3.5a.5.5 0 0 0 .5.5H13.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      <path d="M5.5 8.5h5M5.5 11h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
 export function CharterListClient({ initialCharters }: { initialCharters: CharterSubmission[] }) {
   const router = useRouter()
   const charters = initialCharters
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [hovered, setHovered] = useState<string | null>(null)
 
   async function handleCreate() {
     if (!newTitle.trim()) {
@@ -40,88 +51,91 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
   }
 
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', padding: '32px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>내 과제정의서</h1>
-        <button
+    <div style={{ maxWidth: 600, margin: '0 auto', padding: '48px 24px' }}>
+      <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 24 }}>
+        내 과제정의서
+      </h1>
+
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {charters.map(charter => (
+          <div
+            key={charter.id}
+            onClick={() => router.push(`/my-project/charter/${charter.id}`)}
+            onMouseEnter={() => setHovered(charter.id)}
+            onMouseLeave={() => setHovered(null)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
+              background: hovered === charter.id ? 'var(--surface-hover, rgba(0,0,0,0.04))' : 'transparent',
+              transition: 'background 0.1s',
+            }}
+          >
+            <DocIcon />
+            <span style={{ fontSize: 14, color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {charter.title ?? charter.project_name ?? 'Untitled'}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-tertiary)', flexShrink: 0 }}>
+              {STATUS_LABEL[charter.publish_status] ?? charter.publish_status}
+              {charter.admin_approved_at ? ' · 승인됨' : ''}
+            </span>
+          </div>
+        ))}
+
+        {/* Add button — always visible, styled as a list row */}
+        <div
           onClick={() => setShowModal(true)}
+          onMouseEnter={() => setHovered('__add__')}
+          onMouseLeave={() => setHovered(null)}
           style={{
-            padding: '8px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600,
-            background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 8px', borderRadius: 6, cursor: 'pointer', marginTop: 2,
+            background: hovered === '__add__' ? 'var(--surface-hover, rgba(0,0,0,0.04))' : 'transparent',
+            transition: 'background 0.1s',
           }}
         >
-          + 새로 만들기
-        </button>
+          <span style={{ width: 16, textAlign: 'center', fontSize: 14, color: 'var(--text-tertiary)', opacity: 0.6, flexShrink: 0 }}>+</span>
+          <span style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>
+            {charters.length === 0 ? '첫 번째 과제정의서 작성' : '과제정의서 추가'}
+          </span>
+        </div>
       </div>
-
-      {charters.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-tertiary)' }}>
-          <p>아직 작성된 과제정의서가 없습니다.</p>
-          <p style={{ marginTop: 8, fontSize: 14 }}>&quot;새로 만들기&quot;를 눌러 첫 번째 Charter를 시작하세요.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {charters.map(charter => (
-            <div
-              key={charter.id}
-              onClick={() => router.push(`/my-project/charter/${charter.id}`)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '16px 20px', borderRadius: 12, background: 'var(--surface-primary)',
-                border: '1.5px solid var(--border-subtle)', cursor: 'pointer',
-                boxShadow: 'var(--shadow-s)',
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>
-                  {charter.title ?? charter.project_name ?? 'Untitled Charter'}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 4 }}>
-                  {STATUS_LABEL[charter.publish_status] ?? charter.publish_status}
-                  {charter.admin_approved_at ? ' · 승인됨' : ''}
-                </div>
-              </div>
-              <span style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500 }}>편집 →</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {showModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000,
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div style={{
-            background: 'var(--surface-primary)', borderRadius: 16, padding: 32, width: 400, maxWidth: '90vw',
+            background: 'var(--surface-primary)', borderRadius: 12, padding: 28, width: 400, maxWidth: '90vw',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.16)',
           }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
-              새 Charter 만들기
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 14, color: 'var(--text-primary)' }}>
+              새 과제정의서
             </h2>
             <input
               autoFocus
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              placeholder="Charter 제목 (예: AI 헬스케어)"
+              placeholder="제목 (예: AI 헬스케어 플랫폼)"
               style={{
-                width: '100%', padding: '10px 14px', borderRadius: 8, fontSize: 15,
-                border: '1.5px solid var(--border-subtle)', outline: 'none', marginBottom: 20,
+                width: '100%', padding: '9px 12px', borderRadius: 8, fontSize: 14,
+                border: '1px solid var(--border-subtle)', outline: 'none', marginBottom: 16,
                 background: 'var(--surface-secondary)', color: 'var(--text-primary)',
                 boxSizing: 'border-box',
               }}
             />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => { setShowModal(false); setNewTitle('') }}
-                style={{ padding: '8px 18px', borderRadius: 8, fontSize: 14, border: '1.5px solid var(--border-subtle)', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                style={{ padding: '7px 16px', borderRadius: 6, fontSize: 14, border: '1px solid var(--border-subtle)', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}
               >
                 취소
               </button>
               <button
                 onClick={handleCreate}
                 disabled={creating || !newTitle.trim()}
-                style={{ padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, background: 'var(--primary)', color: '#fff', border: 'none', cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1 }}
+                style={{ padding: '7px 16px', borderRadius: 6, fontSize: 14, fontWeight: 500, background: 'var(--primary)', color: '#fff', border: 'none', cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1 }}
               >
                 {creating ? '생성 중...' : '만들기'}
               </button>
