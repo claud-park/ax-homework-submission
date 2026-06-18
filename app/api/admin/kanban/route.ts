@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       .select('id, user_id, file_name, link_url, status, attempt_number, submitted_at')
       .order('submitted_at', { ascending: false }),
     supabase.from('milestones').select('user_id, status').eq('publish_status', 'published'),
-    supabase.from('charter_submissions').select('user_id').eq('publish_status', 'published'),
+    supabase.from('charter_submissions').select('user_id, admin_approved_at').eq('publish_status', 'published'),
     supabase.from('deadline_change_requests').select('user_id').eq('status', 'pending'),
   ])
 
@@ -45,7 +45,13 @@ export async function GET(req: NextRequest) {
     milestoneMap.set(m.user_id, entry)
   }
 
-  const charterSet = new Set<string>((charters ?? []).map(c => c.user_id))
+  const charterCountMap = new Map<string, { total: number; approved: number }>()
+  for (const c of charters ?? []) {
+    const entry = charterCountMap.get(c.user_id) ?? { total: 0, approved: 0 }
+    entry.total++
+    if (c.admin_approved_at) entry.approved++
+    charterCountMap.set(c.user_id, entry)
+  }
   const deadlineMap = new Map<string, number>()
   for (const r of deadlineReqs ?? []) {
     deadlineMap.set(r.user_id, (deadlineMap.get(r.user_id) ?? 0) + 1)
@@ -58,7 +64,9 @@ export async function GET(req: NextRequest) {
   for (const user of users ?? []) {
     const sub = latestSubMap.get(user.id) ?? null
     const ms = milestoneMap.get(user.id) ?? { total: 0, completed: 0 }
-    const hasCharter = charterSet.has(user.id)
+    const charterEntry = charterCountMap.get(user.id) ?? { total: 0, approved: 0 }
+    const charterCount = charterEntry.total
+    const approvedCharterCount = charterEntry.approved
     const pendingDeadlineRequests = deadlineMap.get(user.id) ?? 0
 
     const card: KanbanCard = {
@@ -76,14 +84,15 @@ export async function GET(req: NextRequest) {
         : null,
       milestoneTotal: ms.total,
       milestoneCompleted: ms.completed,
-      hasCharter,
+      charterCount,
+      approvedCharterCount,
       pendingDeadlineRequests,
     }
 
     if (sub?.status === 'accepted') result.accepted.push(card)
     else if (sub?.status === 'pending') result.reviewing.push(card)
     else if (sub?.status === 'declined') result.declined.push(card)
-    else if (ms.total > 0 || hasCharter) result.in_progress.push(card)
+    else if (ms.total > 0 || charterCount > 0) result.in_progress.push(card)
     else result.not_started.push(card)
   }
 

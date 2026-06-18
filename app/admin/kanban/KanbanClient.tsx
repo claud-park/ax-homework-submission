@@ -136,12 +136,12 @@ function KanbanCardView({
       )}
 
       <div className="flex flex-wrap gap-1">
-        {card.hasCharter && (
+        {card.charterCount > 0 && (
           <span
             className="rounded px-1.5 py-0.5"
-            style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' }}
+            style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', fontSize: 12 }}
           >
-            📋 과제정의서 제출
+            Charter {card.charterCount}개{card.approvedCharterCount > 0 ? ` · ${card.approvedCharterCount}개 승인` : ''}
           </span>
         )}
         {card.pendingDeadlineRequests > 0 && (

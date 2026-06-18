@@ -176,40 +176,65 @@ export default function AdminMobileChartersPage() {
           {tab === 'pending' ? '승인 대기 중인 과제정의서가 없습니다.' : '승인 완료된 과제정의서가 없습니다.'}
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {list.map(charter => {
-            const { displayName, department } = parseName(charter.users?.name ?? '')
-            return (
-              <button
-                key={charter.id}
-                onClick={() => setSelected(charter)}
-                className="flex items-center gap-3 p-3 rounded-xl text-left w-full"
-                style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)' }}
-              >
-                <div
-                  className="flex-shrink-0 flex items-center justify-center rounded-full text-sm font-bold"
-                  style={{ width: 34, height: 34, background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+        <div className="flex flex-col gap-1">
+          {(() => {
+            // champion별 그룹화 (제출 순서 유지, 이름 첫 행에만 표시)
+            const grouped = new Map<string, CharterWithUser[]>()
+            for (const charter of list) {
+              const key = charter.users?.email ?? charter.id
+              if (!grouped.has(key)) grouped.set(key, [])
+              grouped.get(key)!.push(charter)
+            }
+            return Array.from(grouped.values()).map(group => {
+              const first = group[0]
+              const { displayName, department } = parseName(first.users?.name ?? '')
+              return group.map((charter, idx) => (
+                <button
+                  key={charter.id}
+                  onClick={() => setSelected(charter)}
+                  className="flex items-center gap-3 px-3 py-2.5 text-left w-full"
+                  style={{
+                    background: 'var(--surface-primary)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: idx === 0 && group.length > 1 ? '12px 12px 4px 4px' : idx === group.length - 1 && group.length > 1 ? '4px 4px 12px 12px' : group.length === 1 ? '12px' : '4px',
+                    marginBottom: idx === group.length - 1 ? '8px' : '1px',
+                  }}
                 >
-                  {displayName[0] ?? '?'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{displayName}</span>
-                    <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>{department}</span>
-                  </div>
-                  <p className="text-xs truncate" style={{ color: charter.project_name ? 'var(--text-secondary)' : 'var(--text-disabled)' }}>
-                    {charter.project_name ?? '과제명 미입력'}
-                  </p>
-                  {charter.admin_approved_at && (
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--success)' }}>
-                      ✓ 승인됨 · {new Date(charter.admin_approved_at).toLocaleDateString('ko-KR')}
-                    </p>
+                  {/* 첫 행에만 아바타 표시, 나머지는 들여쓰기 */}
+                  {idx === 0 ? (
+                    <div
+                      className="flex-shrink-0 flex items-center justify-center rounded-full text-sm font-bold"
+                      style={{ width: 34, height: 34, background: 'var(--surface-secondary)', color: 'var(--text-secondary)' }}
+                    >
+                      {displayName[0] ?? '?'}
+                    </div>
+                  ) : (
+                    <div style={{ width: 34, flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                      <div style={{ width: 1, height: '100%', background: 'var(--border-subtle)' }} />
+                    </div>
                   )}
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--border-subtle)" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
-              </button>
-            )
-          })}
+                  <div className="flex-1 min-w-0">
+                    {/* 첫 행에만 챔피언 이름 표시 */}
+                    {idx === 0 && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{displayName}</span>
+                        <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>{department}</span>
+                      </div>
+                    )}
+                    <p className="text-xs truncate" style={{ color: charter.project_name ? 'var(--text-secondary)' : 'var(--text-disabled)' }}>
+                      {charter.project_name ?? '과제명 미입력'}
+                    </p>
+                    {charter.admin_approved_at && (
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--success)' }}>
+                        ✓ 승인됨 · {new Date(charter.admin_approved_at).toLocaleDateString('ko-KR')}
+                      </p>
+                    )}
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--border-subtle)" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
+                </button>
+              ))
+            })
+          })()}
         </div>
       )}
     </div>

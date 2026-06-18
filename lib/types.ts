@@ -156,7 +156,8 @@ export interface KanbanCard {
   } | null
   milestoneTotal: number
   milestoneCompleted: number
-  hasCharter: boolean
+  charterCount: number
+  approvedCharterCount: number
   pendingDeadlineRequests: number
 }
 

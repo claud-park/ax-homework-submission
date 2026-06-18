@@ -23,7 +23,7 @@ export default async function AdminProgressPage() {
       .from('milestones')
       .select('*, users(*)')
       .eq('publish_status', 'published')
-      .order('user_id').order('week_number').order('display_order'),
+      .order('user_id').order('charter_submission_id').order('week_number').order('display_order'),
     supabase
       .from('charter_submissions')
       .select('*, users(*)')
