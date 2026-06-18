@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createUserServerClient, createServiceClient } from '@/lib/supabase/server'
 import type { CharterSubmission } from '@/lib/types'
-import { CharterClient } from './CharterClient'
+import { CharterListClient } from './CharterListClient'
 
 export default async function CharterPage() {
   const supabase = createUserServerClient()
@@ -15,5 +15,12 @@ export default async function CharterPage() {
     .eq('user_id', user.id)
     .order('submitted_at', { ascending: false })
 
-  return <CharterClient initialSubmission={(submissions?.[0] ?? null) as CharterSubmission | null} />
+  const charters = (submissions ?? []) as CharterSubmission[]
+
+  // charter가 정확히 1개이면 기존과 동일하게 바로 편집기로 리다이렉트 (하위 호환)
+  if (charters.length === 1) {
+    redirect(`/my-project/charter/${charters[0].id}`)
+  }
+
+  return <CharterListClient initialCharters={charters} />
 }

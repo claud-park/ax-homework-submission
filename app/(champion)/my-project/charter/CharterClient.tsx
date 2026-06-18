@@ -898,7 +898,7 @@ function CharterPanel({ mode, submission, onCreated, onUpdated, onAutoSaved }: {
   )
 }
 
-export function CharterClient({ initialSubmission }: { initialSubmission: CharterSubmission | null }) {
+export function CharterClient({ initialSubmission, charterId }: { initialSubmission: CharterSubmission | null; charterId?: string }) {
   const [sidePanel, setSidePanel] = useState<SidePanel>(initialSubmission)
   const [feedbackOpen, setFeedbackOpen] = useState(true)
 

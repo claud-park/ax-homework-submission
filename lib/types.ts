@@ -41,6 +41,7 @@ export interface Comment {
 export interface CharterSubmission {
   id: string
   user_id: string
+  title: string | null
   project_name: string | null
   content: {
     summary?: string
