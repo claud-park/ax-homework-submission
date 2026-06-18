@@ -6,10 +6,9 @@ import 'gantt-task-react/dist/index.css'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import type { GanttChampion } from '@/app/api/champions/gantt/route'
+import type { GanttChampion, GanttCharter, GanttMilestone } from '@/app/api/champions/gantt/route'
 import type { MilestoneStatus } from '@/lib/types'
 import { NudgePopover, type NudgeType } from '@/components/NudgePopover'
-import type { GanttMilestone } from '@/app/api/champions/gantt/route'
 import { orderMilestonesForGantt } from '@/lib/gantt-order'
 
 interface NudgeState {
@@ -205,10 +204,84 @@ function fmtLocal(d: Date): string {
 }
 
 // Row hierarchy:
-//   champion row  : id='champ-{userId}',  type='project', no project
-//   group row     : id='group-{msId}',    type='project', project='champ-{userId}'
-//   task row      : id=msId,              type='task',    project='champ-{userId}' or 'group-{msId}'
+//   champion row  : id='champ-{userId}',        type='project', no project
+//   charter row   : id='charter-{charterId}',   type='project', project='champ-{userId}'
+//   group row     : id='group-{msId}',           type='task',    project='charter-{charterId}'
+//   task row      : id=msId,                     type='task',    project='charter-{charterId}' or 'group-{msId}'
 // editableUserId: only this champion's leaf milestones are drag-editable (others/parents disabled)
+function addMilestoneRows(
+  tasks: Task[],
+  milestones: GanttMilestone[],
+  parentId: string,
+  editableUserId: string | null,
+  userId: string,
+  todayStr: string,
+) {
+  const ordered = orderMilestonesForGantt(milestones)
+  const depth0 = ordered.filter(m => !m.parent_milestone_id)
+  const depth1 = ordered.filter(m => !!m.parent_milestone_id)
+
+  for (const g of depth0) {
+    const children = depth1.filter(m => m.parent_milestone_id === g.id)
+    const hasChildren = children.length > 0
+
+    const gStart = g.start_date ?? children.find(m => m.start_date)?.start_date ?? null
+    const gEnd = g.due_date ?? [...children].reverse().find(m => m.due_date)?.due_date ?? null
+    if (!gStart || !gEnd) continue
+
+    const start0 = new Date(gStart)
+    let end0 = new Date(gEnd)
+    if (end0 <= start0) end0 = new Date(start0.getTime() + 86400000)
+
+    const isFuture0 = gStart > todayStr
+
+    if (hasChildren) {
+      tasks.push({
+        id: `group-${g.id}`,
+        name: g.title,
+        type: 'task',
+        project: parentId,
+        start: start0,
+        end: end0,
+        ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
+        displayOrder: tasks.length + 1,
+        isDisabled: true,
+      })
+
+      for (const m of children) {
+        if (!m.start_date || !m.due_date) continue
+        const isFuture = m.start_date > todayStr
+        const start = new Date(m.start_date)
+        let end = new Date(m.due_date)
+        if (end <= start) end = new Date(start.getTime() + 86400000)
+        tasks.push({
+          id: m.id,
+          name: m.title,
+          type: 'task',
+          project: `group-${g.id}`,
+          start,
+          end,
+          ...getMilestoneStyle(m.status, m.start_date, m.due_date, isFuture, todayStr),
+          displayOrder: tasks.length + 1,
+          isDisabled: userId !== editableUserId,
+        })
+      }
+    } else {
+      tasks.push({
+        id: g.id,
+        name: g.title,
+        type: 'task',
+        project: parentId,
+        start: start0,
+        end: end0,
+        ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
+        displayOrder: tasks.length + 1,
+        isDisabled: userId !== editableUserId,
+      })
+    }
+  }
+}
+
 function toTasks(champions: GanttChampion[], editableUserId: string | null): Task[] {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -216,16 +289,11 @@ function toTasks(champions: GanttChampion[], editableUserId: string | null): Tas
   const tasks: Task[] = []
 
   for (const c of champions) {
-    if (c.milestones.length === 0) continue
-
-    // Deterministically order by display_order (mirrors charter drag order);
-    // the raw payload order relies on fragile SQL tie-breaking, so re-sort here.
-    const ordered = orderMilestonesForGantt(c.milestones)
-    const depth0 = ordered.filter(m => !m.parent_milestone_id)
-    const depth1 = ordered.filter(m => !!m.parent_milestone_id)
+    const allMs = c.charters.flatMap(ch => ch.milestones)
+    if (allMs.length === 0) continue
 
     // Compute champion row date range from all milestones that have dates
-    const allDated = c.milestones.filter(m => m.start_date && m.due_date)
+    const allDated = allMs.filter(m => m.start_date && m.due_date)
     if (allDated.length === 0) continue
 
     const champStart = allDated.reduce(
@@ -237,7 +305,7 @@ function toTasks(champions: GanttChampion[], editableUserId: string | null): Tas
 
     const champId = `champ-${c.userId}`
 
-    // Champion umbrella row — shows name/dept/과제명/charter in task list
+    // Champion umbrella row
     tasks.push({
       id: champId,
       type: 'project',
@@ -256,68 +324,45 @@ function toTasks(champions: GanttChampion[], editableUserId: string | null): Tas
       },
     })
 
-    for (const g of depth0) {
-      const children = depth1.filter(m => m.parent_milestone_id === g.id)
-      const hasChildren = children.length > 0
+    for (const charter of c.charters) {
+      const charterId = `charter-${charter.id}`
+      const charterMs = charter.milestones
+      const charterDated = charterMs.filter(m => m.start_date && m.due_date)
+      if (charterDated.length === 0) continue
 
-      // Resolve group date range (fallback to children when depth-0 has no dates)
-      const gStart = g.start_date ?? children.find(m => m.start_date)?.start_date ?? null
-      const gEnd = g.due_date ?? [...children].reverse().find(m => m.due_date)?.due_date ?? null
-      if (!gStart || !gEnd) continue
+      const cStart = charterDated.reduce(
+        (min, m) => (m.start_date! < min ? m.start_date! : min), charterDated[0].start_date!
+      )
+      const cEnd = charterDated.reduce(
+        (max, m) => (m.due_date! > max ? m.due_date! : max), charterDated[0].due_date!
+      )
 
-      const start0 = new Date(gStart)
-      let end0 = new Date(gEnd)
-      if (end0 <= start0) end0 = new Date(start0.getTime() + 86400000)
+      let cEndDate = new Date(cEnd)
+      const cStartDate = new Date(cStart)
+      if (cEndDate <= cStartDate) cEndDate = new Date(cStartDate.getTime() + 86400000)
 
-      const isFuture0 = gStart > todayStr
+      // Charter row (child of champion)
+      tasks.push({
+        id: charterId,
+        type: 'project',
+        project: champId,
+        name: charter.title ?? charter.projectName ?? 'Charter',
+        start: cStartDate,
+        end: cEndDate,
+        progress: 0,
+        hideChildren: false,
+        displayOrder: tasks.length + 1,
+        isDisabled: true,
+        styles: {
+          backgroundColor: 'rgba(63,63,255,0.12)',
+          backgroundSelectedColor: 'rgba(63,63,255,0.22)',
+          progressColor: '#6b6bff',
+          progressSelectedColor: '#7878ff',
+        },
+      })
 
-      if (hasChildren) {
-        // depth-0 with children → full-height task bar (collapse handled manually)
-        tasks.push({
-          id: `group-${g.id}`,
-          name: g.title,
-          type: 'task',
-          project: champId,
-          start: start0,
-          end: end0,
-          ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
-          displayOrder: tasks.length + 1,
-          // Parent dates are derived from children (syncParentDates); editing happens on leaves only
-          isDisabled: true,
-        })
-
-        for (const m of children) {
-          if (!m.start_date || !m.due_date) continue
-          const isFuture = m.start_date > todayStr
-          const start = new Date(m.start_date)
-          let end = new Date(m.due_date)
-          if (end <= start) end = new Date(start.getTime() + 86400000)
-          tasks.push({
-            id: m.id,
-            name: m.title,
-            type: 'task',
-            project: `group-${g.id}`,
-            start,
-            end,
-            ...getMilestoneStyle(m.status, m.start_date, m.due_date, isFuture, todayStr),
-            displayOrder: tasks.length + 1,
-            isDisabled: c.userId !== editableUserId,
-          })
-        }
-      } else {
-        // depth-0 with no children → task row directly under champion
-        tasks.push({
-          id: g.id,
-          name: g.title,
-          type: 'task',
-          project: champId,
-          start: start0,
-          end: end0,
-          ...getMilestoneStyle(g.status, g.start_date, g.due_date, isFuture0, todayStr),
-          displayOrder: tasks.length + 1,
-          isDisabled: c.userId !== editableUserId,
-        })
-      }
+      // Milestone rows (children of charter)
+      addMilestoneRows(tasks, charterMs, charterId, editableUserId, c.userId, todayStr)
     }
   }
 
@@ -385,6 +430,7 @@ function makeTaskListTable(
       <div style={{ fontFamily, fontSize, width: listWidth }}>
         {tasks.map(t => {
           const isChampRow = t.id.startsWith('champ-')
+          const isCharterRow = t.id.startsWith('charter-')
           const isGroupRow = t.id.startsWith('group-')
           const isSelected = t.id === selectedTaskId
 
@@ -446,10 +492,10 @@ function makeTaskListTable(
                     {champ?.department || '—'}
                   </div>
                   <div style={cell(projectW, { color: 'var(--text-secondary)' })}>
-                    {champ?.projectName || '—'}
+                    {champ?.charters[0]?.projectName || '—'}
                   </div>
                   <div style={{ ...cell(W.charter), borderRight: 'none', justifyContent: 'center' }}>
-                    {champ?.charterSubmissionId ? (
+                    {champ?.charters[0]?.id ? (
                       <button
                         onClick={e => { e.stopPropagation(); if (userId) onCharterClick(userId) }}
                         style={{
@@ -465,12 +511,40 @@ function makeTaskListTable(
                     )}
                   </div>
                 </>
+              ) : isCharterRow ? (
+                // Charter row: indent under champion, collapsible
+                <div
+                  style={{
+                    width: listWidth, display: 'flex', alignItems: 'center',
+                    padding: '0 6px 0 12px',
+                    overflow: 'hidden', whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                  }}
+                  onClick={e => { e.stopPropagation(); onExpand(t) }}
+                >
+                  <button
+                    onClick={e => { e.stopPropagation(); onExpand(t) }}
+                    aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      marginRight: 4, padding: 0, color: 'var(--text-secondary)',
+                      flexShrink: 0, display: 'flex', alignItems: 'center',
+                    }}
+                  >
+                    {collapsedIds.has(t.id)
+                      ? <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                      : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
+                  </button>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    {t.name}
+                  </span>
+                </div>
               ) : (
                 // Milestone row (group or task): single-width name cell with indent
                 <div
                   style={{
                     width: listWidth, display: 'flex', alignItems: 'center',
-                    padding: `0 6px 0 ${isGroupRow ? 16 : t.project?.startsWith('group-') ? 36 : 28}px`,
+                    padding: `0 6px 0 ${isGroupRow ? 24 : t.project?.startsWith('group-') ? 44 : 36}px`,
                     overflow: 'hidden', whiteSpace: 'nowrap',
                     cursor: isGroupRow ? 'pointer' : 'default',
                   }}
@@ -514,7 +588,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   const [champions, setChampions] = useState<GanttChampion[]>(initialData ?? [])
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [selectedChampions, setSelectedChampions] = useState<Set<string>>(
-    new Set((initialData ?? []).filter(c => c.milestones.length > 0).map(c => c.userId))
+    new Set((initialData ?? []).filter(c => c.charters.flatMap(ch => ch.milestones).length > 0).map(c => c.userId))
   )
   const [alertCollapsed, setAlertCollapsed] = useState(false)
   const [loading, setLoading] = useState(!initialData)
@@ -565,7 +639,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     apiFetch<GanttChampion[]>('/api/champions/gantt')
       .then(data => {
         setChampions(data)
-        setSelectedChampions(new Set(data.filter(c => c.milestones.length > 0).map(c => c.userId)))
+        setSelectedChampions(new Set(data.filter(c => c.charters.flatMap(ch => ch.milestones).length > 0).map(c => c.userId)))
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -587,23 +661,25 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   const milestoneMap = useMemo(() => {
     const m = new Map<string, { milestone: GanttMilestone; userId: string; championName: string }>()
     for (const c of champions) {
-      for (const ms of c.milestones) {
-        m.set(ms.id, { milestone: ms, userId: c.userId, championName: c.name })
+      for (const ch of c.charters) {
+        for (const ms of ch.milestones) {
+          m.set(ms.id, { milestone: ms, userId: c.userId, championName: c.name })
+        }
       }
     }
     return m
   }, [champions])
 
   const noCharter = useMemo(
-    () => champions.filter(c => !c.charterSubmissionId),
+    () => champions.filter(c => c.charters.length === 0),
     [champions],
   )
   const noMilestone = useMemo(
-    () => champions.filter(c => !!c.charterSubmissionId && c.milestones.length === 0),
+    () => champions.filter(c => c.charters.length > 0 && c.charters.flatMap(ch => ch.milestones).length === 0),
     [champions],
   )
   const championsWithMilestones = useMemo(() => {
-    const list = champions.filter(c => c.milestones.length > 0)
+    const list = champions.filter(c => c.charters.flatMap(ch => ch.milestones).length > 0)
     // Champion view only: pin the current user's own section to the top (chips + gantt rows).
     // This also keeps the user's own row near the top of the scroll area so expanding it
     // reveals its sub-milestones in view (a bottom-row expand would render them below the fold).
@@ -623,15 +699,19 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
   const tasks = useMemo(() => {
     const collapsedChamps = new Set<string>()
+    const collapsedCharters = new Set<string>()
     const collapsedGroups = new Set<string>()
     for (const id of collapsedIds) {
       if (id.startsWith('champ-')) collapsedChamps.add(id)
+      else if (id.startsWith('charter-')) collapsedCharters.add(id)
       else if (id.startsWith('group-')) collapsedGroups.add(id)
     }
 
-    // Build a lookup: groupId → champId for grandchild filtering
-    const groupParent = new Map<string, string>()
+    // Build lookups: charterRow → champId, groupRow → charterId
+    const charterParent = new Map<string, string>()   // charter-{id} → champ-{id}
+    const groupParent = new Map<string, string>()      // group-{id}   → charter-{id}
     for (const t of rawTasks) {
+      if (t.id.startsWith('charter-') && t.project) charterParent.set(t.id, t.project)
       if (t.id.startsWith('group-') && t.project) groupParent.set(t.id, t.project)
     }
 
@@ -639,12 +719,37 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
       .map(t => t.type === 'project' ? { ...t, hideChildren: false } : t)
       .filter(t => {
         if (!t.project) return true
-        if (t.id.startsWith('group-')) return !collapsedChamps.has(t.project)
+
+        // charter row: hide if champion is collapsed
+        if (t.id.startsWith('charter-')) return !collapsedChamps.has(t.project)
+
+        // group (depth-0 parent milestone): hide if parent charter or champion is collapsed
+        if (t.id.startsWith('group-')) {
+          if (collapsedChamps.has(t.project)) return false   // parent is champ (legacy)
+          if (collapsedCharters.has(t.project)) return false // parent is charter
+          return true
+        }
+
+        // task under a group: hide if group is collapsed, or if charter/champ ancestor is collapsed
         if (t.project.startsWith('group-')) {
           if (collapsedGroups.has(t.project)) return false
-          const champId = groupParent.get(t.project)
+          const charterId = groupParent.get(t.project)
+          if (charterId && collapsedCharters.has(charterId)) return false
+          if (charterId) {
+            const champId = charterParent.get(charterId)
+            if (champId && collapsedChamps.has(champId)) return false
+          }
+          return true
+        }
+
+        // direct task under charter: hide if charter or champion is collapsed
+        if (t.project.startsWith('charter-')) {
+          if (collapsedCharters.has(t.project)) return false
+          const champId = charterParent.get(t.project)
           return !champId || !collapsedChamps.has(champId)
         }
+
+        // fallback: direct task under champion (legacy)
         return !collapsedChamps.has(t.project)
       })
   }, [rawTasks, collapsedIds])
@@ -701,10 +806,11 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
   const handleCharterClick = useCallback((userId: string) => {
     const champ = champMap.get(userId)
-    if (!champ?.charterSubmissionId) return
+    const charterId = champ?.charters[0]?.id
+    if (!charterId) return
     window.open(
-      `/charter-popup/${champ.charterSubmissionId}`,
-      `charter-popup-${champ.charterSubmissionId}`,
+      `/charter-popup/${charterId}`,
+      `charter-popup-${charterId}`,
       'width=800,height=920,resizable=yes,scrollbars=yes',
     )
   }, [champMap])
@@ -756,7 +862,13 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     // Optimistic update so the bar settles immediately
     setChampions(prev => prev.map(c =>
       c.userId === entry.userId
-        ? { ...c, milestones: c.milestones.map(m => m.id === task.id ? { ...m, start_date, due_date } : m) }
+        ? {
+            ...c,
+            charters: c.charters.map(ch => ({
+              ...ch,
+              milestones: ch.milestones.map(m => m.id === task.id ? { ...m, start_date, due_date } : m),
+            })),
+          }
         : c,
     ))
 
@@ -774,20 +886,23 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
         if (c.userId !== entry.userId) return c
         return {
           ...c,
-          milestones: c.milestones.map(m => {
-            if (m.id === res.milestone.id) {
-              return { ...m, start_date: res.milestone.start_date, due_date: res.milestone.due_date, status: res.milestone.status }
-            }
-            if (res.parentUpdated && m.id === res.parentUpdated.id) {
-              return {
-                ...m,
-                start_date: res.parentUpdated.start_date,
-                due_date: res.parentUpdated.due_date,
-                ...(res.parentUpdated.status ? { status: res.parentUpdated.status } : {}),
+          charters: c.charters.map(ch => ({
+            ...ch,
+            milestones: ch.milestones.map(m => {
+              if (m.id === res.milestone.id) {
+                return { ...m, start_date: res.milestone.start_date, due_date: res.milestone.due_date, status: res.milestone.status }
               }
-            }
-            return m
-          }),
+              if (res.parentUpdated && m.id === res.parentUpdated.id) {
+                return {
+                  ...m,
+                  start_date: res.parentUpdated.start_date,
+                  due_date: res.parentUpdated.due_date,
+                  ...(res.parentUpdated.status ? { status: res.parentUpdated.status } : {}),
+                }
+              }
+              return m
+            }),
+          })),
         }
       }))
       return true
@@ -823,10 +938,12 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
       if (!wrapper || idx < 0) return
 
       const isChamp = taskId.startsWith('champ-')
+      const isCharter = taskId.startsWith('charter-')
       let last = domRows[idx]
       for (let i = idx + 1; i < domRows.length; i++) {
         const id = domRows[i].dataset.taskId || ''
         if (isChamp) { if (id.startsWith('champ-')) break }
+        else if (isCharter) { if (id.startsWith('champ-') || id.startsWith('charter-')) break }
         else if (domRows[i].dataset.taskProject !== taskId) break
         last = domRows[i]
       }
