@@ -28,7 +28,10 @@ export default async function WorkStatusPage({
   ])
 
   const charters = (chartersData ?? []) as Pick<CharterSubmission, 'id' | 'title' | 'project_name' | 'admin_approved_at'>[]
-  const charterId = searchParams.charter_id ?? charters[0]?.id ?? null
+  const requestedId = searchParams.charter_id ?? null
+  const charterId = (requestedId && charters.some(c => c.id === requestedId))
+    ? requestedId
+    : charters[0]?.id ?? null
 
   const firstCharterId = charters[0]?.id ?? null
   const milestones = (milestonesData ?? []).filter(m => {
