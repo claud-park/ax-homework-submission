@@ -24,6 +24,7 @@ export default async function WorkStatusPage({
       .from('charter_submissions')
       .select('id, title, project_name, admin_approved_at')
       .eq('user_id', user.id)
+      .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false }),
   ])
 
