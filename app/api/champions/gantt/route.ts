@@ -65,10 +65,13 @@ export async function GET(req: NextRequest) {
     chartersByUser.get(c.user_id)!.push(c)
   }
 
-  // charter_id → milestone[]
+  // published charter ID 집합 — 이 목록에 없는 milestone은 표시하지 않음
+  const publishedCharterIds = new Set(charters?.map(c => c.id) ?? [])
+
+  // charter_id → milestone[] (published charter 소속만)
   const msByCharter = new Map<string, GanttMilestone[]>()
-  const orphanMsByUser = new Map<string, GanttMilestone[]>()
   for (const m of milestones ?? []) {
+    if (!m.charter_submission_id || !publishedCharterIds.has(m.charter_submission_id)) continue
     const ms: GanttMilestone = {
       id: m.id,
       title: m.title,
@@ -78,37 +81,22 @@ export async function GET(req: NextRequest) {
       week_number: m.week_number,
       parent_milestone_id: m.parent_milestone_id ?? null,
       display_order: m.display_order ?? null,
-      charter_submission_id: m.charter_submission_id ?? null,
+      charter_submission_id: m.charter_submission_id,
     }
-    if (m.charter_submission_id) {
-      if (!msByCharter.has(m.charter_submission_id)) msByCharter.set(m.charter_submission_id, [])
-      msByCharter.get(m.charter_submission_id)!.push(ms)
-    } else {
-      // charter FK 없는 레거시 milestone: user_id로 첫 번째 charter에 귀속
-      if (!orphanMsByUser.has(m.user_id)) orphanMsByUser.set(m.user_id, [])
-      orphanMsByUser.get(m.user_id)!.push(ms)
-    }
+    if (!msByCharter.has(m.charter_submission_id)) msByCharter.set(m.charter_submission_id, [])
+    msByCharter.get(m.charter_submission_id)!.push(ms)
   }
 
   const result: GanttChampion[] = (users ?? []).map(u => {
     const { displayName, department } = parseName(u.name)
     const userCharters = chartersByUser.get(u.id) ?? []
-    const orphans = orphanMsByUser.get(u.id) ?? []
 
-    const charterRows: GanttCharter[] = userCharters.map((c, idx) => ({
+    const charterRows: GanttCharter[] = userCharters.map(c => ({
       id: c.id,
       title: c.title ?? null,
       projectName: c.project_name ?? null,
-      milestones: [
-        ...msByCharter.get(c.id) ?? [],
-        ...(idx === 0 ? orphans : []), // 레거시 orphan milestone은 첫 번째 charter에 귀속
-      ],
+      milestones: msByCharter.get(c.id) ?? [],
     }))
-
-    // charter가 없는 champion에게도 orphan milestone이 있으면 빈 charter row 생성
-    if (charterRows.length === 0 && orphans.length > 0) {
-      charterRows.push({ id: '__orphan__' + u.id, title: null, projectName: null, milestones: orphans })
-    }
 
     return { userId: u.id, name: displayName, department, charters: charterRows }
   })
