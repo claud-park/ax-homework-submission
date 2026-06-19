@@ -6,7 +6,7 @@ import 'gantt-task-react/dist/index.css'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import type { GanttChampion, GanttMilestone } from '@/app/api/champions/gantt/route'
+import type { GanttChampion, GanttCharter, GanttMilestone } from '@/app/api/champions/gantt/route'
 import type { MilestoneStatus } from '@/lib/types'
 import { NudgePopover, type NudgeType } from '@/components/NudgePopover'
 import { orderMilestonesForGantt } from '@/lib/gantt-order'
@@ -204,10 +204,9 @@ function fmtLocal(d: Date): string {
 }
 
 // Row hierarchy:
-//   champion row  : id='champ-{userId}',        type='project', no project
-//   charter row   : id='charter-{charterId}',   type='project', project='champ-{userId}'
-//   group row     : id='group-{msId}',           type='task',    project='charter-{charterId}'
-//   task row      : id=msId,                     type='task',    project='charter-{charterId}' or 'group-{msId}'
+//   champcharter row : id='champcharter-{charterId}', type='project', no project (one per charter)
+//   group row        : id='group-{msId}',             type='task',    project='champcharter-{charterId}'
+//   task row         : id=msId,                       type='task',    project='champcharter-{charterId}' or 'group-{msId}'
 // editableUserId: only this champion's leaf milestones are drag-editable (others/parents disabled)
 function addMilestoneRows(
   tasks: Task[],
@@ -289,43 +288,7 @@ function toTasks(champions: GanttChampion[], editableUserId: string | null): Tas
   const tasks: Task[] = []
 
   for (const c of champions) {
-    const allMs = c.charters.flatMap(ch => ch.milestones)
-    if (allMs.length === 0) continue
-
-    // Compute champion row date range from all milestones that have dates
-    const allDated = allMs.filter(m => m.start_date && m.due_date)
-    if (allDated.length === 0) continue
-
-    const champStart = allDated.reduce(
-      (min, m) => (m.start_date! < min ? m.start_date! : min), allDated[0].start_date!
-    )
-    const champEnd = allDated.reduce(
-      (max, m) => (m.due_date! > max ? m.due_date! : max), allDated[0].due_date!
-    )
-
-    const champId = `champ-${c.userId}`
-
-    // Champion umbrella row
-    tasks.push({
-      id: champId,
-      type: 'project',
-      name: c.name,
-      start: new Date(champStart),
-      end: new Date(champEnd),
-      progress: 0,
-      hideChildren: false,
-      displayOrder: tasks.length + 1,
-      isDisabled: true,
-      styles: {
-        backgroundColor: 'rgba(63,63,255,0.25)',
-        backgroundSelectedColor: 'rgba(63,63,255,0.4)',
-        progressColor: '#3f3fff',
-        progressSelectedColor: '#5868ff',
-      },
-    })
-
     for (const charter of c.charters) {
-      const charterId = `charter-${charter.id}`
       const charterMs = charter.milestones
       const charterDated = charterMs.filter(m => m.start_date && m.due_date)
       if (charterDated.length === 0) continue
@@ -341,12 +304,13 @@ function toTasks(champions: GanttChampion[], editableUserId: string | null): Tas
       const cStartDate = new Date(cStart)
       if (cEndDate <= cStartDate) cEndDate = new Date(cStartDate.getTime() + 86400000)
 
-      // Charter row (child of champion)
+      const rowId = `champcharter-${charter.id}`
+
+      // Combined champion+charter top-level row (one per charter)
       tasks.push({
-        id: charterId,
+        id: rowId,
         type: 'project',
-        project: champId,
-        name: charter.title ?? charter.projectName ?? 'Charter',
+        name: c.name,
         start: cStartDate,
         end: cEndDate,
         progress: 0,
@@ -354,15 +318,14 @@ function toTasks(champions: GanttChampion[], editableUserId: string | null): Tas
         displayOrder: tasks.length + 1,
         isDisabled: true,
         styles: {
-          backgroundColor: 'rgba(63,63,255,0.12)',
-          backgroundSelectedColor: 'rgba(63,63,255,0.22)',
-          progressColor: '#6b6bff',
-          progressSelectedColor: '#7878ff',
+          backgroundColor: 'rgba(63,63,255,0.25)',
+          backgroundSelectedColor: 'rgba(63,63,255,0.4)',
+          progressColor: '#3f3fff',
+          progressSelectedColor: '#5868ff',
         },
       })
 
-      // Milestone rows (children of charter)
-      addMilestoneRows(tasks, charterMs, charterId, editableUserId, c.userId, todayStr)
+      addMilestoneRows(tasks, charterMs, rowId, editableUserId, c.userId, todayStr)
     }
   }
 
@@ -414,8 +377,8 @@ function makeTaskListHeader(projectW: number, listWidth: number, onResizeStart: 
 }
 
 function makeTaskListTable(
-  champMap: Map<string, GanttChampion>,
-  onCharterClick: (userId: string) => void,
+  charterInfoMap: Map<string, { charter: GanttCharter; champ: GanttChampion }>,
+  onCharterClick: (charterId: string) => void,
   projectW: number,
   listWidth: number,
   collapsedIds: Set<string>,
@@ -429,14 +392,13 @@ function makeTaskListTable(
     return (
       <div style={{ fontFamily, fontSize, width: listWidth }}>
         {tasks.map(t => {
-          const isChampRow = t.id.startsWith('champ-')
-          const isCharterRow = t.id.startsWith('charter-')
+          const isChampCharterRow = t.id.startsWith('champcharter-')
           const isGroupRow = t.id.startsWith('group-')
           const isSelected = t.id === selectedTaskId
 
-          const userId = isChampRow ? t.id.slice(6) : null
-          const champ = userId ? champMap.get(userId) : null
-          const isSelf = isChampRow && !!selfUserId && userId === selfUserId
+          const charterId = isChampCharterRow ? t.id.slice('champcharter-'.length) : null
+          const info = charterId ? charterInfoMap.get(charterId) : null
+          const isSelf = isChampCharterRow && !!selfUserId && info?.champ.userId === selfUserId
 
           return (
             <div
@@ -454,8 +416,8 @@ function makeTaskListTable(
                 cursor: 'pointer',
               }}
             >
-              {isChampRow ? (
-                // Champion row: 4 full columns
+              {isChampCharterRow ? (
+                // Combined champion+charter row: 4 full columns
                 <>
                   <div
                     style={{ ...cell(W.name), cursor: 'pointer' }}
@@ -475,7 +437,7 @@ function makeTaskListTable(
                         : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                     </button>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {champ?.name ?? t.name}
+                      {info?.champ.name ?? t.name}
                     </span>
                     {isSelf && (
                       <span style={{
@@ -489,15 +451,15 @@ function makeTaskListTable(
                     )}
                   </div>
                   <div style={cell(W.dept, { color: 'var(--text-secondary)', fontSize: 11 })}>
-                    {champ?.department || '—'}
+                    {info?.champ.department || '—'}
                   </div>
                   <div style={cell(projectW, { color: 'var(--text-secondary)' })}>
-                    {champ?.charters[0]?.projectName || '—'}
+                    {info?.charter.projectName ?? info?.charter.title ?? '—'}
                   </div>
                   <div style={{ ...cell(W.charter), borderRight: 'none', justifyContent: 'center' }}>
-                    {champ?.charters[0]?.id ? (
+                    {charterId ? (
                       <button
-                        onClick={e => { e.stopPropagation(); if (userId) onCharterClick(userId) }}
+                        onClick={e => { e.stopPropagation(); onCharterClick(charterId) }}
                         style={{
                           fontSize: 10, padding: '2px 6px', borderRadius: 4,
                           background: 'rgba(37,99,235,0.1)',
@@ -511,34 +473,6 @@ function makeTaskListTable(
                     )}
                   </div>
                 </>
-              ) : isCharterRow ? (
-                // Charter row: indent under champion, collapsible
-                <div
-                  style={{
-                    width: listWidth, display: 'flex', alignItems: 'center',
-                    padding: '0 6px 0 12px',
-                    overflow: 'hidden', whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  }}
-                  onClick={e => { e.stopPropagation(); onExpand(t) }}
-                >
-                  <button
-                    onClick={e => { e.stopPropagation(); onExpand(t) }}
-                    aria-label={collapsedIds.has(t.id) ? '펼치기' : '접기'}
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      marginRight: 4, padding: 0, color: 'var(--text-secondary)',
-                      flexShrink: 0, display: 'flex', alignItems: 'center',
-                    }}
-                  >
-                    {collapsedIds.has(t.id)
-                      ? <ChevronRight className="h-3 w-3" aria-hidden="true" />
-                      : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
-                  </button>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {t.name}
-                  </span>
-                </div>
               ) : (
                 // Milestone row (group or task): single-width name cell with indent
                 <div
@@ -651,10 +585,12 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null))
   }, [])
 
-  // userId → champion (for charter panel and task list table)
-  const champMap = useMemo(() => {
-    const m = new Map<string, GanttChampion>()
-    for (const c of champions) m.set(c.userId, c)
+  // charterId → { charter, champ } (for task list table)
+  const charterInfoMap = useMemo(() => {
+    const m = new Map<string, { charter: GanttCharter; champ: GanttChampion }>()
+    for (const c of champions) {
+      for (const ch of c.charters) m.set(ch.id, { charter: ch, champ: c })
+    }
     return m
   }, [champions])
 
@@ -698,20 +634,16 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   const rawTasks = useMemo(() => toTasks(filteredChampions, currentUserId), [filteredChampions, currentUserId])
 
   const tasks = useMemo(() => {
-    const collapsedChamps = new Set<string>()
-    const collapsedCharters = new Set<string>()
-    const collapsedGroups = new Set<string>()
+    const collapsedCCs = new Set<string>()    // champcharter-*
+    const collapsedGroups = new Set<string>() // group-*
     for (const id of collapsedIds) {
-      if (id.startsWith('champ-')) collapsedChamps.add(id)
-      else if (id.startsWith('charter-')) collapsedCharters.add(id)
+      if (id.startsWith('champcharter-')) collapsedCCs.add(id)
       else if (id.startsWith('group-')) collapsedGroups.add(id)
     }
 
-    // Build lookups: charterRow → champId, groupRow → charterId
-    const charterParent = new Map<string, string>()   // charter-{id} → champ-{id}
-    const groupParent = new Map<string, string>()      // group-{id}   → charter-{id}
+    // group-{id} → champcharter-{id}
+    const groupParent = new Map<string, string>()
     for (const t of rawTasks) {
-      if (t.id.startsWith('charter-') && t.project) charterParent.set(t.id, t.project)
       if (t.id.startsWith('group-') && t.project) groupParent.set(t.id, t.project)
     }
 
@@ -720,37 +652,18 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
       .filter(t => {
         if (!t.project) return true
 
-        // charter row: hide if champion is collapsed
-        if (t.id.startsWith('charter-')) return !collapsedChamps.has(t.project)
+        // group row: hide if parent champcharter is collapsed
+        if (t.id.startsWith('group-')) return !collapsedCCs.has(t.project)
 
-        // group (depth-0 parent milestone): hide if parent charter or champion is collapsed
-        if (t.id.startsWith('group-')) {
-          if (collapsedChamps.has(t.project)) return false   // parent is champ (legacy)
-          if (collapsedCharters.has(t.project)) return false // parent is charter
-          return true
-        }
-
-        // task under a group: hide if group is collapsed, or if charter/champ ancestor is collapsed
+        // task under group: hide if group or grandparent champcharter is collapsed
         if (t.project.startsWith('group-')) {
           if (collapsedGroups.has(t.project)) return false
-          const charterId = groupParent.get(t.project)
-          if (charterId && collapsedCharters.has(charterId)) return false
-          if (charterId) {
-            const champId = charterParent.get(charterId)
-            if (champId && collapsedChamps.has(champId)) return false
-          }
-          return true
+          const ccId = groupParent.get(t.project)
+          return !ccId || !collapsedCCs.has(ccId)
         }
 
-        // direct task under charter: hide if charter or champion is collapsed
-        if (t.project.startsWith('charter-')) {
-          if (collapsedCharters.has(t.project)) return false
-          const champId = charterParent.get(t.project)
-          return !champId || !collapsedChamps.has(champId)
-        }
-
-        // fallback: direct task under champion (legacy)
-        return !collapsedChamps.has(t.project)
+        // direct task under champcharter
+        return !collapsedCCs.has(t.project)
       })
   }, [rawTasks, collapsedIds])
 
@@ -804,16 +717,13 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     return () => observer.disconnect()
   }, [viewMode, tasks.length])
 
-  const handleCharterClick = useCallback((userId: string) => {
-    const champ = champMap.get(userId)
-    const charterId = champ?.charters[0]?.id
-    if (!charterId) return
+  const handleCharterClick = useCallback((charterId: string) => {
     window.open(
       `/charter-popup/${charterId}`,
       `charter-popup-${charterId}`,
       'width=800,height=920,resizable=yes,scrollbars=yes',
     )
-  }, [champMap])
+  }, [])
 
   const handleChipNudge = useCallback((
     c: GanttChampion,
@@ -830,7 +740,7 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
 
   const handleGanttClick = useCallback((task: Task) => {
     if (!isAdmin) return
-    if (task.id.startsWith('champ-')) return
+    if (task.id.startsWith('champcharter-')) return
     const msId = task.id.startsWith('group-') ? task.id.slice(6) : task.id
     const entry = milestoneMap.get(msId)
     const todayStr = new Date().toISOString().split('T')[0]
@@ -919,9 +829,9 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   )
 
   const TaskListTable = useMemo(
-    () => makeTaskListTable(champMap, handleCharterClick, projectW, listWidth, collapsedIds, handleExpandChange, isAdmin ? null : currentUserId),
+    () => makeTaskListTable(charterInfoMap, handleCharterClick, projectW, listWidth, collapsedIds, handleExpandChange, isAdmin ? null : currentUserId),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [champMap, handleCharterClick, projectW, listWidth, collapsedIds, isAdmin, currentUserId],
+    [charterInfoMap, handleCharterClick, projectW, listWidth, collapsedIds, isAdmin, currentUserId],
   )
 
   // After expanding a row, scroll its newly-revealed children into view if they fall below
@@ -937,13 +847,11 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
       const idx = domRows.findIndex(r => r.dataset.taskId === taskId)
       if (!wrapper || idx < 0) return
 
-      const isChamp = taskId.startsWith('champ-')
-      const isCharter = taskId.startsWith('charter-')
+      const isCC = taskId.startsWith('champcharter-')
       let last = domRows[idx]
       for (let i = idx + 1; i < domRows.length; i++) {
         const id = domRows[i].dataset.taskId || ''
-        if (isChamp) { if (id.startsWith('champ-')) break }
-        else if (isCharter) { if (id.startsWith('champ-') || id.startsWith('charter-')) break }
+        if (isCC) { if (id.startsWith('champcharter-')) break }
         else if (domRows[i].dataset.taskProject !== taskId) break
         last = domRows[i]
       }
