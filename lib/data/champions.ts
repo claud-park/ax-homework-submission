@@ -11,7 +11,7 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
     { data: milestones },
   ] = await Promise.all([
     supabase.from('users').select('id, name').eq('user_group', 'champion'),
-    supabase.from('charter_submissions').select('user_id, id, project_name, title'),
+    supabase.from('charter_submissions').select('user_id, id, project_name, title').eq('publish_status', 'published'),
     supabase.from('milestones')
       .select('id, user_id, charter_submission_id, title, start_date, due_date, status, week_number, parent_milestone_id, display_order')
       .eq('publish_status', 'published')
