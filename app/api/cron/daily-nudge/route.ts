@@ -11,6 +11,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // 주말(토/일, KST 기준)에는 발송하지 않음. cron은 UTC(05:00 = KST 14:00)로 실행되므로 KST 요일로 판단
+  const kstWeekday = new Date().toLocaleDateString('en-US', {
+    timeZone: 'Asia/Seoul',
+    weekday: 'short',
+  })
+  if (kstWeekday === 'Sat' || kstWeekday === 'Sun') {
+    console.log(`[cron/daily-nudge] skipped: weekend (${kstWeekday})`)
+    return NextResponse.json({ skipped: true, reason: 'weekend', weekday: kstWeekday })
+  }
+
   const supabase = createServiceClient()
 
   // user_group = 'champion' 인 유저만 조회
