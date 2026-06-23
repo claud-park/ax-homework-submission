@@ -321,8 +321,8 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>💬 댓글 ({comments.length})</p>
         <div className="flex flex-col gap-2 mb-2">
           {comments.map(c => {
-            const authorName = (c.author as any)?.name
-              ? parseName((c.author as any).name).displayName
+            const authorName = c.author?.name
+              ? parseName(c.author.name).displayName
               : c.author_role === 'admin' ? '관리자' : '챔피언'
             return (
               <div
