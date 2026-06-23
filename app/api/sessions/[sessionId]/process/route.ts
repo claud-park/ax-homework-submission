@@ -7,7 +7,10 @@ import OpenAI from 'openai'
 import { toFile } from 'openai'
 
 const MODEL = 'claude-sonnet-4-6'
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const openai = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY ?? process.env.OPENAI_API_KEY,
+  baseURL: process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : undefined,
+})
 
 type Params = { params: { sessionId: string } }
 
@@ -62,7 +65,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const whisperFile = await toFile(audioBlob, 'audio.webm', { type: 'audio/webm' })
     const transcription = await openai.audio.transcriptions.create({
       file: whisperFile,
-      model: 'whisper-1',
+      model: process.env.GROQ_API_KEY ? 'whisper-large-v3-turbo' : 'whisper-1',
       language: 'ko',
     })
     const transcript = transcription.text
