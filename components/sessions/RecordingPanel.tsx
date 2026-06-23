@@ -5,6 +5,12 @@ import { toast } from 'sonner'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { SessionActionItem } from '@/lib/types'
 
+interface UsageSummary {
+  stt: { provider: string; durationSec: number; cost: number }
+  claude: { inputTokens: number; outputTokens: number; cost: number }
+  totalCost: number
+}
+
 interface Props {
   sessionId: string
   onProcessed: (notes: string, actionItems: SessionActionItem[]) => void
@@ -36,6 +42,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   const [progress, setProgress] = useState(0)    // 0-100
   const [remainingSec, setRemainingSec] = useState<number | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [usage, setUsage] = useState<UsageSummary | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -192,6 +199,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
           try {
             const result = JSON.parse(xhr.responseText)
             onProcessed(result.notes ?? '', result.actionItems ?? [])
+            if (result.usage) setUsage(result.usage)
           } catch {
             onProcessed('', [])
           }
@@ -329,9 +337,27 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
       )}
 
       {phase === 'done' && (
-        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--success)' }}>
-          <span>✅</span>
-          <span className="font-semibold">처리 완료! 아래 내용을 확인하고 수정하세요.</span>
+        <div>
+          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--success)' }}>
+            <span>✅</span>
+            <span className="font-semibold">처리 완료! 아래 내용을 확인하고 수정하세요.</span>
+          </div>
+          {usage && (
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-disabled)' }}>
+              {usage.stt.provider === 'groq'
+                ? `Groq Whisper ${formatTime(usage.stt.durationSec)} (무료)`
+                : `Whisper ${formatTime(usage.stt.durationSec)} ($${usage.stt.cost.toFixed(3)})`
+              }
+              {' · '}
+              Claude {(usage.claude.inputTokens + usage.claude.outputTokens).toLocaleString()} 토큰
+              {' '}(입력 {usage.claude.inputTokens.toLocaleString()} / 출력 {usage.claude.outputTokens.toLocaleString()})
+              {' $'}{usage.claude.cost.toFixed(4)}
+              {' · '}
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                합계 ${usage.totalCost.toFixed(4)}
+              </span>
+            </p>
+          )}
         </div>
       )}
 

@@ -148,14 +148,21 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
     setReprocessing(true)
     setSession(prev => prev ? { ...prev, processing_status: 'transcribing' } : prev)
     try {
-      const result = await apiFetch<{ notes: string; actionItems: SessionActionItem[] }>(
-        `/api/sessions/${sessionId}/reprocess`,
-        { method: 'POST' }
-      )
+      const result = await apiFetch<{
+        notes: string
+        actionItems: SessionActionItem[]
+        usage?: { stt: { provider: string; durationSec: number; cost: number }; claude: { inputTokens: number; outputTokens: number; cost: number }; totalCost: number }
+      }>(`/api/sessions/${sessionId}/reprocess`, { method: 'POST' })
       setNotes(result.notes)
       setActionItems(result.actionItems)
       setSession(prev => prev ? { ...prev, processing_status: 'done', notes: result.notes } : prev)
-      toast.success('재처리 완료!')
+      if (result.usage) {
+        const u = result.usage
+        const sttStr = u.stt.provider === 'groq' ? 'Groq (무료)' : `Whisper $${u.stt.cost.toFixed(3)}`
+        toast.success(`재처리 완료! ${sttStr} · Claude $${u.claude.cost.toFixed(4)} · 합계 $${u.totalCost.toFixed(4)}`)
+      } else {
+        toast.success('재처리 완료!')
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : '재처리 실패'
       toast.error(msg)

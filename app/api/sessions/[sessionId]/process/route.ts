@@ -89,7 +89,7 @@ ${transcript}
 
 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.`
 
-    const { text } = await generateText({
+    const { text, usage: claudeUsage } = await generateText({
       model: anthropic(MODEL),
       prompt,
     })
@@ -137,7 +137,29 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
       insertedActionItems = data ?? []
     }
 
-    return NextResponse.json({ notes, actionItems: insertedActionItems })
+    const durationMin = (recordingDurationSec ?? 0) / 60
+    const whisperCost = process.env.GROQ_API_KEY ? 0 : durationMin * 0.006
+    const claudeInputCost = ((claudeUsage.inputTokens ?? 0) / 1_000_000) * 3
+    const claudeOutputCost = ((claudeUsage.outputTokens ?? 0) / 1_000_000) * 15
+    const claudeCost = claudeInputCost + claudeOutputCost
+
+    return NextResponse.json({
+      notes,
+      actionItems: insertedActionItems,
+      usage: {
+        stt: {
+          provider: process.env.GROQ_API_KEY ? 'groq' : 'openai',
+          durationSec: recordingDurationSec ?? 0,
+          cost: whisperCost,
+        },
+        claude: {
+          inputTokens: claudeUsage.inputTokens ?? 0,
+          outputTokens: claudeUsage.outputTokens ?? 0,
+          cost: claudeCost,
+        },
+        totalCost: whisperCost + claudeCost,
+      },
+    })
   } catch (err) {
     await supabase
       .from('check_up_sessions')
