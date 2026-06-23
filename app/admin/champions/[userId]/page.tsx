@@ -411,6 +411,7 @@ export default function AdminChampionPage() {
             onClick={() => {
               setActiveMainTab(tab.key)
               if (tab.key === 'sessions') {
+                setSessionTab('list')
                 apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
                   .then(setSessions)
                   .catch(() => {})

@@ -83,8 +83,9 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     await new Promise<void>(resolve => {
       recorder.onstop = () => resolve()
       recorder.stop()
-      recorder.stream.getTracks().forEach(t => t.stop())
     })
+    // Stop tracks after onstop fires so the final ondataavailable chunk is captured
+    recorder.stream.getTracks().forEach(t => t.stop())
 
     const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' })
 
@@ -137,7 +138,12 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     summarizeEstimate: number
   ) {
     const supabase = createSupabaseBrowserClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    // Refresh token before upload to avoid stale JWT on long recordings
+    let { data: { session } } = await supabase.auth.refreshSession()
+    if (!session) {
+      const fallback = await supabase.auth.getSession()
+      session = fallback.data.session
+    }
     if (!session) { setPhase('error'); setErrorMsg('인증 오류'); return }
 
     const formData = new FormData()

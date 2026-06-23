@@ -94,12 +94,23 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
     let notes = ''
     let actionItems: { body: string }[] = []
     try {
-      const parsed = JSON.parse(text.trim())
+      // Claude sometimes wraps JSON in code fences — strip them first
+      let jsonStr = text.trim()
+      const fenceMatch = jsonStr.match(/```(?:json)?\n?([\s\S]*?)\n?```/)
+      if (fenceMatch) jsonStr = fenceMatch[1].trim()
+      const parsed = JSON.parse(jsonStr)
       notes = parsed.notes ?? ''
       actionItems = Array.isArray(parsed.actionItems) ? parsed.actionItems : []
     } catch {
-      // If JSON parsing fails, use the raw text as notes
-      notes = text
+      // Claude returned non-JSON; surface as error so admin knows to review
+      await supabase
+        .from('check_up_sessions')
+        .update({ processing_status: 'error', notes: text, updated_at: new Date().toISOString() })
+        .eq('id', params.sessionId)
+      return NextResponse.json(
+        { error: 'AI 요약 결과를 파싱할 수 없습니다. 전사 텍스트를 확인하세요.', notes: text, actionItems: [] },
+        { status: 422 }
+      )
     }
 
     // 7. Save results
@@ -108,17 +119,22 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
       .update({ processing_status: 'done', notes, updated_at: new Date().toISOString() })
       .eq('id', params.sessionId)
 
+    let insertedActionItems: import('@/lib/types').SessionActionItem[] = []
     if (actionItems.length > 0) {
-      await supabase.from('session_action_items').insert(
-        actionItems.map((item, idx) => ({
-          session_id: params.sessionId,
-          body: item.body,
-          display_order: idx,
-        }))
-      )
+      const { data } = await supabase
+        .from('session_action_items')
+        .insert(
+          actionItems.map((item, idx) => ({
+            session_id: params.sessionId,
+            body: item.body,
+            display_order: idx,
+          }))
+        )
+        .select()
+      insertedActionItems = data ?? []
     }
 
-    return NextResponse.json({ notes, actionItems })
+    return NextResponse.json({ notes, actionItems: insertedActionItems })
   } catch (err) {
     await supabase
       .from('check_up_sessions')

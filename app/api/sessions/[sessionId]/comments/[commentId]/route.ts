@@ -16,6 +16,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .from('session_comments')
     .select('id, author_id')
     .eq('id', params.commentId)
+    .eq('session_id', params.sessionId)
     .single()
 
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -43,6 +44,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .from('session_comments')
     .select('id, author_id')
     .eq('id', params.commentId)
+    .eq('session_id', params.sessionId)
     .single()
 
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -54,6 +56,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .from('session_comments')
     .delete()
     .eq('id', params.commentId)
+    .eq('session_id', params.sessionId)
 
   if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
   return new NextResponse(null, { status: 204 })
