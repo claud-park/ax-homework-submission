@@ -27,3 +27,28 @@ export async function PATCH(
   if (error || !data) return NextResponse.json({ error: 'Update failed' }, { status: 500 })
   return NextResponse.json(data)
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { commentId: string } }
+) {
+  const user = await verifyJWT(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const isAdmin = !!user.user_metadata?.is_admin
+  const supabase = createServiceClient()
+  const { data: existing } = await supabase
+    .from('charter_comments')
+    .select('id, author_id')
+    .eq('id', params.commentId)
+    .single()
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!isAdmin && existing.author_id !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  const { error } = await supabase
+    .from('charter_comments')
+    .delete()
+    .eq('id', params.commentId)
+  if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
+  return new NextResponse(null, { status: 204 })
+}
