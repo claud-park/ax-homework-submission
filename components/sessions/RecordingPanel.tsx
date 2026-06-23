@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Mic, Square, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import type { SessionActionItem, SessionProcessingStatus } from '@/lib/types'
+import type { SessionActionItem } from '@/lib/types'
 
 interface Props {
   sessionId: string
@@ -132,7 +132,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   async function processWithXHR(
     blob: Blob,
     durationSec: number,
-    uploadEstimate: number,
+    _uploadEstimate: number,
     sttEstimate: number,
     summarizeEstimate: number
   ) {
