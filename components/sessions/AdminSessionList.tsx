@@ -4,6 +4,7 @@ import { Plus, ChevronRight } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { CheckUpSession } from '@/lib/types'
+import DatePicker from '@/components/DatePicker'
 
 const STATUS_LABEL: Record<string, string> = {
   idle: '미처리',
@@ -86,25 +87,23 @@ export function AdminSessionList({ championUserId, sessions, onSelect, onRefresh
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
           />
-          <input
-            type="date"
+          <DatePicker
             value={newDate}
-            onChange={e => setNewDate(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
-            style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+            onChange={setNewDate}
+            style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }}
           />
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-end">
             <button
               onClick={() => setShowForm(false)}
-              className="flex-1 text-xs py-2 rounded-lg"
-              style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              className="text-xs px-4 py-2 rounded-lg font-medium"
+              style={{ background: '#fff', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
             >
               취소
             </button>
             <button
               onClick={createSession}
               disabled={creating || !newTitle.trim()}
-              className="flex-1 text-xs py-2 rounded-lg font-semibold disabled:opacity-40"
+              className="text-xs px-4 py-2 rounded-lg font-semibold disabled:opacity-40"
               style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
             >
               {creating ? '생성 중...' : '생성'}

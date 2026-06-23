@@ -4,7 +4,7 @@
 CREATE TABLE check_up_sessions (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   champion_user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  admin_user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  admin_user_id           UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   session_date            DATE NOT NULL,
   title                   TEXT NOT NULL,
   notes                   TEXT,
@@ -78,7 +78,7 @@ CREATE TABLE session_comments (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id  UUID NOT NULL REFERENCES check_up_sessions(id) ON DELETE CASCADE,
   body        TEXT NOT NULL,
-  author_id   UUID NOT NULL REFERENCES users(id),
+  author_id   UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   author_role TEXT NOT NULL CHECK (author_role IN ('admin','champion')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()

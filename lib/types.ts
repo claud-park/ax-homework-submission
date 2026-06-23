@@ -225,7 +225,7 @@ export type SessionProcessingStatus = 'idle' | 'uploading' | 'transcribing' | 's
 export interface CheckUpSession {
   id: string
   champion_user_id: string
-  admin_user_id: string
+  admin_user_id: string | null
   session_date: string
   title: string
   notes: string | null
