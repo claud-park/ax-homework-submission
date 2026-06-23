@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack } from '@/lib/one-on-one/slack'
-import { formatSlotLabel } from '@/lib/one-on-one/slot-utils'
+import { formatSlotLabel, isWorkingHour, overlapsLunchBreak } from '@/lib/one-on-one/slot-utils'
 import type { OneOnOneBooking } from '@/lib/types'
 
 function buildBlocks(bookingId: string, text: string) {
@@ -45,6 +45,23 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  // Server-side slot validation
+  const startMs = new Date(slotStart).getTime()
+  const endMs   = new Date(slotEnd).getTime()
+
+  // 1. Must be in the future
+  if (startMs <= Date.now()) {
+    return NextResponse.json({ error: '과거 시간은 선택할 수 없습니다.' }, { status: 400 })
+  }
+  // 2. duration must match slot length
+  if (endMs - startMs !== duration * 60 * 1000) {
+    return NextResponse.json({ error: '잘못된 슬롯 길이입니다.' }, { status: 400 })
+  }
+  // 3. Working hours and lunch break check
+  if (!isWorkingHour(slotStart) || overlapsLunchBreak(slotStart, slotEnd)) {
+    return NextResponse.json({ error: '업무 시간 외 슬롯입니다.' }, { status: 400 })
+  }
 
   // 중복 신청 방지
   const { data: existing } = await supabase
@@ -97,6 +114,10 @@ export async function POST(req: NextRequest) {
   if (insertError || !booking) {
     // Compensate: delete the orphaned Slack message
     await slack.chat.delete({ channel: channelId, ts: slackTs }).catch(() => {})
+    // Unique index violation = concurrent duplicate booking
+    if (insertError?.code === '23505') {
+      return NextResponse.json({ error: '이미 대기 중인 신청이 있습니다.' }, { status: 409 })
+    }
     return NextResponse.json({ error: 'DB insert failed' }, { status: 500 })
   }
 

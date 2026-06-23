@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, getAdminIdBySlackUserId, type AdminId } from '@/lib/one-on-one/slack'
@@ -14,7 +14,10 @@ function verifySlackSignature(
 ): boolean {
   const base = `v0:${timestamp}:${body}`
   const hash = createHmac('sha256', secret).update(base).digest('hex')
-  return signature === `v0=${hash}`
+  const sigBuf = Buffer.from(signature)
+  const hashBuf = Buffer.from(`v0=${hash}`)
+  if (sigBuf.length !== hashBuf.length) return false
+  return timingSafeEqual(sigBuf, hashBuf)
 }
 
 export async function POST(req: NextRequest) {
