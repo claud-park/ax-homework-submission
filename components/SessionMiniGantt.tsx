@@ -99,7 +99,7 @@ export function SessionMiniGantt({ milestones, sessionDate }: Props) {
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
           {/* Date header */}
           <div style={{ display: 'flex', height: 20, marginBottom: 0 }}>
-            {headerDates.map((d, i) => (
+            {headerDates.map((d) => (
               <div
                 key={d}
                 style={{
