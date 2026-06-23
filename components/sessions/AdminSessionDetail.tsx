@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Trash2, Send } from 'lucide-react'
+import { ArrowLeft, Trash2, Send, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
@@ -28,6 +28,8 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
   const [newItemBody, setNewItemBody] = useState('')
   const [addingItem, setAddingItem] = useState(false)
+
+  const [reprocessing, setReprocessing] = useState(false)
 
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -139,6 +141,28 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   function handleProcessed(processedNotes: string, processedItems: SessionActionItem[]) {
     setNotes(processedNotes)
     setActionItems(processedItems)
+    setSession(prev => prev ? { ...prev, processing_status: 'done' } : prev)
+  }
+
+  async function reprocess() {
+    setReprocessing(true)
+    setSession(prev => prev ? { ...prev, processing_status: 'transcribing' } : prev)
+    try {
+      const result = await apiFetch<{ notes: string; actionItems: SessionActionItem[] }>(
+        `/api/sessions/${sessionId}/reprocess`,
+        { method: 'POST' }
+      )
+      setNotes(result.notes)
+      setActionItems(result.actionItems)
+      setSession(prev => prev ? { ...prev, processing_status: 'done', notes: result.notes } : prev)
+      toast.success('재처리 완료!')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '재처리 실패'
+      toast.error(msg)
+      setSession(prev => prev ? { ...prev, processing_status: 'error' } : prev)
+    } finally {
+      setReprocessing(false)
+    }
   }
 
   if (loading) {
@@ -189,6 +213,28 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
       {/* Mini Gantt */}
       <SessionMiniGantt milestones={milestones} sessionDate={session.session_date} />
+
+      {/* Reprocess banner — shown when previous processing failed but audio exists */}
+      {session.processing_status === 'error' && session.audio_file_path && (
+        <div
+          className="rounded-xl border p-3 mb-4 flex items-center justify-between"
+          style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
+        >
+          <div>
+            <p className="text-xs font-semibold" style={{ color: 'var(--error)' }}>이전 처리 실패</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>저장된 오디오로 재처리할 수 있습니다.</p>
+          </div>
+          <button
+            onClick={reprocess}
+            disabled={reprocessing}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-40"
+            style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+          >
+            <RefreshCw className={`h-3 w-3 ${reprocessing ? 'animate-spin' : ''}`} />
+            {reprocessing ? '처리 중...' : '재처리'}
+          </button>
+        </div>
+      )}
 
       {/* Recording Panel */}
       <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} />
