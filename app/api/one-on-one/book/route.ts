@@ -95,6 +95,8 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (insertError || !booking) {
+    // Compensate: delete the orphaned Slack message
+    await slack.chat.delete({ channel: channelId, ts: slackTs }).catch(() => {})
     return NextResponse.json({ error: 'DB insert failed' }, { status: 500 })
   }
 

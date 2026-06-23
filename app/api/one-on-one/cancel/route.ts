@@ -28,12 +28,14 @@ export async function POST(req: NextRequest) {
   const b = updated[0]
   if (b.slack_ts && b.slack_channel) {
     const label = formatSlotLabel(b.slot_start)
-    await slack.chat.update({
-      channel: b.slack_channel,
-      ts: b.slack_ts,
-      text: `🚫 챔피언이 취소함 — ${b.champion_name} ${label} (${b.duration_minutes}분)`,
-      blocks: [],
-    })
+    try {
+      await slack.chat.update({
+        channel: b.slack_channel,
+        ts: b.slack_ts,
+        text: `🚫 챔피언이 취소함 — ${b.champion_name} ${label} (${b.duration_minutes}분)`,
+        blocks: [],
+      })
+    } catch { /* Slack update failure should not block the cancel response */ }
   }
 
   return NextResponse.json({ ok: true })
