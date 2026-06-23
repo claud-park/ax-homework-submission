@@ -217,3 +217,48 @@ export interface UserManagementEntry {
   userGroup: UserGroup
   createdAt: string
 }
+
+// ─── Check-up Sessions ───────────────────────────────────────────────────────
+
+export type SessionProcessingStatus = 'idle' | 'uploading' | 'transcribing' | 'summarizing' | 'done' | 'error'
+
+export interface CheckUpSession {
+  id: string
+  champion_user_id: string
+  admin_user_id: string | null
+  session_date: string
+  title: string
+  notes: string | null
+  audio_file_path: string | null
+  recording_duration_sec: number | null
+  processing_status: SessionProcessingStatus
+  raw_transcript: string | null
+  created_at: string
+  updated_at: string
+  action_items?: SessionActionItem[]
+  comments?: SessionComment[]
+  milestones?: Milestone[]
+  champion?: User
+}
+
+export interface SessionActionItem {
+  id: string
+  session_id: string
+  body: string
+  is_completed: boolean
+  completed_at: string | null
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SessionComment {
+  id: string
+  session_id: string
+  body: string
+  author_id: string
+  author_role: 'admin' | 'champion'
+  created_at: string
+  updated_at: string
+  author?: User
+}

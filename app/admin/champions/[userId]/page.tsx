@@ -7,6 +7,8 @@ import { parseName } from '@/lib/utils'
 import { ArrowLeft, Download, ExternalLink, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
+import { AdminSessionList } from '@/components/sessions/AdminSessionList'
+import { AdminSessionDetail } from '@/components/sessions/AdminSessionDetail'
 
 
 const MS_STATUS_LABEL: Record<MilestoneStatus, string> = {
@@ -162,7 +164,7 @@ const CHARTER_SECTIONS = [
 ]
 
 type SubWithComments = Submission & { comments?: Comment[] }
-type CharterComment = { id: string; body: string; author_role: 'admin' | 'user'; created_at: string }
+type CharterComment = { id: string; body: string; author_role: 'admin' | 'user'; author_id: string | null; created_at: string }
 
 export default function AdminChampionPage() {
   const { userId } = useParams<{ userId: string }>()
@@ -179,6 +181,9 @@ export default function AdminChampionPage() {
   const [charterComments, setCharterComments] = useState<CharterComment[]>([])
   const [newCharterComment, setNewCharterComment] = useState('')
   const [postingCharter, setPostingCharter] = useState(false)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editingBody, setEditingBody] = useState('')
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null)
 
   // feedback confirm flow
   const [confirmingSubId, setConfirmingSubId] = useState<string | null>(null)
@@ -191,6 +196,12 @@ export default function AdminChampionPage() {
   const [posting, setPosting] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
+  // session tab
+  const [sessionTab, setSessionTab] = useState<'list' | 'detail'>('list')
+  const [sessions, setSessions] = useState<import('@/lib/types').CheckUpSession[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('submissions')
+
   function loadSubs() {
     return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
   }
@@ -200,6 +211,11 @@ export default function AdminChampionPage() {
   }
 
   useEffect(() => {
+    import('@/lib/supabase/client').then(({ createSupabaseBrowserClient }) => {
+      createSupabaseBrowserClient().auth.getSession().then(({ data: { session } }) => {
+        setCurrentAdminId(session?.user?.id ?? null)
+      })
+    })
     Promise.all([
       apiFetch<ChampionProject>(`/api/champions/${userId}`).then(d => {
         setData(d)
@@ -241,6 +257,30 @@ export default function AdminChampionPage() {
       toast.error('코멘트 작성 실패')
     } finally {
       setPostingCharter(false)
+    }
+  }
+
+  async function saveEditCharterComment(commentId: string) {
+    if (!editingBody.trim()) return
+    try {
+      await apiFetch(`/api/charter/comments/${commentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ body: editingBody.trim() }),
+      })
+      setCharterComments(prev => prev.map(c => c.id === commentId ? { ...c, body: editingBody.trim() } : c))
+      setEditingCommentId(null)
+    } catch {
+      toast.error('편집 실패')
+    }
+  }
+
+  async function deleteCharterComment(commentId: string) {
+    if (!window.confirm('코멘트를 삭제하시겠습니까?')) return
+    try {
+      await apiFetch(`/api/charter/comments/${commentId}`, { method: 'DELETE' })
+      setCharterComments(prev => prev.filter(c => c.id !== commentId))
+    } catch {
+      toast.error('삭제 실패')
     }
   }
 
@@ -359,6 +399,37 @@ export default function AdminChampionPage() {
         )}
       </div>
 
+      {/* Main Tab Bar */}
+      <div className="flex gap-2 mb-6">
+        {([
+          { key: 'submissions', label: '제출물' },
+          { key: 'charter', label: '과제정의서' },
+          { key: 'sessions', label: '체크업 세션' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => {
+              setActiveMainTab(tab.key)
+              if (tab.key === 'sessions') {
+                setSessionTab('list')
+                apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
+                  .then(setSessions)
+                  .catch(() => {})
+              }
+            }}
+            className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+            style={{
+              background: activeMainTab === tab.key ? 'var(--blue-600)' : 'var(--surface-secondary)',
+              color: activeMainTab === tab.key ? '#fff' : 'var(--text-secondary)',
+              border: 'none', cursor: 'pointer',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeMainTab === 'submissions' && (
       <section className="mb-8">
         <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>과제 제출 이력</h2>
         {submissions.length === 0 ? (
@@ -544,8 +615,9 @@ export default function AdminChampionPage() {
           </div>
         )}
       </section>
+      )}
 
-      {data.charters.length > 0 && (
+      {activeMainTab === 'charter' && data.charters.length > 0 && (
         <section id="charter" className="mb-8">
           {/* Charter 탭 (2개 이상일 때만 표시) */}
           {data.charters.length > 1 && (
@@ -678,9 +750,41 @@ export default function AdminChampionPage() {
                         <span className="font-semibold" style={{ color: c.author_role === 'admin' ? 'var(--blue-600)' : 'var(--text-primary)' }}>
                           {c.author_role === 'admin' ? '관리자' : '챔피언'}
                         </span>
-                        <span style={{ color: 'var(--text-disabled)' }}>{relativeTime(c.created_at)}</span>
+                        <div className="flex items-center gap-2">
+                          <span style={{ color: 'var(--text-disabled)' }}>{relativeTime(c.created_at)}</span>
+                          {c.author_id === currentAdminId && (
+                            <button
+                              onClick={() => { setEditingCommentId(c.id); setEditingBody(c.body) }}
+                              style={{ color: 'var(--text-disabled)', fontSize: '10px' }}
+                            >편집</button>
+                          )}
+                          <button
+                            onClick={() => deleteCharterComment(c.id)}
+                            style={{ color: 'var(--error)', fontSize: '10px' }}
+                          >삭제</button>
+                        </div>
                       </div>
-                      <p className="whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{c.body}</p>
+                      {editingCommentId === c.id ? (
+                        <div>
+                          <textarea
+                            value={editingBody}
+                            onChange={e => setEditingBody(e.target.value)}
+                            rows={2}
+                            className="w-full rounded-md border p-1.5 resize-none mb-1"
+                            style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', fontSize: '12px' }}
+                          />
+                          <div className="flex gap-1.5">
+                            <button onClick={() => setEditingCommentId(null)}
+                              className="text-xs px-2 py-0.5 rounded"
+                              style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>취소</button>
+                            <button onClick={() => saveEditCharterComment(c.id)}
+                              className="text-xs px-2 py-0.5 rounded font-semibold"
+                              style={{ background: 'var(--blue-600)', color: '#fff' }}>저장</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{c.body}</p>
+                      )}
                     </div>
                   ))
                 )}
@@ -719,6 +823,41 @@ export default function AdminChampionPage() {
       )}
 
       {/* 마일스톤 그룹 (읽기 전용) */}
+
+      {activeMainTab === 'sessions' && (
+        <section className="mb-8">
+          {sessionTab === 'list' ? (
+            <AdminSessionList
+              championUserId={userId}
+              sessions={sessions}
+              milestones={data?.milestones ?? []}
+              onSelect={(s) => { setSelectedSessionId(s.id); setSessionTab('detail') }}
+              onRefresh={() => {
+                apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
+                  .then(setSessions)
+                  .catch(() => {})
+              }}
+            />
+          ) : selectedSessionId ? (
+            <AdminSessionDetail
+              sessionId={selectedSessionId}
+              currentAdminId={currentAdminId ?? ''}
+              onBack={() => {
+                setSessionTab('list')
+                apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
+                  .then(setSessions)
+                  .catch(() => {})
+              }}
+              onDeleted={() => {
+                setSessionTab('list')
+                apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
+                  .then(setSessions)
+                  .catch(() => {})
+              }}
+            />
+          ) : null}
+        </section>
+      )}
     </div>
   )
 }
