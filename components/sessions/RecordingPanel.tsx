@@ -53,6 +53,18 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     }
   }, [])
 
+  // Warn before leaving page while recording or processing
+  useEffect(() => {
+    const active = phase === 'recording' || phase === 'uploading' || phase === 'transcribing' || phase === 'summarizing'
+    if (!active) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = '세션 녹음이 진행되고 있습니다. 페이지를 벗어나면 녹음 내용이 저장되지 않습니다.'
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [phase])
+
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })

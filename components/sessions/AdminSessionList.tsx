@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { Plus, ChevronRight } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
-import type { CheckUpSession } from '@/lib/types'
+import type { CheckUpSession, Milestone } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
+import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 
 const STATUS_LABEL: Record<string, string> = {
   idle: '미처리',
@@ -26,11 +27,12 @@ const STATUS_COLOR: Record<string, string> = {
 interface Props {
   championUserId: string
   sessions: CheckUpSession[]
+  milestones: Milestone[]
   onSelect: (session: CheckUpSession) => void
   onRefresh: () => void
 }
 
-export function AdminSessionList({ championUserId, sessions, onSelect, onRefresh }: Props) {
+export function AdminSessionList({ championUserId, sessions, milestones, onSelect, onRefresh }: Props) {
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
@@ -117,26 +119,29 @@ export function AdminSessionList({ championUserId, sessions, onSelect, onRefresh
       ) : (
         <div className="flex flex-col gap-2">
           {sessions.map(s => (
-            <button
+            <div
               key={s.id}
               onClick={() => onSelect(s)}
-              className="w-full flex items-center justify-between p-3 rounded-xl border text-left"
+              className="rounded-xl border p-3"
               style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', cursor: 'pointer' }}
             >
-              <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{s.title}</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{s.session_date}</p>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{s.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{s.session_date}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ color: STATUS_COLOR[s.processing_status], background: `${STATUS_COLOR[s.processing_status]}18`, fontWeight: 600 }}
+                  >
+                    {STATUS_LABEL[s.processing_status]}
+                  </span>
+                  <ChevronRight className="h-4 w-4" style={{ color: 'var(--text-disabled)' }} />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className="text-xs px-2 py-0.5 rounded-full"
-                  style={{ color: STATUS_COLOR[s.processing_status], background: `${STATUS_COLOR[s.processing_status]}18`, fontWeight: 600 }}
-                >
-                  {STATUS_LABEL[s.processing_status]}
-                </span>
-                <ChevronRight className="h-4 w-4" style={{ color: 'var(--text-disabled)' }} />
-              </div>
-            </button>
+              <SessionMiniGantt milestones={milestones} sessionDate={s.session_date} />
+            </div>
           ))}
         </div>
       )}

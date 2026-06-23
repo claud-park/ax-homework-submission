@@ -830,6 +830,7 @@ export default function AdminChampionPage() {
             <AdminSessionList
               championUserId={userId}
               sessions={sessions}
+              milestones={data?.milestones ?? []}
               onSelect={(s) => { setSelectedSessionId(s.id); setSessionTab('detail') }}
               onRefresh={() => {
                 apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
