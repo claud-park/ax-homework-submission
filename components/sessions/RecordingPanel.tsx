@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { SessionActionItem } from '@/lib/types'
 
 interface UsageSummary {
-  stt: { provider: string; durationSec: number; cost: number }
+  stt: { durationSec: number; cost: number }
   claude: { inputTokens: number; outputTokens: number; cost: number }
   totalCost: number
 }
@@ -344,10 +344,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
           </div>
           {usage && (
             <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-disabled)' }}>
-              {usage.stt.provider === 'groq'
-                ? `Groq Whisper ${formatTime(usage.stt.durationSec)} (무료)`
-                : `Whisper ${formatTime(usage.stt.durationSec)} ($${usage.stt.cost.toFixed(3)})`
-              }
+              {`Whisper ${formatTime(usage.stt.durationSec)} ($${usage.stt.cost.toFixed(3)})`}
               {' · '}
               Claude {(usage.claude.inputTokens + usage.claude.outputTokens).toLocaleString()} 토큰
               {' '}(입력 {usage.claude.inputTokens.toLocaleString()} / 출력 {usage.claude.outputTokens.toLocaleString()})

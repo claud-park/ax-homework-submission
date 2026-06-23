@@ -7,10 +7,7 @@ import OpenAI from 'openai'
 import { toFile } from 'openai'
 
 const MODEL = 'claude-sonnet-4-6'
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY ?? process.env.OPENAI_API_KEY,
-  baseURL: process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : undefined,
-})
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 type Params = { params: { sessionId: string } }
 
@@ -65,7 +62,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const whisperFile = await toFile(audioBlob, 'audio.webm', { type: 'audio/webm' })
     const transcription = await openai.audio.transcriptions.create({
       file: whisperFile,
-      model: process.env.GROQ_API_KEY ? 'whisper-large-v3-turbo' : 'whisper-1',
+      model: 'whisper-1',
       language: 'ko',
     })
     const transcript = transcription.text
@@ -138,7 +135,7 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
     }
 
     const durationMin = (recordingDurationSec ?? 0) / 60
-    const whisperCost = process.env.GROQ_API_KEY ? 0 : durationMin * 0.006
+    const whisperCost = durationMin * 0.006
     const claudeInputCost = ((claudeUsage.inputTokens ?? 0) / 1_000_000) * 3
     const claudeOutputCost = ((claudeUsage.outputTokens ?? 0) / 1_000_000) * 15
     const claudeCost = claudeInputCost + claudeOutputCost
@@ -148,7 +145,6 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
       actionItems: insertedActionItems,
       usage: {
         stt: {
-          provider: process.env.GROQ_API_KEY ? 'groq' : 'openai',
           durationSec: recordingDurationSec ?? 0,
           cost: whisperCost,
         },

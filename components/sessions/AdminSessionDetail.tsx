@@ -151,15 +151,14 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       const result = await apiFetch<{
         notes: string
         actionItems: SessionActionItem[]
-        usage?: { stt: { provider: string; durationSec: number; cost: number }; claude: { inputTokens: number; outputTokens: number; cost: number }; totalCost: number }
+        usage?: { stt: { durationSec: number; cost: number }; claude: { inputTokens: number; outputTokens: number; cost: number }; totalCost: number }
       }>(`/api/sessions/${sessionId}/reprocess`, { method: 'POST' })
       setNotes(result.notes)
       setActionItems(result.actionItems)
       setSession(prev => prev ? { ...prev, processing_status: 'done', notes: result.notes } : prev)
       if (result.usage) {
         const u = result.usage
-        const sttStr = u.stt.provider === 'groq' ? 'Groq (무료)' : `Whisper $${u.stt.cost.toFixed(3)}`
-        toast.success(`재처리 완료! ${sttStr} · Claude $${u.claude.cost.toFixed(4)} · 합계 $${u.totalCost.toFixed(4)}`)
+        toast.success(`재처리 완료! Whisper $${u.stt.cost.toFixed(3)} · Claude $${u.claude.cost.toFixed(4)} · 합계 $${u.totalCost.toFixed(4)}`)
       } else {
         toast.success('재처리 완료!')
       }
