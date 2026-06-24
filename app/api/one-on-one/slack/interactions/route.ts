@@ -86,7 +86,7 @@ async function handleConfirm(payload: Record<string, unknown>, bookingId: string
     await calendar.events.insert({
       calendarId: 'primary',
       requestBody: {
-        summary: `1-on-1: ${booking.champion_name} × ${confirmedAdminId.toUpperCase()}`,
+        summary: `[AX] 1-on-1: ${booking.champion_name} × ${confirmedAdminId.toUpperCase()}`,
         start: { dateTime: booking.slot_start, timeZone: 'Asia/Seoul' },
         end:   { dateTime: booking.slot_end,   timeZone: 'Asia/Seoul' },
         attendees: [{ email: booking.champion_email }],
