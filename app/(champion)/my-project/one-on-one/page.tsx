@@ -17,39 +17,45 @@ type ViewMode = 'chip' | 'calendar'
 function getMonday(kstDateStr?: string | null): string {
   const ref = kstDateStr
     ? new Date(kstDateStr + 'T00:00:00+09:00')
-    : new Date(Date.now() + 9 * 3600 * 1000)  // shift to KST
-  const dow = ref.getUTCDay()  // 0=Sun when using shifted time
+    : new Date(Date.now() + 9 * 3600 * 1000)
+  const dow = ref.getUTCDay()
   const daysToMon = dow === 0 ? 1 : dow === 1 ? 0 : -(dow - 1)
   const monMs = Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate() + daysToMon)
   const mon = new Date(monMs)
   return `${mon.getUTCFullYear()}-${String(mon.getUTCMonth()+1).padStart(2,'0')}-${String(mon.getUTCDate()).padStart(2,'0')}`
 }
 
+function filterSlots(slots: Slot[], busy: BusyInterval[] | null): Slot[] {
+  if (!busy) return slots
+  return slots.filter(s => !busy.some(b => s.start < b.end && s.end > b.start))
+}
+
 export default function OneOnOnePage() {
   const searchParams = useSearchParams()
 
-  const [viewMode,     setViewMode]     = useState<ViewMode>('chip')
-  const [duration,     setDuration]     = useState<30 | 60>(30)
+  const [viewMode,       setViewMode]       = useState<ViewMode>('chip')
+  const [duration,       setDuration]       = useState<30 | 60>(30)
+  const [champConnected, setChampConnected] = useState(false)
 
   // 칩 뷰 state
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [chipSlots,    setChipSlots]    = useState<Slot[]>([])
+  const [chipBusy,     setChipBusy]     = useState<BusyInterval[] | null>(null)
   const [chipLoading,  setChipLoading]  = useState(false)
 
   // 캘린더 뷰 state
-  const [weekStart,    setWeekStart]    = useState<string>(() => getMonday())
-  const [calSlots,     setCalSlots]     = useState<Slot[]>([])
-  const [championBusy, setChampionBusy] = useState<BusyInterval[] | null>(null)
-  const [calLoading,   setCalLoading]   = useState(false)
-  const [champConnected, setChampConnected] = useState(false)
+  const [weekStart,  setWeekStart]  = useState<string>(() => getMonday())
+  const [calSlots,   setCalSlots]   = useState<Slot[]>([])
+  const [calBusy,    setCalBusy]    = useState<BusyInterval[] | null>(null)
+  const [calLoading, setCalLoading] = useState(false)
 
   // 공통 state
-  const [selectedSlot, setSelectedSlot]   = useState<Slot | null>(null)
-  const [booking,      setBooking]         = useState<OneOnOneBooking | null>(null)
-  const [bookingLoading, setBookingLoading] = useState(true)
-  const [submitting,   setSubmitting]      = useState(false)
-  const [cancelling,   setCancelling]      = useState(false)
-  const [error,        setError]           = useState<string | null>(null)
+  const [selectedSlot,   setSelectedSlot]   = useState<Slot | null>(null)
+  const [booking,        setBooking]         = useState<OneOnOneBooking | null>(null)
+  const [bookingLoading, setBookingLoading]  = useState(true)
+  const [submitting,     setSubmitting]      = useState(false)
+  const [cancelling,     setCancelling]      = useState(false)
+  const [error,          setError]           = useState<string | null>(null)
 
   // OAuth 결과 처리
   useEffect(() => {
@@ -75,9 +81,15 @@ export default function OneOnOnePage() {
     if (viewMode !== 'chip' || !selectedDate) return
     setChipLoading(true)
     setSelectedSlot(null)
-    apiFetch<{ slots: Slot[] }>(`/api/one-on-one/slots?date=${selectedDate}&duration=${duration}`)
-      .then(r => setChipSlots(r.slots))
-      .catch(() => setChipSlots([]))
+    apiFetch<{ slots: Slot[]; championBusy: BusyInterval[] | null; championConnected: boolean }>(
+      `/api/one-on-one/slots?date=${selectedDate}&duration=${duration}`
+    )
+      .then(r => {
+        setChipSlots(r.slots)
+        setChipBusy(r.championBusy)
+        setChampConnected(r.championConnected)
+      })
+      .catch(() => { setChipSlots([]); setChipBusy(null) })
       .finally(() => setChipLoading(false))
   }, [selectedDate, duration, viewMode])
 
@@ -91,13 +103,10 @@ export default function OneOnOnePage() {
     )
       .then(r => {
         setCalSlots(r.slots)
-        setChampionBusy(r.championBusy)
+        setCalBusy(r.championBusy)
         setChampConnected(r.championConnected)
       })
-      .catch(() => {
-        setCalSlots([])
-        setChampionBusy(null)
-      })
+      .catch(() => { setCalSlots([]); setCalBusy(null) })
       .finally(() => setCalLoading(false))
   }, [viewMode, weekStart, duration])
 
@@ -158,15 +167,15 @@ export default function OneOnOnePage() {
         claud, alex, jennifer 중 가능한 시간을 선택해 신청하세요.
       </p>
 
-      {/* Phase B: Google Calendar 연결 배너 */}
-      {!champConnected && viewMode === 'calendar' && (
+      {/* Google Calendar 연결 배너 — 뷰 무관하게 항상 표시 */}
+      {!champConnected && (
         <div
           className="flex items-center justify-between rounded-xl border px-4 py-3 mb-4"
           style={{ background: '#fffbeb', borderColor: '#fde68a' }}
         >
           <div>
             <p className="text-xs font-semibold" style={{ color: '#92400e' }}>내 Google Calendar 연결</p>
-            <p className="text-xs" style={{ color: '#b45309' }}>내 일정과 겹치는 빈 시간을 확인하세요.</p>
+            <p className="text-xs" style={{ color: '#b45309' }}>내 일정과 겹치는 빈 시간만 보여드려요.</p>
           </div>
           <a
             href="/api/auth/google/champion"
@@ -214,7 +223,7 @@ export default function OneOnOnePage() {
               <DateStrip selectedDate={selectedDate} onSelect={setSelectedDate} />
               {selectedDate && (
                 <TimeSlotGrid
-                  slots={chipSlots}
+                  slots={filterSlots(chipSlots, chipBusy)}
                   selected={selectedSlot}
                   onSelect={setSelectedSlot}
                   loading={chipLoading}
@@ -270,8 +279,8 @@ export default function OneOnOnePage() {
               <WeekCalendar
                 weekStart={weekStart}
                 duration={duration}
-                slots={calSlots}
-                championBusy={championBusy}
+                slots={filterSlots(calSlots, calBusy)}
+                championBusy={calBusy}
                 selected={selectedSlot}
                 onSelect={setSelectedSlot}
                 loading={calLoading}

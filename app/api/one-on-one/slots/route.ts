@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth'
 import { getAvailableSlots } from '@/lib/one-on-one/calendar'
+import { getChampionBusy, isChampionConnected } from '@/lib/one-on-one/champion-google'
+import { getDayRange } from '@/lib/one-on-one/slot-utils'
 
 export async function GET(req: NextRequest) {
   const user = await verifyUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const date = req.nextUrl.searchParams.get('date')       // 'YYYY-MM-DD'
-  const durStr = req.nextUrl.searchParams.get('duration') // '30' | '60'
+  const date = req.nextUrl.searchParams.get('date')
+  const durStr = req.nextUrl.searchParams.get('duration')
   if (!date || !durStr) {
     return NextResponse.json({ error: 'date and duration required' }, { status: 400 })
   }
@@ -18,8 +20,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const slots = await getAvailableSlots(date, duration)
-    return NextResponse.json({ slots })
+    const [slots, connected] = await Promise.all([
+      getAvailableSlots(date, duration),
+      isChampionConnected(user.id),
+    ])
+
+    let championBusy = null
+    if (connected) {
+      const { timeMin, timeMax } = getDayRange(date)
+      championBusy = await getChampionBusy(user.id, timeMin, timeMax)
+    }
+
+    return NextResponse.json({ slots, championBusy, championConnected: connected })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed'
     return NextResponse.json({ error: message }, { status: 500 })
