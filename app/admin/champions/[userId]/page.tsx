@@ -403,7 +403,7 @@ export default function AdminChampionPage() {
       <div className="flex gap-2 mb-6">
         {([
           { key: 'charter', label: '과제정의서' },
-          { key: 'sessions', label: '체크업 세션' },
+          { key: 'sessions', label: '1-on-1 세션' },
           { key: 'submissions', label: '제출물' },
         ] as const).map(tab => (
           <button

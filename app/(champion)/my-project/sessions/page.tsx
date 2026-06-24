@@ -29,11 +29,11 @@ export default async function ChampionSessionsPage() {
 
   return (
     <div>
-      <h1 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>체크업 세션</h1>
+      <h1 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>1-on-1 세션</h1>
 
       {list.length === 0 ? (
         <p className="text-sm text-center py-12" style={{ color: 'var(--text-disabled)' }}>
-          아직 체크업 세션이 없습니다.
+          아직 1-on-1 세션이 없습니다.
         </p>
       ) : (
         <div className="flex flex-col gap-2">
