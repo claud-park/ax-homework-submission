@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { champion_user_id, session_date, title } = await req.json()
+  const { champion_user_id, session_date, session_time, title } = await req.json()
   if (!champion_user_id || !session_date || !title?.trim()) {
     return NextResponse.json({ error: 'champion_user_id, session_date, title required' }, { status: 400 })
   }
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       admin_user_id: admin.id,
       session_date,
       title: title.trim(),
+      ...(session_time ? { session_time } : {}),
     })
     .select()
     .single()

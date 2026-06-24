@@ -227,6 +227,7 @@ export interface CheckUpSession {
   champion_user_id: string
   admin_user_id: string | null
   session_date: string
+  session_time: string | null
   title: string
   notes: string | null
   audio_file_path: string | null

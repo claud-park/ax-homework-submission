@@ -237,7 +237,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       </div>
 
       <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{session.title}</h3>
-      <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>{session.session_date}</p>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>{session.session_date}{session.session_time ? ` ${session.session_time.slice(0, 5)}` : ''}</p>
 
       {/* Mini Gantt */}
       <SessionMiniGantt milestones={milestones} sessionDate={session.session_date} />

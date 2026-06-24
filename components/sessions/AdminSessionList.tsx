@@ -36,6 +36,7 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
+  const [newTime, setNewTime] = useState('')
   const [showForm, setShowForm] = useState(false)
 
   async function createSession() {
@@ -47,12 +48,14 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
         body: JSON.stringify({
           champion_user_id: championUserId,
           session_date: newDate,
+          session_time: newTime || undefined,
           title: newTitle.trim(),
         }),
       })
       toast.success('세션이 생성되었습니다.')
       setShowForm(false)
       setNewTitle('')
+      setNewTime('')
       onRefresh()
       onSelect(session)
     } catch {
@@ -94,6 +97,13 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
             onChange={setNewDate}
             style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }}
           />
+          <input
+            type="time"
+            value={newTime}
+            onChange={e => setNewTime(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+            style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+          />
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => setShowForm(false)}
@@ -128,7 +138,7 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{s.title}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{s.session_date}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{s.session_date}{s.session_time ? ` ${s.session_time.slice(0, 5)}` : ''}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
