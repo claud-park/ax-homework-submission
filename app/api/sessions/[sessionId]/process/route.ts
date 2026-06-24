@@ -3,6 +3,7 @@ import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { isAcceptedAudio } from '@/lib/audio'
 import { processSessionAudio, SummaryParseError } from '@/lib/sessions/processAudio'
+import { claimSessionForProcessing } from '@/lib/sessions/lock'
 
 // Whisper + Claude on long recordings can take a while.
 export const maxDuration = 300
@@ -50,6 +51,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   try {
+    const claimed = await claimSessionForProcessing(supabase, params.sessionId)
+    if (!claimed) {
+      return NextResponse.json(
+        { error: '이미 처리 중인 세션입니다. 잠시 후 다시 시도하세요.' },
+        { status: 409 }
+      )
+    }
+
     await supabase
       .from('check_up_sessions')
       .update({ audio_file_path: audioPath, recording_duration_sec: recordingDurationSec })

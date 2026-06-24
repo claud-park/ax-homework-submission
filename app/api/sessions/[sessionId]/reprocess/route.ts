@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { processSessionAudio, SummaryParseError } from '@/lib/sessions/processAudio'
+import { claimSessionForProcessing } from '@/lib/sessions/lock'
 
 export const maxDuration = 300
 
@@ -26,6 +27,14 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   try {
+    const claimed = await claimSessionForProcessing(supabase, params.sessionId)
+    if (!claimed) {
+      return NextResponse.json(
+        { error: '이미 처리 중인 세션입니다. 잠시 후 다시 시도하세요.' },
+        { status: 409 }
+      )
+    }
+
     const durationSec = session.recording_duration_sec ?? 0
     const result = await processSessionAudio(supabase, params.sessionId, session.audio_file_path, durationSec)
     return NextResponse.json(result)
