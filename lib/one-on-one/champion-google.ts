@@ -19,12 +19,12 @@ function createOAuth2Client(): OAuth2Client {
   )
 }
 
-export function getChampionAuthUrl(userId: string): string {
+export function getChampionAuthUrl(userId: string, nonce: string): string {
   const client = createOAuth2Client()
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/calendar.readonly'],
-    state: userId,
+    state: nonce,  // NOT userId — use nonce for CSRF
     prompt: 'consent',
   })
 }

@@ -22,6 +22,9 @@ export async function GET(req: NextRequest) {
   if (!weekStart || !durStr) {
     return NextResponse.json({ error: 'weekStart and duration required' }, { status: 400 })
   }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+    return NextResponse.json({ error: 'invalid weekStart format' }, { status: 400 })
+  }
   const duration = parseInt(durStr) as 30 | 60
   if (duration !== 30 && duration !== 60) {
     return NextResponse.json({ error: 'duration must be 30 or 60' }, { status: 400 })

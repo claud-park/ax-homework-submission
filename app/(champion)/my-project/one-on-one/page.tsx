@@ -94,7 +94,10 @@ export default function OneOnOnePage() {
         setChampionBusy(r.championBusy)
         setChampConnected(r.championConnected)
       })
-      .catch(() => setCalSlots([]))
+      .catch(() => {
+        setCalSlots([])
+        setChampionBusy(null)
+      })
       .finally(() => setCalLoading(false))
   }, [viewMode, weekStart, duration])
 
@@ -224,7 +227,9 @@ export default function OneOnOnePage() {
               <div className="flex items-center gap-3 mb-3">
                 {(() => {
                   const todayMon = getMonday()
-                  const maxMon = getMonday(new Date(Date.now() + 9*3600*1000 + 7*86400000).toISOString().slice(0,10))
+                  const [ty, tm, td] = todayMon.split('-').map(Number)
+                  const nextMonDate = new Date(Date.UTC(ty, tm-1, td+7))
+                  const maxMon = `${nextMonDate.getUTCFullYear()}-${String(nextMonDate.getUTCMonth()+1).padStart(2,'0')}-${String(nextMonDate.getUTCDate()).padStart(2,'0')}`
                   const [y,m,d] = weekStart.split('-').map(Number)
                   const prevStr = new Date(Date.UTC(y,m-1,d-7)).toISOString().slice(0,10)
                   const nextStr = new Date(Date.UTC(y,m-1,d+7)).toISOString().slice(0,10)
