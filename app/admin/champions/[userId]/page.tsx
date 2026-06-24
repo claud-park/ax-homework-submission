@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission, Milestone, Comment, SubmissionStatus } from '@/lib/types'
@@ -202,16 +202,23 @@ export default function AdminChampionPage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('charter')
   const [scrolled, setScrolled] = useState(false)
+  const headerSentinelRef = useRef<HTMLDivElement>(null)
 
-  // 스크롤 시 헤더를 컴팩트 고정 바([챔피언 | 프로젝트])로 전환
+  // 헤더 위 sentinel을 IntersectionObserver로 감지해 컴팩트 고정 바로 전환.
+  // (scrollTop 임계값 방식은 컴팩트 전환 시 헤더 높이가 줄어 임계값이 흔들려
+  //  느린 스크롤에서 토글이 반복되는 flickering을 유발 → sentinel은 헤더 위에 있어
+  //  헤더 높이 변화의 영향을 받지 않으므로 피드백 루프가 없음.)
   useEffect(() => {
+    const sentinel = headerSentinelRef.current
     const main = document.querySelector('main')
-    if (!main) return
-    const onScroll = () => setScrolled(main.scrollTop > 48)
-    onScroll()
-    main.addEventListener('scroll', onScroll, { passive: true })
-    return () => main.removeEventListener('scroll', onScroll)
-  }, [])
+    if (!sentinel || !main) return
+    const io = new IntersectionObserver(
+      ([entry]) => setScrolled(!entry.isIntersecting),
+      { root: main, threshold: 0 }
+    )
+    io.observe(sentinel)
+    return () => io.disconnect()
+  }, [data])
 
   function loadSubs() {
     return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
@@ -402,6 +409,9 @@ export default function AdminChampionPage() {
         <ArrowLeft className="h-3 w-3" /> 대시보드로
       </button>
 
+      {/* sticky 전환 트리거 (헤더 위에 위치 — 헤더 높이 변화에 영향받지 않음) */}
+      <div ref={headerSentinelRef} aria-hidden style={{ height: 1 }} />
+
       <div
         className="mb-6"
         style={{
@@ -411,8 +421,10 @@ export default function AdminChampionPage() {
           transition: 'padding 0.15s ease, background 0.15s ease',
           ...(scrolled
             ? {
-                margin: '0 -24px 16px',
-                padding: '10px 24px',
+                // 음수 top/좌우 마진으로 main의 p-6(1.5rem) 패딩을 덮어 상단 빈 공간 제거
+                top: '-1.5rem',
+                margin: '0 -1.5rem 16px',
+                padding: '12px 1.5rem',
                 background: 'var(--surface-primary)',
                 borderBottom: '1px solid var(--border-subtle)',
                 boxShadow: 'var(--shadow-s)',
