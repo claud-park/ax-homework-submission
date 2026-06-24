@@ -57,6 +57,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
+  const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null
   const allowed = ['title', 'notes', 'session_date'] as const
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   for (const key of allowed) {
@@ -64,15 +65,24 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const supabase = createServiceClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('check_up_sessions')
     .update(updates)
     .eq('id', params.sessionId)
-    .select()
-    .single()
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt)
 
-  if (error || !data) return NextResponse.json({ error: 'Update failed' }, { status: 500 })
-  return NextResponse.json(data)
+  const { data, error } = await query.select()
+  if (error) return NextResponse.json({ error: 'Update failed' }, { status: 500 })
+  if (!data || data.length === 0) {
+    if (expectedUpdatedAt) {
+      return NextResponse.json(
+        { error: '다른 관리자가 먼저 수정했습니다. 새로고침 후 다시 시도하세요.' },
+        { status: 409 }
+      )
+    }
+    return NextResponse.json({ error: 'Update failed' }, { status: 500 })
+  }
+  return NextResponse.json(data[0])
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
