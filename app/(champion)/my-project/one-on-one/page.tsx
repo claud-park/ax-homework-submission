@@ -223,13 +223,17 @@ export default function OneOnOnePage() {
           {viewMode === 'chip' ? (
             <>
               <DateStrip selectedDate={selectedDate} onSelect={setSelectedDate} />
-              {selectedDate && (
+              {selectedDate ? (
                 <TimeSlotGrid
                   slots={filterSlots(chipSlots, chipBusy)}
                   selected={selectedSlot}
                   onSelect={setSelectedSlot}
                   loading={chipLoading}
                 />
+              ) : (
+                <p className="text-xs py-4 text-center" style={{ color: 'var(--text-disabled)' }}>
+                  날짜를 먼저 선택해주세요.
+                </p>
               )}
             </>
           ) : (
