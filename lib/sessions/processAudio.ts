@@ -8,7 +8,22 @@ import type { SessionActionItem } from '@/lib/types'
 
 const MODEL = 'claude-sonnet-4-6'
 const BUCKET = 'check-up-sessions'
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+let _openai: OpenAI | null = null
+function getOpenAI() {
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  return _openai
+}
+
+export const AI_DIVIDER = '\n\n---\n\n**🤖 AI 요약**\n\n'
+
+// Splits on the AI divider tolerantly: any emphasis markers (* _ ** __), 3+ dashes,
+// and flexible blank lines — so an editor round-trip can't defeat de-nesting.
+const AI_DIVIDER_RE = /\n+-{3,}\n+[*_]*🤖 AI 요약[*_]*\n+/
+
+export function combineSessionNotes(prevNotes: string, summary: string): string {
+  const userPart = (prevNotes ?? '').split(AI_DIVIDER_RE)[0].trimEnd()
+  return userPart ? `${userPart}${AI_DIVIDER}${summary}` : summary
+}
 
 export interface ProcessUsage {
   stt: { durationSec: number; cost: number }
@@ -68,7 +83,7 @@ export async function processSessionAudio(
   const { ext, contentType } = resolveAudioType(audioFilePath)
   const audioBlob = new Blob([audioBuffer], { type: contentType })
   const whisperFile = await toFile(audioBlob, `audio.${ext}`, { type: contentType })
-  const transcription = await openai.audio.transcriptions.create({
+  const transcription = await getOpenAI().audio.transcriptions.create({
     file: whisperFile,
     model: 'whisper-1',
     language: 'ko',
@@ -115,10 +130,18 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
   }
 
   // 4. Persist: replace action items, mark done
+  // 기존 사용자 수기 노트 보존: 이전 AI 구분선 앞부분만 유지(재처리 시 중첩 방지)
+  const { data: prev } = await supabase
+    .from('check_up_sessions')
+    .select('notes')
+    .eq('id', sessionId)
+    .single()
+  const combinedNotes = combineSessionNotes(prev?.notes ?? '', notes)
+
   await supabase.from('session_action_items').delete().eq('session_id', sessionId)
   await supabase
     .from('check_up_sessions')
-    .update({ processing_status: 'done', notes, updated_at: new Date().toISOString() })
+    .update({ processing_status: 'done', notes: combinedNotes, updated_at: new Date().toISOString() })
     .eq('id', sessionId)
 
   let insertedActionItems: SessionActionItem[] = []
@@ -143,7 +166,7 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
   const claudeCost = claudeInputCost + claudeOutputCost
 
   return {
-    notes,
+    notes: combinedNotes,
     actionItems: insertedActionItems,
     usage: {
       stt: { durationSec, cost: whisperCost },

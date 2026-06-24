@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       author_id: user.id,
       author_role: isAdmin ? 'admin' : 'champion',
     })
-    .select('*, author:users(id,name,email)')
+    .select('*')
     .single()
 
   if (error || !data) return NextResponse.json({ error: 'Create failed' }, { status: 500 })
