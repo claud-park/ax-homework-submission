@@ -93,7 +93,7 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-3 max-w-3xl">
+      <div className="flex flex-col gap-3">
         {[1, 2, 3].map(i => (
           <div key={i} className="h-5 rounded animate-pulse" style={{ background: 'var(--surface-secondary)', width: i === 1 ? '40%' : '100%' }} />
         ))}
@@ -109,7 +109,7 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
   const labelStyle = { color: 'var(--text-tertiary)', letterSpacing: '0.02em' }
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <button
         onClick={() => router.push('/my-project/sessions')}
         className="flex items-center gap-1 text-xs mb-8"
