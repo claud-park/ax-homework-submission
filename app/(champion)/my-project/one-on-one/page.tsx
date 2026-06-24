@@ -152,7 +152,7 @@ export default function OneOnOnePage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <h1 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>1-on-1 신청하기</h1>
       <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
         claud, alex, jennifer 중 가능한 시간을 선택해 신청하세요.
