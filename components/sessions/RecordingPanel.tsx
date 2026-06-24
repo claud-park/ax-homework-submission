@@ -43,10 +43,10 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)      // recording elapsed seconds
   const [progress, setProgress] = useState(0)    // 0-100
-  const [remainingSec, setRemainingSec] = useState<number | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
   const [mode, setMode] = useState<'record' | 'upload'>('record')
+  const [dragOver, setDragOver] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -54,7 +54,6 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordingStartRef = useRef<number>(0)
-  const progressStartRef = useRef<number>(0)
   const estimatedTotalRef = useRef<number>(0)
 
   // Cleanup on unmount
@@ -134,16 +133,11 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
 
     setPhase('uploading')
     setProgress(0)
-    progressStartRef.current = Date.now()
 
     await uploadAndProcess(audioBlob, 'audio.webm', durationSec, uploadEstimate, sttEstimate, summarizeEstimate)
   }
 
-  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = '' // allow re-selecting the same file later
-    if (!file) return
-
+  async function handleFileFromDrop(file: File) {
     if (!isAcceptedAudio(file.name)) {
       toast.error('지원하지 않는 형식입니다. wav, mp3, m4a, webm 파일을 올려주세요.')
       return
@@ -162,10 +156,16 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
 
     setPhase('uploading')
     setProgress(0)
-    progressStartRef.current = Date.now()
 
     // duration unknown for uploads → 0 (Whisper cost shown as estimate)
     await uploadAndProcess(file, file.name, 0, uploadEstimate, sttEstimate, summarizeEstimate)
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+    await handleFileFromDrop(file)
   }
 
   function startProgressTimer(fromPct: number, toPct: number, durationMs: number, onDone?: () => void) {
@@ -177,15 +177,6 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
       const frac = Math.min(elapsed / durationMs, 1)
       const current = fromPct + range * frac
       setProgress(Math.round(current))
-
-      // Remaining time based on overall progress
-      const overallPct = current
-      if (overallPct > 5) {
-        const elapsedSec = (Date.now() - progressStartRef.current) / 1000
-        const rate = overallPct / elapsedSec
-        const remaining = Math.round((100 - overallPct) / rate)
-        setRemainingSec(remaining > 10 ? remaining : null)
-      }
 
       if (frac >= 1) {
         clearInterval(progressIntervalRef.current!)
@@ -261,7 +252,6 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
 
       const result = await procRes.json()
       setProgress(100)
-      setRemainingSec(null)
       setPhase('done')
       onProcessed(result.notes ?? '', result.actionItems ?? [])
       if (result.usage) setUsage(result.usage)
@@ -276,7 +266,6 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     setPhase('idle')
     setProgress(0)
     setElapsed(0)
-    setRemainingSec(null)
     setErrorMsg(null)
   }
 
@@ -320,7 +309,17 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
               녹음 시작
             </button>
           ) : (
-            <div>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => {
+                e.preventDefault(); setDragOver(false)
+                const file = e.dataTransfer.files?.[0]
+                if (file) handleFileFromDrop(file)
+              }}
+              className="rounded-xl border-2 border-dashed p-6 text-center"
+              style={{ borderColor: dragOver ? 'var(--blue-600)' : 'var(--border-subtle)', background: dragOver ? 'var(--surface-secondary)' : 'transparent' }}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
@@ -330,7 +329,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold mx-auto"
                 style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
               >
                 <Upload className="h-4 w-4" />
@@ -338,6 +337,9 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
               </button>
               <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
                 wav, mp3, m4a, webm · 최대 {MAX_AUDIO_MB}MB
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-disabled)' }}>
+                또는 파일을 여기로 드래그
               </p>
             </div>
           )}
@@ -375,13 +377,6 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               세션 처리 중...
             </span>
-            {remainingSec && remainingSec > 10 ? (
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                남은 시간 {formatTime(remainingSec)}
-              </span>
-            ) : remainingSec !== null ? (
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>거의 완료 중...</span>
-            ) : null}
           </div>
 
           {/* Progress bar */}
