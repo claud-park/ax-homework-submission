@@ -200,7 +200,7 @@ export default function AdminChampionPage() {
   const [sessionTab, setSessionTab] = useState<'list' | 'detail'>('list')
   const [sessions, setSessions] = useState<import('@/lib/types').CheckUpSession[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('submissions')
+  const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('charter')
 
   function loadSubs() {
     return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
@@ -402,9 +402,9 @@ export default function AdminChampionPage() {
       {/* Main Tab Bar */}
       <div className="flex gap-2 mb-6">
         {([
-          { key: 'submissions', label: '제출물' },
           { key: 'charter', label: '과제정의서' },
           { key: 'sessions', label: '체크업 세션' },
+          { key: 'submissions', label: '제출물' },
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -826,6 +826,17 @@ export default function AdminChampionPage() {
 
       {activeMainTab === 'sessions' && (
         <section className="mb-8">
+          {data.charters[0]?.id && (
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={() => window.open(`/charter-popup/${data.charters[0].id}`, 'charter-popup', 'width=900,height=700,scrollbars=yes')}
+                className="text-xs font-semibold"
+                style={{ background: 'none', border: 'none', color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline', padding: '0' }}
+              >
+                과제정의서 보기
+              </button>
+            </div>
+          )}
           {sessionTab === 'list' ? (
             <AdminSessionList
               championUserId={userId}

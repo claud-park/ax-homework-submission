@@ -55,7 +55,7 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
       setNewTitle('')
       onRefresh()
       onSelect(session)
-    } catch (e) {
+    } catch {
       toast.error('세션 생성 실패')
     } finally {
       setCreating(false)

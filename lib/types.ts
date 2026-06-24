@@ -262,3 +262,20 @@ export interface SessionComment {
   updated_at: string
   author?: User
 }
+
+export interface OneOnOneBooking {
+  id: string
+  champion_user_id: string
+  champion_name: string
+  champion_email: string
+  duration_minutes: 30 | 60
+  slot_start: string       // ISO UTC
+  slot_end: string         // ISO UTC
+  available_admins: string[]
+  status: 'pending' | 'confirmed' | 'cancelled'
+  confirmed_by: string | null
+  slack_ts: string | null
+  slack_channel: string | null
+  created_at: string
+  updated_at: string
+}

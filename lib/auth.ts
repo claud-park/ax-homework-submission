@@ -15,3 +15,5 @@ export async function verifyAdmin(req: NextRequest): Promise<User | null> {
   if (!user?.user_metadata?.is_admin) return null
   return user
 }
+
+export const verifyUser = verifyJWT

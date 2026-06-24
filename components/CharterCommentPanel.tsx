@@ -14,23 +14,31 @@ function relativeTime(dateStr: string): string {
 }
 
 function CommentThread({
-  comment, currentUserId, onReply, onEdit,
+  comment, currentUserId, onReply, onEdit, onDelete,
 }: {
   comment: CharterComment
   currentUserId: string | null
   onReply: (parentId: string, body: string) => Promise<void>
   onEdit: (commentId: string, body: string) => Promise<void>
+  onDelete: (commentId: string) => Promise<void>
 }) {
   const [replyOpen, setReplyOpen] = useState(false)
   const [replyBody, setReplyBody] = useState('')
   const [editOpen, setEditOpen] = useState(false)
   const [editBody, setEditBody] = useState(comment.body)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const isOwn = comment.author_id === currentUserId
   const isAdminComment = comment.author_role === 'admin'
   const isTopLevel = comment.parent_id === null
   const dimmed = isTopLevel && comment.is_resolved
+
+  async function handleDeleteClick() {
+    if (!window.confirm('코멘트를 삭제하시겠습니까?')) return
+    setDeleting(true)
+    try { await onDelete(comment.id) } finally { setDeleting(false) }
+  }
 
   const badge = isAdminComment
     ? { label: '관리자', color: 'var(--blue-600)', bg: 'rgba(37,99,235,0.08)' }
@@ -95,6 +103,10 @@ function CommentThread({
         {!editOpen && !dimmed && (
           <div className="flex gap-3 mt-2">
             {isOwn && <button onClick={() => setEditOpen(true)} className="text-xs" style={{ color: 'var(--text-disabled)' }}>편집</button>}
+            {isOwn && (
+              <button onClick={handleDeleteClick} disabled={deleting} className="text-xs disabled:opacity-50"
+                style={{ color: 'var(--error)' }}>삭제</button>
+            )}
             {isTopLevel && !replyOpen && (
               <button onClick={() => setReplyOpen(true)} className="text-xs" style={{ color: 'var(--text-disabled)' }}>↩ 답글</button>
             )}
@@ -105,7 +117,7 @@ function CommentThread({
       {comment.replies && comment.replies.length > 0 && (
         <div className="ml-4 border-l pl-3 mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
           {comment.replies.map(r => (
-            <CommentThread key={r.id} comment={r} currentUserId={currentUserId} onReply={onReply} onEdit={onEdit} />
+            <CommentThread key={r.id} comment={r} currentUserId={currentUserId} onReply={onReply} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -189,6 +201,17 @@ export function CharterCommentPanel({ charterId }: { charterId: string }) {
     setComments(prev => updateInTree(prev, updated))
   }
 
+  function removeFromTree(list: CharterComment[], id: string): CharterComment[] {
+    return list
+      .filter(c => c.id !== id)
+      .map(c => ({ ...c, replies: c.replies ? removeFromTree(c.replies, id) : [] }))
+  }
+
+  async function handleDelete(commentId: string) {
+    await apiFetch(`/api/charter/comments/${commentId}`, { method: 'DELETE' })
+    setComments(prev => removeFromTree(prev, commentId))
+  }
+
   const unresolvedCount = comments.filter(c => !c.is_resolved).length
   const filtered = filter === 'unresolved' ? comments.filter(c => !c.is_resolved) : comments
 
@@ -231,7 +254,7 @@ export function CharterCommentPanel({ charterId }: { charterId: string }) {
         )}
         {filtered.map(c => (
           <CommentThread key={c.id} comment={c} currentUserId={currentUserId}
-            onReply={handleReply} onEdit={handleEdit} />
+            onReply={handleReply} onEdit={handleEdit} onDelete={handleDelete} />
         ))}
       </div>
 
