@@ -40,3 +40,5 @@ next-env.d.ts
 .superpowers/
 
 /slides
+# git worktrees
+.claude/worktrees/

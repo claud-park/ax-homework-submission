@@ -5,6 +5,8 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { RecordingPanel } from '@/components/sessions/RecordingPanel'
+import { MarkdownView } from '@/components/MarkdownView'
+import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 
@@ -30,6 +32,11 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   const [addingItem, setAddingItem] = useState(false)
 
   const [reprocessing, setReprocessing] = useState(false)
+
+  const [isEditingNotes, setIsEditingNotes] = useState(false)
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingItemBody, setEditingItemBody] = useState('')
 
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -73,6 +80,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       setSession(updated)
       setNotes(updated.notes ?? '')
       toast.success('저장되었습니다.')
+      setIsEditingNotes(false)
     } catch (e) {
       // 409 등 서버 메시지를 그대로 노출하고 최신 데이터로 갱신
       toast.error(e instanceof Error ? e.message : '저장 실패')
@@ -120,6 +128,16 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       await apiFetch(`/api/sessions/${sessionId}/action-items/${itemId}`, { method: 'DELETE' })
       setActionItems(v => v.filter(i => i.id !== itemId))
     } catch { toast.error('삭제 실패') }
+  }
+
+  async function saveItemBody(itemId: string) {
+    try {
+      const updated = await apiFetch<SessionActionItem>(`/api/sessions/${sessionId}/action-items/${itemId}`, {
+        method: 'PATCH', body: JSON.stringify({ body: editingItemBody.trim() }),
+      })
+      setActionItems(v => v.map(i => i.id === itemId ? updated : i))
+      setEditingItemId(null)
+    } catch { toast.error('수정 실패') }
   }
 
   async function postComment() {
@@ -232,7 +250,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       </div>
 
       <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{session.title}</h3>
-      <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>{session.session_date}</p>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>{session.session_date}{session.session_time ? ` ${session.session_time.slice(0, 5)}` : ''}</p>
 
       {/* Mini Gantt */}
       <SessionMiniGantt milestones={milestones} sessionDate={session.session_date} />
@@ -264,15 +282,25 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
       {/* Notes */}
       <div className="mb-4">
-        <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>📝 미팅 노트</p>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={8}
-          placeholder="미팅 내용을 입력하거나 녹음 후 AI 요약을 사용하세요."
-          className="w-full rounded-xl border p-3 text-sm resize-none"
-          style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
-        />
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>📝 미팅 노트</p>
+          {!isEditingNotes && (
+            <button
+              onClick={() => setIsEditingNotes(true)}
+              className="text-xs font-semibold px-2 py-1 rounded-md"
+              style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >
+              수정
+            </button>
+          )}
+        </div>
+        {isEditingNotes ? (
+          <SessionNotesEditor value={notes} onChange={setNotes} />
+        ) : (
+          <div className="rounded-xl border p-3" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+            <MarkdownView markdown={notes} />
+          </div>
+        )}
       </div>
 
       {/* Action Items */}
@@ -292,23 +320,52 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
                 className="h-4 w-4 cursor-pointer"
                 style={{ accentColor: 'var(--blue-600)' }}
               />
-              <span
-                className="flex-1 text-sm"
-                style={{
-                  color: 'var(--text-primary)',
-                  textDecoration: item.is_completed ? 'line-through' : 'none',
-                  opacity: item.is_completed ? 0.5 : 1,
-                }}
-              >
-                {item.body}
-              </span>
-              <button
-                onClick={() => deleteItem(item.id)}
-                className="text-xs"
-                style={{ color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                삭제
-              </button>
+              {editingItemId === item.id ? (
+                <>
+                  <input
+                    type="text"
+                    value={editingItemBody}
+                    onChange={e => setEditingItemBody(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveItemBody(item.id) }}
+                    className="flex-1 rounded border px-2 py-1 text-sm"
+                    style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => saveItemBody(item.id)}
+                    className="text-xs font-semibold"
+                    style={{ color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >저장</button>
+                  <button
+                    onClick={() => setEditingItemId(null)}
+                    className="text-xs"
+                    style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >취소</button>
+                </>
+              ) : (
+                <>
+                  <span
+                    className="flex-1 text-sm"
+                    style={{
+                      color: 'var(--text-primary)',
+                      textDecoration: item.is_completed ? 'line-through' : 'none',
+                      opacity: item.is_completed ? 0.5 : 1,
+                    }}
+                  >
+                    {item.body}
+                  </span>
+                  <button
+                    onClick={() => { setEditingItemId(item.id); setEditingItemBody(item.body) }}
+                    className="text-xs"
+                    style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >수정</button>
+                  <button
+                    onClick={() => deleteItem(item.id)}
+                    className="text-xs"
+                    style={{ color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >삭제</button>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -414,15 +471,22 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         </div>
       </div>
 
-      {/* Save Button */}
-      <button
-        onClick={saveNotes}
-        disabled={saving}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
-        style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
-      >
-        {saving ? '저장 중...' : '저장'}
-      </button>
+      {/* Save / Cancel Buttons — only in edit mode */}
+      {isEditingNotes && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setIsEditingNotes(false); setNotes(session?.notes ?? '') }}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+          >취소</button>
+          <button
+            onClick={saveNotes}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+          >{saving ? '저장 중...' : '저장'}</button>
+        </div>
+      )}
     </div>
   )
 }

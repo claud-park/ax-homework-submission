@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeUsage } from '@/lib/audio-pipeline/costs'
 import { SummaryParseError } from '@/lib/audio-pipeline/errors'
-import { runAudioPipeline } from '@/lib/audio-pipeline/process'
 import { summarizeTranscript } from '@/lib/audio-pipeline/summarize'
 import { transcribeAudio } from '@/lib/audio-pipeline/transcribe'
+import { combineSessionNotes } from '@/lib/audio-pipeline/notes'
+// runAudioPipeline is only re-exported below, not used here
 import type { ProcessUsage } from '@/lib/audio-pipeline/types'
 import type { SessionActionItem } from '@/lib/types'
 
@@ -12,6 +13,7 @@ const BUCKET = 'check-up-sessions'
 export type { ProcessUsage } from '@/lib/audio-pipeline/types'
 export { SummaryParseError } from '@/lib/audio-pipeline/errors'
 export { runAudioPipeline } from '@/lib/audio-pipeline/process'
+export { combineSessionNotes, AI_DIVIDER } from '@/lib/audio-pipeline/notes'
 
 export interface ProcessResult {
   notes: string
@@ -63,6 +65,7 @@ async function persistPipelineResult(
  * Session orchestration: download from Storage → transcribe → summarize → persist.
  * Assumes the audio already lives in Storage (clients upload via signed URL).
  * Sets processing_status as it advances (transcribing → summarizing → done).
+ * Preserves the user's handwritten notes by combining them with the AI summary.
  */
 export async function processSessionAudio(
   supabase: SupabaseClient,
@@ -96,17 +99,26 @@ export async function processSessionAudio(
     throw err
   }
 
+  // Preserve the user's handwritten notes: keep the part before the AI divider
+  // (so reprocess doesn't nest), then append the fresh summary below the divider.
+  const { data: prev } = await supabase
+    .from('check_up_sessions')
+    .select('notes')
+    .eq('id', sessionId)
+    .single()
+  const combinedNotes = combineSessionNotes(prev?.notes ?? '', summary.notes)
+
   const insertedActionItems = await persistPipelineResult(
     supabase,
     sessionId,
-    summary.notes,
+    combinedNotes,
     summary.actionItems
   )
 
   const usage = computeUsage(durationSec, summary.inputTokens, summary.outputTokens)
 
   return {
-    notes: summary.notes,
+    notes: combinedNotes,
     actionItems: insertedActionItems,
     usage,
   }
