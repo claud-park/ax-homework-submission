@@ -5,6 +5,8 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { RecordingPanel } from '@/components/sessions/RecordingPanel'
+import { MarkdownView } from '@/components/MarkdownView'
+import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 
@@ -30,6 +32,8 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   const [addingItem, setAddingItem] = useState(false)
 
   const [reprocessing, setReprocessing] = useState(false)
+
+  const [isEditingNotes, setIsEditingNotes] = useState(false)
 
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -73,6 +77,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       setSession(updated)
       setNotes(updated.notes ?? '')
       toast.success('저장되었습니다.')
+      setIsEditingNotes(false)
     } catch (e) {
       // 409 등 서버 메시지를 그대로 노출하고 최신 데이터로 갱신
       toast.error(e instanceof Error ? e.message : '저장 실패')
@@ -264,15 +269,25 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
       {/* Notes */}
       <div className="mb-4">
-        <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>📝 미팅 노트</p>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={8}
-          placeholder="미팅 내용을 입력하거나 녹음 후 AI 요약을 사용하세요."
-          className="w-full rounded-xl border p-3 text-sm resize-none"
-          style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
-        />
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>📝 미팅 노트</p>
+          {!isEditingNotes && (
+            <button
+              onClick={() => setIsEditingNotes(true)}
+              className="text-xs font-semibold px-2 py-1 rounded-md"
+              style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >
+              수정
+            </button>
+          )}
+        </div>
+        {isEditingNotes ? (
+          <SessionNotesEditor value={notes} onChange={setNotes} />
+        ) : (
+          <div className="rounded-xl border p-3" style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
+            <MarkdownView markdown={notes} />
+          </div>
+        )}
       </div>
 
       {/* Action Items */}
@@ -414,15 +429,22 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         </div>
       </div>
 
-      {/* Save Button */}
-      <button
-        onClick={saveNotes}
-        disabled={saving}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
-        style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
-      >
-        {saving ? '저장 중...' : '저장'}
-      </button>
+      {/* Save / Cancel Buttons — only in edit mode */}
+      {isEditingNotes && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setIsEditingNotes(false); setNotes(session?.notes ?? '') }}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+          >취소</button>
+          <button
+            onClick={saveNotes}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+          >{saving ? '저장 중...' : '저장'}</button>
+        </div>
+      )}
     </div>
   )
 }
