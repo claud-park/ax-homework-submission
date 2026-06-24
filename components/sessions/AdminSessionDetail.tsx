@@ -35,6 +35,9 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
   const [isEditingNotes, setIsEditingNotes] = useState(false)
 
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingItemBody, setEditingItemBody] = useState('')
+
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
@@ -125,6 +128,14 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       await apiFetch(`/api/sessions/${sessionId}/action-items/${itemId}`, { method: 'DELETE' })
       setActionItems(v => v.filter(i => i.id !== itemId))
     } catch { toast.error('삭제 실패') }
+  }
+
+  async function saveItemBody(itemId: string) {
+    const updated = await apiFetch<SessionActionItem>(`/api/sessions/${sessionId}/action-items/${itemId}`, {
+      method: 'PATCH', body: JSON.stringify({ body: editingItemBody.trim() }),
+    })
+    setActionItems(v => v.map(i => i.id === itemId ? updated : i))
+    setEditingItemId(null)
   }
 
   async function postComment() {
@@ -307,23 +318,52 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
                 className="h-4 w-4 cursor-pointer"
                 style={{ accentColor: 'var(--blue-600)' }}
               />
-              <span
-                className="flex-1 text-sm"
-                style={{
-                  color: 'var(--text-primary)',
-                  textDecoration: item.is_completed ? 'line-through' : 'none',
-                  opacity: item.is_completed ? 0.5 : 1,
-                }}
-              >
-                {item.body}
-              </span>
-              <button
-                onClick={() => deleteItem(item.id)}
-                className="text-xs"
-                style={{ color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                삭제
-              </button>
+              {editingItemId === item.id ? (
+                <>
+                  <input
+                    type="text"
+                    value={editingItemBody}
+                    onChange={e => setEditingItemBody(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveItemBody(item.id) }}
+                    className="flex-1 rounded border px-2 py-1 text-sm"
+                    style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => saveItemBody(item.id)}
+                    className="text-xs font-semibold"
+                    style={{ color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >저장</button>
+                  <button
+                    onClick={() => setEditingItemId(null)}
+                    className="text-xs"
+                    style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >취소</button>
+                </>
+              ) : (
+                <>
+                  <span
+                    className="flex-1 text-sm"
+                    style={{
+                      color: 'var(--text-primary)',
+                      textDecoration: item.is_completed ? 'line-through' : 'none',
+                      opacity: item.is_completed ? 0.5 : 1,
+                    }}
+                  >
+                    {item.body}
+                  </span>
+                  <button
+                    onClick={() => { setEditingItemId(item.id); setEditingItemBody(item.body) }}
+                    className="text-xs"
+                    style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >수정</button>
+                  <button
+                    onClick={() => deleteItem(item.id)}
+                    className="text-xs"
+                    style={{ color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >삭제</button>
+                </>
+              )}
             </div>
           ))}
         </div>
