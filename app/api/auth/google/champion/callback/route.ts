@@ -13,14 +13,16 @@ export async function GET(req: NextRequest) {
   }
 
   if (!code || !stateParam || stateParam !== cookieData.nonce || !cookieData.userId) {
-    return NextResponse.redirect(new URL('/my-project/one-on-one?error=oauth_failed', req.url))
+    console.error('Champion OAuth CSRF 실패', { code: !!code, stateParam, nonce: cookieData.nonce, userId: cookieData.userId })
+    return NextResponse.redirect(new URL('/my-project/one-on-one?error=oauth_failed&reason=csrf', req.url))
   }
 
   try {
     await exchangeChampionCode(code, cookieData.userId)
   } catch (err) {
     console.error('Champion Google OAuth 실패:', err)
-    return NextResponse.redirect(new URL('/my-project/one-on-one?error=oauth_failed', req.url))
+    const reason = err instanceof Error ? encodeURIComponent(err.message.slice(0, 80)) : 'unknown'
+    return NextResponse.redirect(new URL(`/my-project/one-on-one?error=oauth_failed&reason=${reason}`, req.url))
   }
 
   const res = NextResponse.redirect(new URL('/my-project/one-on-one?connected=true', req.url))

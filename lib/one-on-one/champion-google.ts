@@ -32,20 +32,53 @@ export function getChampionAuthUrl(userId: string, nonce: string): string {
 export async function exchangeChampionCode(code: string, userId: string): Promise<void> {
   const client = createOAuth2Client()
   const { tokens } = await client.getToken(code)
+  if (!tokens.access_token) {
+    throw new Error('access_token 없음')
+  }
   if (!tokens.refresh_token) {
-    throw new Error('refresh_token 없음. Google 권한 취소 후 재시도.')
+    console.warn('refresh_token 없음 — 기존 토큰 유지 또는 access_token만 저장')
   }
   client.setCredentials(tokens)
   const oauth2 = google.oauth2({ version: 'v2', auth: client })
   const { data } = await oauth2.userinfo.get()
 
+  // refresh_token이 없으면 기존 행의 refresh_token을 유지하기 위해 upsert 컬럼 조정
+  const upsertData: Record<string, unknown> = {
+    user_id:      userId,
+    email:        data.email ?? '',
+    access_token: tokens.access_token,
+    expires_at:   new Date(tokens.expiry_date ?? Date.now() + 3600_000).toISOString(),
+    updated_at:   new Date().toISOString(),
+  }
+  if (tokens.refresh_token) {
+    upsertData.refresh_token = tokens.refresh_token
+  }
+
+  // refresh_token 없을 때는 기존 행 UPDATE, 없으면 INSERT (refresh_token NOT NULL이라 INSERT 시 필요)
+  if (!tokens.refresh_token) {
+    const { data: existing } = await supabase
+      .from('champion_google_tokens')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (!existing) {
+      throw new Error('refresh_token 없음. Google 계정에서 앱 권한 취소 후 재시도하세요.')
+    }
+    const { error } = await supabase
+      .from('champion_google_tokens')
+      .update({ access_token: tokens.access_token, expires_at: upsertData.expires_at as string, updated_at: upsertData.updated_at as string, email: upsertData.email as string })
+      .eq('user_id', userId)
+    if (error) throw new Error(`토큰 갱신 실패: ${error.message}`)
+    return
+  }
+
   const { error } = await supabase.from('champion_google_tokens').upsert(
     {
       user_id:       userId,
       email:         data.email ?? '',
-      access_token:  tokens.access_token!,
+      access_token:  tokens.access_token,
       refresh_token: tokens.refresh_token,
-      expires_at:    new Date(tokens.expiry_date!).toISOString(),
+      expires_at:    new Date(tokens.expiry_date ?? Date.now() + 3600_000).toISOString(),
       updated_at:    new Date().toISOString(),
     },
     { onConflict: 'user_id' }
