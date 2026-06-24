@@ -3,9 +3,9 @@ import { parseAdminConfig } from '../lib/admin/adminConfig'
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY
   if (!url || !serviceKey) {
-    console.error('NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 필요')
+    console.error('NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_KEY 필요')
     process.exit(1)
   }
 
