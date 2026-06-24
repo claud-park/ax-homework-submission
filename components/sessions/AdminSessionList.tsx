@@ -4,7 +4,6 @@ import { Plus, ChevronRight } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { CheckUpSession, Milestone } from '@/lib/types'
-import DatePicker from '@/components/DatePicker'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -35,27 +34,29 @@ interface Props {
 export function AdminSessionList({ championUserId, sessions, milestones, onSelect, onRefresh }: Props) {
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
-  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
-  const [newTime, setNewTime] = useState('')
   const [showForm, setShowForm] = useState(false)
 
   async function createSession() {
     if (!newTitle.trim()) return
     setCreating(true)
     try {
+      // 날짜·시각은 [생성] 클릭 시점(관리자 로컬 타임존) 기준으로 자동 기록
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const session_date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+      const session_time = `${pad(now.getHours())}:${pad(now.getMinutes())}`
       const session = await apiFetch<CheckUpSession>('/api/sessions', {
         method: 'POST',
         body: JSON.stringify({
           champion_user_id: championUserId,
-          session_date: newDate,
-          session_time: newTime || undefined,
+          session_date,
+          session_time,
           title: newTitle.trim(),
         }),
       })
       toast.success('세션이 생성되었습니다.')
       setShowForm(false)
       setNewTitle('')
-      setNewTime('')
       onRefresh()
       onSelect(session)
     } catch {
@@ -92,18 +93,9 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
           />
-          <DatePicker
-            value={newDate}
-            onChange={setNewDate}
-            style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }}
-          />
-          <input
-            type="time"
-            value={newTime}
-            onChange={e => setNewTime(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
-            style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
-          />
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            날짜·시간은 [생성] 클릭 시점으로 자동 기록됩니다.
+          </p>
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => setShowForm(false)}
