@@ -7,7 +7,7 @@ interface Props {
 
 export function DurationToggle({ value, onChange }: Props) {
   return (
-    <div className="flex gap-2 mb-4">
+    <div className="flex gap-2">
       {([30, 60] as const).map((d) => (
         <button
           key={d}

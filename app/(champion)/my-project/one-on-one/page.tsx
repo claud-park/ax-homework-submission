@@ -196,26 +196,28 @@ export default function OneOnOnePage() {
         />
       ) : (
         <>
-          <DurationToggle value={duration} onChange={(d) => { setDuration(d); setSelectedSlot(null) }} />
+          <div className="flex items-center justify-between mb-4">
+            <DurationToggle value={duration} onChange={(d) => { setDuration(d); setSelectedSlot(null) }} />
 
-          {/* 뷰 모드 토글 */}
-          <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'var(--surface-secondary)', width: 'fit-content' }}>
-            {(['chip', 'calendar'] as ViewMode[]).map(mode => (
-              <button
-                key={mode}
-                onClick={() => { setViewMode(mode); setSelectedSlot(null) }}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                style={{
-                  background: viewMode === mode ? '#fff' : 'transparent',
-                  color:      viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  border:     viewMode === mode ? '1px solid var(--border-subtle)' : 'none',
-                  cursor:     'pointer',
-                  boxShadow:  viewMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                }}
-              >
-                {mode === 'chip' ? '슬롯 뷰' : '캘린더 뷰'}
-              </button>
-            ))}
+            {/* 뷰 모드 토글 */}
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--surface-secondary)' }}>
+              {(['chip', 'calendar'] as ViewMode[]).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => { setViewMode(mode); setSelectedSlot(null) }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                  style={{
+                    background: viewMode === mode ? '#fff' : 'transparent',
+                    color:      viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    border:     viewMode === mode ? '1px solid var(--border-subtle)' : 'none',
+                    cursor:     'pointer',
+                    boxShadow:  viewMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  }}
+                >
+                  {mode === 'chip' ? '슬롯 뷰' : '캘린더 뷰'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {viewMode === 'chip' ? (
