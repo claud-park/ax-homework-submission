@@ -19,7 +19,7 @@ export async function getAuthenticatedClient(adminId: AdminId): Promise<OAuth2Cl
     .single()
 
   if (error || !data) {
-    throw new Error(`${adminId} Google 토큰 없음. 스케줄러 어드민 페이지에서 연결 필요.`)
+    throw new Error(`${adminId} Google 토큰 없음. Supabase error: ${error?.code} ${error?.message}`)
   }
 
   const client = new google.auth.OAuth2(
