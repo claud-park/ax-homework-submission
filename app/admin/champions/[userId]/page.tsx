@@ -83,7 +83,7 @@ function MilestoneRow({ m, depth = 0 }: { m: Milestone & { children?: Milestone[
               {m.week_number != null && (
                 <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-disabled)', flexShrink: 0 }}>{m.week_number}주차</span>
               )}
-              <p style={{
+              <p title={m.title} style={{
                 fontSize: isParent ? 13 : 12,
                 fontWeight: isParent ? 600 : 500,
                 color: 'var(--text-primary)',
@@ -831,7 +831,7 @@ export default function AdminChampionPage() {
               <button
                 onClick={() => window.open(`/charter-popup/${data.charters[0].id}`, 'charter-popup', 'width=900,height=700,scrollbars=yes')}
                 className="text-xs font-semibold"
-                style={{ background: 'none', border: 'none', color: 'var(--blue-600)', cursor: 'pointer', textDecoration: 'underline', padding: '0' }}
+                style={{ background: 'transparent', border: '1px solid var(--blue-600)', color: 'var(--blue-600)', cursor: 'pointer', padding: '4px 12px', borderRadius: 6, fontWeight: 600 }}
               >
                 과제정의서 보기
               </button>
