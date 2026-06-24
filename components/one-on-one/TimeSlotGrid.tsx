@@ -3,10 +3,10 @@ import { formatTimeKST } from '@/lib/one-on-one/slot-utils'
 import type { Slot } from '@/lib/one-on-one/calendar'
 import type { AdminId } from '@/lib/one-on-one/google-auth'
 
-const ADMIN_META: Record<AdminId, { initial: string; color: string; bg: string; selectedBg: string }> = {
-  claud:    { initial: 'C', color: '#1d4ed8', bg: '#dbeafe', selectedBg: 'rgba(219,234,254,0.3)' },
-  alex:     { initial: 'A', color: '#15803d', bg: '#dcfce7', selectedBg: 'rgba(220,252,231,0.3)' },
-  jennifer: { initial: 'J', color: '#7c3aed', bg: '#ede9fe', selectedBg: 'rgba(237,233,254,0.3)' },
+const ADMIN_META: Record<AdminId, { name: string; color: string; bg: string; selectedBg: string }> = {
+  claud:    { name: 'Claud',    color: '#1d4ed8', bg: '#dbeafe', selectedBg: 'rgba(219,234,254,0.3)' },
+  alex:     { name: 'Alex',     color: '#15803d', bg: '#dcfce7', selectedBg: 'rgba(220,252,231,0.3)' },
+  jennifer: { name: 'Jennifer', color: '#7c3aed', bg: '#ede9fe', selectedBg: 'rgba(237,233,254,0.3)' },
 }
 
 interface Props {
@@ -51,28 +51,26 @@ export function TimeSlotGrid({ slots, selected, onSelect, loading }: Props) {
                 }}
               >
                 <span className="text-sm font-bold">{formatTimeKST(slot.start)}</span>
-                <div className="flex gap-0.5">
+                <div className="flex flex-wrap gap-0.5 justify-center">
                   {slot.availableAdmins.map((adminId) => {
                     const m = ADMIN_META[adminId]
                     return (
                       <span
                         key={adminId}
-                        title={adminId}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 18,
-                          height: 18,
-                          borderRadius: '50%',
+                          padding: '1px 5px',
+                          borderRadius: 4,
                           fontSize: 9,
                           fontWeight: 700,
                           background: isSelected ? m.selectedBg : m.bg,
                           color: isSelected ? '#fff' : m.color,
                           border: isSelected ? '1px solid rgba(255,255,255,0.4)' : 'none',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        {m.initial}
+                        {m.name}
                       </span>
                     )
                   })}

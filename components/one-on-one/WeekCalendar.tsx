@@ -9,6 +9,11 @@ const START_HOUR = 10           // KST 10:00
 const END_HOUR   = 17           // KST 17:00
 const TOTAL_H    = END_HOUR - START_HOUR  // 7 hours
 
+const ADMIN_NAME: Record<AdminId, string> = {
+  claud:    'Claud',
+  alex:     'Alex',
+  jennifer: 'Jennifer',
+}
 const ADMIN_COLOR: Record<AdminId, string> = {
   claud:    '#2563eb',
   alex:     '#16a34a',
@@ -241,24 +246,22 @@ export function WeekCalendar({
                     >
                       {formatTimeKST(slot.start)}
                     </span>
-                    <div style={{ display: 'flex', gap: 2 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                       {slot.availableAdmins.map(adminId => (
                         <span
                           key={adminId}
                           style={{
-                            width: 14,
-                            height: 14,
-                            borderRadius: '50%',
-                            background: isSelected ? 'rgba(255,255,255,0.3)' : ADMIN_COLOR[adminId],
+                            padding: '1px 4px',
+                            borderRadius: 3,
+                            background: isSelected ? 'rgba(255,255,255,0.25)' : ADMIN_COLOR[adminId],
                             color: '#fff',
                             fontSize: 8,
                             fontWeight: 700,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            lineHeight: 1.4,
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {adminId[0].toUpperCase()}
+                          {ADMIN_NAME[adminId]}
                         </span>
                       ))}
                     </div>
