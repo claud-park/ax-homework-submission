@@ -56,6 +56,13 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
   useEffect(() => { load() }, [sessionId])
 
+  async function refreshSessionMeta() {
+    try {
+      const data = await apiFetch<CheckUpSession>(`/api/sessions/${sessionId}`)
+      setSession(prev => prev ? { ...prev, updated_at: data.updated_at } : prev)
+    } catch { /* best-effort: stale updated_at만 갱신 실패, 치명적 아님 */ }
+  }
+
   async function saveNotes() {
     setSaving(true)
     try {
@@ -150,6 +157,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
     setNotes(processedNotes)
     setActionItems(processedItems)
     setSession(prev => prev ? { ...prev, processing_status: 'done' } : prev)
+    void refreshSessionMeta()
   }
 
   async function reprocess() {
@@ -164,6 +172,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       setNotes(result.notes)
       setActionItems(result.actionItems)
       setSession(prev => prev ? { ...prev, processing_status: 'done', notes: result.notes } : prev)
+      await refreshSessionMeta()
       if (result.usage) {
         const u = result.usage
         toast.success(`재처리 완료! Whisper $${u.stt.cost.toFixed(3)} · Claude $${u.claude.cost.toFixed(4)} · 합계 $${u.totalCost.toFixed(4)}`)
