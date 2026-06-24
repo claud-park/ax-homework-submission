@@ -1,6 +1,6 @@
-# Entity Relationship Diagram — v6
+# Entity Relationship Diagram — v7
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-16
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-24
 
 ---
 
@@ -217,6 +217,73 @@ File attachments linked to a hotline message.
 
 ---
 
+## 1-on-1 Session Tables
+
+> Added v7 (2026-06-24). Admin identity note: `admin_user_id` and `author_id` columns now reference individual admin accounts (`admin_alex@`, `admin_claud@`, `admin_jennifer@dreamus.io`) stored in `auth.users` with `user_metadata.is_admin = true`. The former shared `admin@dreamus.io` account has been deactivated (banned, not deleted — FK integrity preserved).
+
+### `check_up_sessions`
+Audio-recorded 1-on-1 check-up sessions between an admin and a champion. Notes are stored as markdown (manual notes + AI summary separated by a `---` divider).
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | `gen_random_uuid()` |
+| 🔗 champion_user_id | uuid NOT NULL | → users.id ON DELETE CASCADE |
+| 🔗 admin_user_id | uuid | → auth.users(id) ON DELETE SET NULL; individual admin account for attribution |
+| session_date | date NOT NULL | auto-set to admin local date (KST) at creation time |
+| session_time | time | nullable; HH:mm, auto-set to admin local time at creation time |
+| title | text NOT NULL | |
+| notes | text | markdown: `[수기 노트]` + `---` + `🤖 AI 요약` sections |
+| audio_file_path | text | Storage path: `sessions/{id}/audio.{ext}` |
+| recording_duration_sec | int | |
+| processing_status | text NOT NULL | default `idle`; CHECK in (`idle`, `uploading`, `transcribing`, `summarizing`, `done`, `error`) |
+| raw_transcript | text | Whisper STT output |
+| created_at | timestamptz | |
+| updated_at | timestamptz | updated on every PATCH; used for optimistic concurrency (`expectedUpdatedAt`) |
+
+INDEX: `(champion_user_id, session_date DESC)`. RLS: champion SELECT own rows only; admin ALL.
+
+### `session_action_items`
+Action items generated (or manually added) per session. Champions can toggle completion; admins can edit body text, reorder, add, or delete.
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 session_id | uuid NOT NULL | → check_up_sessions(id) ON DELETE CASCADE |
+| body | text NOT NULL | action item text; admin-editable inline |
+| is_completed | boolean | default `false` |
+| completed_at | timestamptz | set when `is_completed` toggled to true |
+| display_order | int | default `0`; ordering within session |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+INDEX: `(session_id, display_order)`. RLS: champion SELECT + `is_completed` toggle on own session rows; admin ALL.
+
+### `session_comments`
+Threaded comments on a session by either admin or champion. Admin `author_id` resolves to individual admin account (not `public.users`); display falls back to `author_role`-based label ("관리자" / "챔피언") to avoid JOIN failures.
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 session_id | uuid NOT NULL | → check_up_sessions(id) ON DELETE CASCADE |
+| body | text NOT NULL | |
+| 🔗 author_id | uuid NOT NULL | → auth.users(id) ON DELETE CASCADE; individual admin or champion UUID |
+| author_role | text NOT NULL | CHECK (`admin` \| `champion`) |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+INDEX: `(session_id, created_at)`. RLS applied.
+
+### Storage — `check-up-sessions` bucket
+```
+bucket: check-up-sessions   (private)
+  path: sessions/{session_id}/audio.{ext}
+  notes: Client uploads directly via signed upload URL (createSignedUploadUrl → uploadToSignedUrl).
+         Bypasses Vercel function body limit (4.5 MB). Server receives only the Storage path.
+         Admin RLS (ALL). Signed URLs generated server-side.
+```
+
+---
+
 ## Relationships
 
 ```
@@ -238,6 +305,12 @@ milestones        1 ──< N  deadline_change_requests
 users             1 ──< N  hotline_messages (via champion_user_id)
 users             1 ──< N  hotline_messages (via sender_id)
 hotline_messages  1 ──< N  hotline_attachments
+
+users             1 ──< N  check_up_sessions (via champion_user_id)
+auth.users        1 ──< N  check_up_sessions (via admin_user_id; individual admin account)
+check_up_sessions 1 ──< N  session_action_items
+check_up_sessions 1 ──< N  session_comments
+auth.users        1 ──< N  session_comments (via author_id; admin OR champion)
 ```
 
 ---
@@ -254,9 +327,14 @@ bucket: milestone-deliverables   (private)
 bucket: hotline                  (private)
   path: {user_id}/{uuid}/{filename}
   notes: Signed URLs — images: 1-year TTL; documents: 60s TTL
+
+bucket: check-up-sessions        (private)
+  path: sessions/{session_id}/audio.{ext}
+  notes: Client uploads directly via signed upload URL (bypasses Vercel 4.5 MB body limit).
+         Admin RLS (ALL). Signed URLs generated server-side.
 ```
 
-Both buckets: RLS DENY ALL. Signed URLs generated server-side (60s TTL).
+All buckets: RLS DENY ALL by default. Signed URLs generated server-side (60s TTL unless noted above).
 
 ---
 
