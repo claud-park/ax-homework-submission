@@ -30,8 +30,8 @@ async function getAllBusyIntervals(
         })
         const busy = (res.data.calendars?.['primary']?.busy ?? []) as BusyInterval[]
         result.set(adminId, busy)
-      } catch (err) {
-        console.error(`[one-on-one] ${adminId} 슬롯 조회 실패:`, err instanceof Error ? err.message : err)
+      } catch {
+        // 토큰 없거나 에러 → 해당 어드민 스킵
       }
     })
   )
