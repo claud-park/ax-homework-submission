@@ -68,10 +68,13 @@ export default function OneOnOnePage() {
     }
   }, [searchParams])
 
-  // 기존 booking 조회
+  // 기존 booking 조회 + 초기 Google Calendar 연결 상태
   useEffect(() => {
-    apiFetch<{ booking: OneOnOneBooking | null }>('/api/one-on-one/my-booking')
-      .then(r => setBooking(r.booking))
+    apiFetch<{ booking: OneOnOneBooking | null; championConnected: boolean }>('/api/one-on-one/my-booking')
+      .then(r => {
+        setBooking(r.booking)
+        if (r.championConnected) setChampConnected(true)
+      })
       .catch(() => {})
       .finally(() => setBookingLoading(false))
   }, [])
