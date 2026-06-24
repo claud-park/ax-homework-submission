@@ -14,16 +14,6 @@ const ADMIN_NAME: Record<AdminId, string> = {
   alex:     'Alex',
   jennifer: 'Jennifer',
 }
-const ADMIN_COLOR: Record<AdminId, string> = {
-  claud:    '#2563eb',
-  alex:     '#16a34a',
-  jennifer: '#7c3aed',
-}
-const ADMIN_BG: Record<AdminId, string> = {
-  claud:    '#dbeafe',
-  alex:     '#dcfce7',
-  jennifer: '#ede9fe',
-}
 
 const DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
