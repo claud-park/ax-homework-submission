@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Calendar } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { CheckUpSession, Milestone } from '@/lib/types'
@@ -13,16 +13,6 @@ const STATUS_LABEL: Record<string, string> = {
   summarizing: '요약 중',
   done: '완료',
   error: '오류',
-}
-
-function MicIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.45 }}>
-      <rect x="5.5" y="1" width="5" height="8" rx="2.5" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M3 7.5a5 5 0 0 0 10 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M8 12.5V15M6 15h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  )
 }
 
 interface Props {
@@ -160,7 +150,7 @@ export function AdminSessionList({ championUserId, sessions, milestones, charter
                 transition: 'background 0.1s',
               }}
             >
-              <MicIcon />
+              <Calendar className="h-4 w-4" style={{ flexShrink: 0, opacity: 0.45 }} />
               <span style={{ fontSize: 14, color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {s.title || '제목없음'}
               </span>
