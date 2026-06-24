@@ -78,7 +78,7 @@ export function DateStrip({ selectedDate, onSelect }: Props) {
                 key={d.date}
                 onClick={() => !d.isPast && onSelect(d.date)}
                 disabled={d.isPast}
-                className="flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px]"
+                className="flex flex-col items-center px-2 py-2 rounded-xl flex-1"
                 style={{
                   background:   selected ? 'var(--blue-600)' : 'var(--surface-secondary)',
                   border:       selected ? 'none' : '1px solid var(--border-subtle)',

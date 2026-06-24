@@ -1,6 +1,13 @@
 'use client'
 import { formatTimeKST } from '@/lib/one-on-one/slot-utils'
 import type { Slot } from '@/lib/one-on-one/calendar'
+import type { AdminId } from '@/lib/one-on-one/google-auth'
+
+const ADMIN_META: Record<AdminId, { initial: string; color: string; bg: string; selectedBg: string }> = {
+  claud:    { initial: 'C', color: '#1d4ed8', bg: '#dbeafe', selectedBg: 'rgba(219,234,254,0.3)' },
+  alex:     { initial: 'A', color: '#15803d', bg: '#dcfce7', selectedBg: 'rgba(220,252,231,0.3)' },
+  jennifer: { initial: 'J', color: '#7c3aed', bg: '#ede9fe', selectedBg: 'rgba(237,233,254,0.3)' },
+}
 
 interface Props {
   slots: Slot[]
@@ -35,15 +42,41 @@ export function TimeSlotGrid({ slots, selected, onSelect, loading }: Props) {
               <button
                 key={slot.start}
                 onClick={() => onSelect(slot)}
-                className="py-2 rounded-lg text-sm font-semibold"
+                className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl"
                 style={{
-                  background:   isSelected ? 'var(--blue-600)' : 'var(--surface-secondary)',
-                  color:        isSelected ? '#fff' : 'var(--text-primary)',
-                  border:       isSelected ? 'none' : '1px solid var(--border-subtle)',
-                  cursor:       'pointer',
+                  background: isSelected ? 'var(--blue-600)' : 'var(--surface-secondary)',
+                  color:      isSelected ? '#fff' : 'var(--text-primary)',
+                  border:     isSelected ? 'none' : '1px solid var(--border-subtle)',
+                  cursor:     'pointer',
                 }}
               >
-                {formatTimeKST(slot.start)}
+                <span className="text-sm font-bold">{formatTimeKST(slot.start)}</span>
+                <div className="flex gap-0.5">
+                  {slot.availableAdmins.map((adminId) => {
+                    const m = ADMIN_META[adminId]
+                    return (
+                      <span
+                        key={adminId}
+                        title={adminId}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 18,
+                          height: 18,
+                          borderRadius: '50%',
+                          fontSize: 9,
+                          fontWeight: 700,
+                          background: isSelected ? m.selectedBg : m.bg,
+                          color: isSelected ? '#fff' : m.color,
+                          border: isSelected ? '1px solid rgba(255,255,255,0.4)' : 'none',
+                        }}
+                      >
+                        {m.initial}
+                      </span>
+                    )
+                  })}
+                </div>
               </button>
             )
           })}
