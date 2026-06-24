@@ -35,27 +35,12 @@ export async function exchangeChampionCode(code: string, userId: string): Promis
   if (!tokens.access_token) {
     throw new Error('access_token 없음')
   }
-  if (!tokens.refresh_token) {
-    console.warn('refresh_token 없음 — 기존 토큰 유지 또는 access_token만 저장')
-  }
-  client.setCredentials(tokens)
-  const oauth2 = google.oauth2({ version: 'v2', auth: client })
-  const { data } = await oauth2.userinfo.get()
 
-  // refresh_token이 없으면 기존 행의 refresh_token을 유지하기 위해 upsert 컬럼 조정
-  const upsertData: Record<string, unknown> = {
-    user_id:      userId,
-    email:        data.email ?? '',
-    access_token: tokens.access_token,
-    expires_at:   new Date(tokens.expiry_date ?? Date.now() + 3600_000).toISOString(),
-    updated_at:   new Date().toISOString(),
-  }
-  if (tokens.refresh_token) {
-    upsertData.refresh_token = tokens.refresh_token
-  }
+  const expiresAt = new Date(tokens.expiry_date ?? Date.now() + 3600_000).toISOString()
+  const now = new Date().toISOString()
 
-  // refresh_token 없을 때는 기존 행 UPDATE, 없으면 INSERT (refresh_token NOT NULL이라 INSERT 시 필요)
   if (!tokens.refresh_token) {
+    // refresh_token 없으면 기존 행 있을 때만 access_token UPDATE
     const { data: existing } = await supabase
       .from('champion_google_tokens')
       .select('user_id')
@@ -66,20 +51,24 @@ export async function exchangeChampionCode(code: string, userId: string): Promis
     }
     const { error } = await supabase
       .from('champion_google_tokens')
-      .update({ access_token: tokens.access_token, expires_at: upsertData.expires_at as string, updated_at: upsertData.updated_at as string, email: upsertData.email as string })
+      .update({ access_token: tokens.access_token, expires_at: expiresAt, updated_at: now })
       .eq('user_id', userId)
     if (error) throw new Error(`토큰 갱신 실패: ${error.message}`)
     return
   }
 
+  // email은 Supabase auth에서 가져옴 (Google userinfo API 호출 불필요)
+  const { data: authUser } = await supabase.auth.admin.getUserById(userId)
+  const email = authUser?.user?.email ?? ''
+
   const { error } = await supabase.from('champion_google_tokens').upsert(
     {
       user_id:       userId,
-      email:         data.email ?? '',
+      email,
       access_token:  tokens.access_token,
       refresh_token: tokens.refresh_token,
-      expires_at:    new Date(tokens.expiry_date ?? Date.now() + 3600_000).toISOString(),
-      updated_at:    new Date().toISOString(),
+      expires_at:    expiresAt,
+      updated_at:    now,
     },
     { onConflict: 'user_id' }
   )
