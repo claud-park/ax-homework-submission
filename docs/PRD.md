@@ -1,8 +1,8 @@
 # AX Homework Submission Platform — PRD
 
-> **Version** 2.2 · **Updated** 2026-06-16 · **Author** yr.park@dreamus.io
+> **Version** 2.3 · **Updated** 2026-06-24 · **Author** yr.park@dreamus.io
 > **Status** Internal Review · **Repo** `AX/ax-homework-submission`
-> **Previous** v2.0 (2026-06-02) · v1.1 (2026-05-21)
+> **Previous** v2.2 (2026-06-16) · v2.0 (2026-06-02) · v1.1 (2026-05-21)
 
 ---
 
@@ -44,9 +44,11 @@ AX program operations involve multiple champions executing multi-milestone assig
 
 ### Top Risks
 1. **Gmail SMTP limit (500/day)** — alert loss on volume spike. → SendGrid/SES migration prepared (P2).
-2. **Single admin mailbox** — no routing logic for multi-admin setup.
+2. ~~Single admin mailbox~~ — **resolved v2.3**: migrated to 3 individual admin accounts.
 3. **Unidirectional Kanban DnD** — no rollback after accept/reject. Mis-verdict recovery undefined.
 4. **Nudge rate limiting absent** — same champion can be nudged repeatedly.
+5. **Audio processing timeout** — sessions > ~100 min or slow Whisper responses may hit `maxDuration=300`. → Monitor via processing_status=error; reprocess available.
+6. **OpenAI/Anthropic API cost** — per-session Whisper + Claude costs accumulate at scale. → `costs` module in `lib/audio-pipeline/` tracks usage.
 
 ---
 
@@ -88,10 +90,21 @@ Pain points with existing operations:
 ### 2.3 Permission Model
 ```
 Champion = user_metadata.is_admin === false  (default)
-Admin    = user_metadata.is_admin === true
+Admin    = user_metadata.is_admin === true + user_metadata.name set
 ```
 - All APIs: JWT verification (`verifyJWT`) + admin-only APIs add `verifyAdmin`
 - Direct client DB access blocked (Supabase RLS **DENY ALL**)
+
+### 2.4 Admin Account Model (v2.3)
+Admin accounts are **individual** — one Supabase Auth user per admin operator, provisioned via `scripts/create-admins.ts` (idempotent, credentials injected via env, uses `SUPABASE_SERVICE_KEY`).
+
+| Account | Email | Metadata |
+|---|---|---|
+| Alex | `admin_alex@dreamus.io` | `is_admin=true`, `name="Alex"` |
+| Claud | `admin_claud@dreamus.io` | `is_admin=true`, `name="Claud"` |
+| Jennifer | `admin_jennifer@dreamus.io` | `is_admin=true`, `name="Jennifer"` |
+
+**Migration from shared account**: The previous shared account (`admin@dreamus.io`) is **deactivated** (banned + `is_admin=false`) — not deleted, to preserve foreign-key references. All new records (`admin_user_id`, `author_id`) reference individual admin UUIDs, enabling automatic attribution and audit trails. Benefits: action attribution (who recorded/edited/commented), cost attribution per operator, and elimination of concurrent-edit conflicts.
 
 ---
 
@@ -99,23 +112,28 @@ Admin    = user_metadata.is_admin === true
 
 ### 3.1 System Context
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│  Browser (CSR)                                                        │
-│  Champion UI: /my-project/charter, /my-project/milestones, /progress  │
-│  Admin UI: /admin, /admin/delay-reports, /admin/reports               │
-└──────────────────────┬────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Browser (CSR)                                                               │
+│  Champion UI: /my-project/charter, /my-project/milestones, /progress         │
+│               /my-project/sessions (1-on-1 session list + detail)            │
+│  Admin UI: /admin, /admin/delay-reports, /admin/reports                      │
+│            /admin/champions/[userId] (1-on-1 session management)             │
+└──────────────────────┬───────────────────────────────────────────────────────┘
                        │ HTTPS + JWT
-┌──────────────────────▼────────────────────────────────────────────────┐
-│  Next.js 14 App Router                                                │
-│  middleware.ts (role-based routing) + API Routes (app/api/**)         │
-└────────┬─────────────────────────────────────────┬────────────────────┘
-         │ service_role key                         │ SMTP
-┌────────▼────────────────────────────┐   ┌────────▼──────────┐
-│  Supabase (RLS DENY ALL)            │   │  Gmail SMTP       │
-│  Auth (Google OAuth)                │   │  (Nodemailer)     │
-│  PostgreSQL (9 tables)              │   │  9 triggers       │
-│  Storage (submissions bucket)       │   └───────────────────┘
-└─────────────────────────────────────┘
+                       │ (audio: direct signed-URL PUT → Storage, bypasses API)
+┌──────────────────────▼───────────────────────────────────────────────────────┐
+│  Next.js 14 App Router                                                       │
+│  middleware.ts (role-based routing) + API Routes (app/api/**)                │
+│  maxDuration=300 on audio-processing routes                                  │
+└────────┬──────────────────────────────────┬───────────────┬───────────────────┘
+         │ service_role key                 │ SMTP          │ AI APIs
+┌────────▼──────────────────────┐  ┌───────▼──────────┐  ┌─▼──────────────────┐
+│  Supabase (RLS DENY ALL)      │  │  Gmail SMTP      │  │  OpenAI Whisper    │
+│  Auth (individual admin accts)│  │  (Nodemailer)    │  │  (STT, whisper-1)  │
+│  PostgreSQL (12 tables)       │  │  9 triggers      │  │  Anthropic Claude  │
+│  Storage (submissions +       │  └──────────────────┘  │  (summarize notes) │
+│           check-up-sessions)  │                         └────────────────────┘
+└───────────────────────────────┘
 ```
 
 ### 3.2 4-Layer Architecture
@@ -148,6 +166,7 @@ Admin    = user_metadata.is_admin === true
 | C13 | **Mobile UX** (BottomTabBar + card layouts) | Responsive components | ✅ |
 | C14 | Champion progress dashboard | `/progress` | 🚧 Skeletal |
 | C15 | **Smart milestone input** — AI generate (Charter-grounded) / template presets / direct, editable draft staging → batch save | AI SDK v6 + Claude, `MilestoneDraftDrawer` | 📋 Designed (v2.2) |
+| C16 | **1-on-1 (Check-up) Session** — view session list, read meeting notes (markdown), toggle action item completion, add comments | `/(champion)/my-project/sessions` | ✅ (v2.3) |
 
 #### Smart Milestone Input (C15)
 Single entry `+ 마일스톤 추가 ▾` → three methods converge into one **editable draft (staging) list**, committed in one batch save. Addresses the "add one-by-one" pain.
@@ -203,6 +222,7 @@ depth-0 (parent_milestone_id IS NULL)    → task group (dates optional)
 | A10 | **Champion Nudge** (one-click email nudge) | NudgePopover + POST /api/admin/nudge | ✅ |
 | A11 | **Weekly reports** (PDF print + week navigation) | @media print + weekly filter | ✅ |
 | A12 | Admin mobile UX | Responsive components | ✅ |
+| A13 | **1-on-1 (Check-up) Session management** — create sessions, record/upload audio, trigger AI processing, edit meeting notes, manage action items and comments | `/admin/champions/[userId]` — [1-on-1 세션] tab | ✅ (v2.3) |
 
 #### Kanban 5-Column Structure
 ```
@@ -232,7 +252,139 @@ Not started → In progress → Reviewing ──DnD──→ Accepted
 | `no_milestone` | `[AX] 마일스톤 등록을 기다리고 있습니다 🙏` |
 | `delayed_milestone` | `[AX] '{{title}}' 마일스톤을 확인해주세요 🙏` |
 
-### 4.3 Email Notification Matrix (9 Triggers)
+### 4.3 1-on-1 (Check-up) Session
+
+Weekly 1-on-1 sessions between Admin and Champion are recorded, transcribed, and summarized automatically. The feature covers the full lifecycle: audio capture → AI processing → structured meeting notes with action items → Champion read-access with completion tracking and comments.
+
+#### 4.3.1 Overview
+| Actor | Actions |
+|---|---|
+| Admin | Create session, record audio in-browser or upload file, trigger AI processing / reprocess, edit meeting notes (markdown), manage action items (add / edit / delete / complete), comment |
+| Champion | View session list and detail (read-only notes), toggle action item completion, add comments |
+
+#### 4.3.2 Admin User Flow
+```
+/admin/champions/[userId] → [1-on-1 세션] tab
+  ↓
+[새 세션 만들기] → session created with session_date + session_time from click timestamp (KST)
+  ↓
+Record in-browser (32 kbps mono Opus webm) or upload file (wav/mp3/m4a/webm, ≤ 25 MB)
+  → drag/drop zone supported
+  ↓
+Client requests signed upload URL (POST /api/sessions/[id]/upload-url)
+  → uploads directly to Supabase Storage (PUT signed URL) — bypasses Vercel 4.5 MB body limit
+  ↓
+POST /api/sessions/[id]/process { audioFilePath }
+  → atomic status claim (409 if already processing)
+  → transcribing (Whisper whisper-1, ko) → summarizing (Claude claude-sonnet-4-6, JSON)
+  → notes + action items saved to DB
+  ↓
+Notes rendered in markdown viewer; admin may click [수정] to edit (tiptap + toolbar)
+  → PATCH /api/sessions/[id] with expectedUpdatedAt (optimistic concurrency — 409 on conflict)
+  → save → read-only view
+  ↓
+Action items: inline text edit / complete toggle / delete
+Comments: admin or champion authorship, displayed by author_role
+```
+
+#### 4.3.3 Champion User Flow
+```
+/(champion)/my-project/sessions → session list (Link-based rows, prefetch, empty state)
+  ↓
+Click row → session detail
+  ├─ Read meeting notes (react-markdown)
+  ├─ Toggle action item is_completed
+  └─ Add / view comments
+```
+
+#### 4.3.4 Audio Pipeline
+| Step | Detail |
+|---|---|
+| Input formats | Browser recording: 32 kbps mono Opus webm. File upload: wav / mp3 / m4a / webm, ≤ 25 MB |
+| Upload path | Client → signed URL (`createSignedUploadUrl`) → Supabase Storage `check-up-sessions` bucket (private). Server receives file path only — **Vercel 4.5 MB function-body limit bypassed** |
+| Transcription | OpenAI `whisper-1`, language `ko`; safe up to ~100 min at 32 kbps |
+| Summarization | Claude `claude-sonnet-4-6`; output JSON `{ notes: string, actionItems: string[] }` |
+| Code location | `lib/audio-pipeline/` (transcribe / summarize / costs / notes / process) + `lib/sessions/processAudio.ts` orchestration |
+| Route timeout | `maxDuration = 300` on `/api/sessions/[id]/process` and `/reprocess` |
+| Processing lock | Atomic status claim at process/reprocess start; concurrent requests → **409** |
+
+`processing_status` state machine:
+```
+idle → uploading (client) → transcribing → summarizing → done
+                                                       ↘ error
+```
+
+#### 4.3.5 Meeting Notes
+- **Storage format**: markdown (PostgreSQL `TEXT`).
+- **Editor**: tiptap + `tiptap-markdown` extension. Toolbar: bold / italic / strikethrough / heading 1–3 / bullet list / numbered list / blockquote / code.
+- **Read / edit toggle**: sessions with no saved notes (e.g., mid-recording) open in edit view by default; sessions with saved notes show read-only + **[수정]** button. Saving returns to read-only.
+- **Optimistic concurrency**: PATCH sends `expectedUpdatedAt` (last-known `updated_at`). Server rejects with **409** if `updated_at` has changed ("다른 관리자가 먼저 수정했습니다"). After processing/reprocessing, client re-syncs `updated_at`.
+- **LLM note structure**: AI summarization preserves user hand-written notes.
+  ```
+  [User notes]
+  ---
+  🤖 AI 요약
+  [AI summary]
+  ```
+  On reprocess: user section is preserved; only the AI section is replaced (regex split, robust to editor markdown round-trip).
+
+#### 4.3.6 Session Creation & Metadata
+- `session_date` and `session_time` (HH:mm) are set automatically to the **admin's local (KST) time at the moment of clicking [새 세션 만들기]** — no manual datetime input.
+- Session list and detail display `date HH:mm`.
+- `session_time` is a nullable `TIME` column added in v2.3.
+
+#### 4.3.7 Action Items
+| Actor | Allowed actions |
+|---|---|
+| Admin | Add, inline text edit (PATCH body), complete toggle, delete |
+| Champion | Complete toggle only |
+
+#### 4.3.8 Comments
+- Both admin and champion can post comments.
+- **Bug fix (v2.3)**: POST comment no longer joins `public.users` for author — admins are not in `public.users`, which previously caused 500 errors. Author display uses `author_role` fallback ("관리자" / "챔피언").
+
+#### 4.3.9 Recording Stop Button Label
+The in-browser recording stop button label was updated for clarity:
+
+| Before | After |
+|---|---|
+| 녹음 종료 & 처리 | 녹음 종료 & AI 요약 |
+
+#### 4.3.10 Recorded Session: Download Area vs. Record/Upload Panel
+The session detail page conditionally shows either the record/upload panel or a download area based on whether audio has been recorded.
+
+| Session state | `audio_file_path` | UI shown |
+|---|---|---|
+| New session (no audio) | `null` | Record/upload panel ([녹음하기 / 파일 올리기 / 녹음 시작]) |
+| Recorded session (audio exists) | set | **Download area** (record/upload panel fully hidden) |
+
+**Download area — 3 download buttons (when `audio_file_path` is set)**
+
+| Item | Source | Mechanism | Visibility |
+|---|---|---|---|
+| Audio file | Supabase Storage | `GET /api/sessions/[sessionId]/audio-url` → signed URL | Always |
+| Transcript (`.txt`) | `raw_transcript` column | Client-side Blob | Only when `raw_transcript` exists; otherwise shows "no transcript" message |
+| AI summary (`.md`) | `notes` column (markdown) | Client-side Blob | Only when `notes` exists |
+
+#### 4.3.11 Session Title Inline Edit
+The session detail page header supports in-place title editing.
+
+| Step | Behavior |
+|---|---|
+| 1 | Click pencil (✏️) button next to title → inline text input activates |
+| 2 | Edit title, then click Save (or press Enter) |
+| 3 | `PATCH /api/sessions/[sessionId]` with `{ title, expectedUpdatedAt }` |
+| 4 | Optimistic concurrency: server returns **409** if `expectedUpdatedAt` does not match current `updated_at` |
+| 5 | On success: inline edit mode exits, new title is displayed |
+
+#### 4.3.12 Admin Champion Detail UI Enhancements (v2.3)
+- Default tab on `/admin/champions/[userId]` is **[과제정의서]**.
+- **[과제정의서 보기]** button rendered as outlined style.
+- Milestone name **hover tooltip** shows full name on overflow.
+- Scrolling header collapses from 3-line `[Champion name / team / project]` to a **compact sticky bar** `[Champion | Project]`.
+- Audio upload area supports **drag-and-drop**.
+
+### 4.4 Email Notification Matrix (9 Triggers)
 | # | Trigger Event | Recipient | Function |
 |---|---|---|---|
 | E1 | Champion final submission | Admin | `notifyNewSubmission` |
@@ -293,7 +445,7 @@ Browser ──O──→ Next.js API Routes (verifyJWT + verifyAdmin)
 
 ## 6. Data Model
 
-### 6.1 Core Tables (9)
+### 6.1 Core Tables (12)
 | Table | Role | Key Columns |
 |---|---|---|
 | `users` | All users (champions + admins) | id(PK), email, name, avatar_url |
@@ -305,9 +457,28 @@ Browser ──O──→ Next.js API Routes (verifyJWT + verifyAdmin)
 | `milestones` | Champion WBS items (**2-depth tree**) | id(PK), user_id, homework_id, **parent_milestone_id**(FK→self), week_number, start_date?, due_date?, status, publish_status, bottleneck_type, **source**(manual·ai·template, v2.2) |
 | `deadline_change_requests` | Deadline extension requests | id(PK), milestone_id, user_id, original_due_date, requested_due_date, status(pending·approved·rejected) |
 | `bottleneck_replies` | Admin responses to delay reports | id(PK), milestone_id, admin_id, body |
+| `check_up_sessions` | 1-on-1 session records | id(PK), champion_user_id, admin_user_id, session_date, **session_time**(TIME nullable), title, notes(markdown), audio_file_path, recording_duration_sec, processing_status, raw_transcript, created_at, updated_at |
+| `session_action_items` | Action items per session | id(PK), session_id(FK→check_up_sessions CASCADE), body, is_completed, completed_at, display_order, created_at, updated_at |
+| `session_comments` | Comments per session | id(PK), session_id(FK→check_up_sessions CASCADE), body, author_id(FK→auth.users CASCADE), author_role(admin\|champion), created_at, updated_at |
 
 > **v2.0 change**: `sub_tasks` table removed → consolidated into `milestones.parent_milestone_id`.
 > `milestone_deliverables` table removed (deliverable attachment simplified).
+> **v2.3 change**: +3 tables for 1-on-1 session feature (`check_up_sessions`, `session_action_items`, `session_comments`).
+
+### 6.1.1 check_up_sessions — Key Constraints
+- `admin_user_id` FK → `auth.users(id)` ON DELETE SET NULL (individual admin attribution).
+- `champion_user_id` FK → `users(id)` ON DELETE CASCADE.
+- `processing_status` CHECK IN (`idle`, `uploading`, `transcribing`, `summarizing`, `done`, `error`), default `idle`.
+- INDEX on `(champion_user_id, session_date DESC)`.
+- RLS: champion can SELECT own rows; admin has ALL.
+
+### 6.1.2 Storage Buckets (2)
+| Bucket | Visibility | Contents |
+|---|---|---|
+| `submissions` | Private | Champion final submission files |
+| `check-up-sessions` | Private | Session audio files (`sessions/{id}/audio.{ext}`) |
+
+Admin RLS: ALL on `check-up-sessions`. Champions upload via server-issued signed URLs only.
 
 ### 6.2 Milestone Auto Status Calculation (server-side, priority order)
 | Priority | Status | Condition |
@@ -356,20 +527,25 @@ Browser ──O──→ Next.js API Routes (verifyJWT + verifyAdmin)
 | gantt-task-react | ^0.3.9 | WBS visualization |
 | sonner | ^2.0.7 | Toast UI |
 | ai (Vercel AI SDK) | v6 | `generateText` + `Output.object` — Charter-grounded milestone generation |
-| @ai-sdk/anthropic | ^3 | Anthropic provider (Claude `claude-haiku-4-5`) — direct connection |
+| @ai-sdk/anthropic | ^3 | Anthropic provider (Claude `claude-haiku-4-5` / `claude-sonnet-4-6`) — direct connection |
 | zod | ^4 | AI structured-output schema validation |
+| openai | — | Whisper STT (`whisper-1`) for 1-on-1 session audio transcription |
+| tiptap-markdown | — | Markdown I/O extension for meeting notes tiptap editor |
+| react-markdown + remark-gfm | — | Read-only markdown rendering of meeting notes |
 
 ### 7.2 Environment Variables
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY     # server-side only
+SUPABASE_SERVICE_KEY          # admin provisioning script (create-admins.ts)
 GMAIL_USER
 GMAIL_APP_PASSWORD
 ADMIN_NOTIFICATION_EMAIL
 APP_BASE_URL
-ANTHROPIC_API_KEY             # milestone AI generation (direct Anthropic, server-only)
+ANTHROPIC_API_KEY             # milestone AI generation + session summarization (server-only)
 MILESTONE_AI_MODEL            # optional, default claude-haiku-4-5
+OPENAI_API_KEY                # Whisper STT for 1-on-1 session audio (server-only)
 ```
 
 ### 7.3 Deployment
@@ -381,7 +557,7 @@ MILESTONE_AI_MODEL            # optional, default claude-haiku-4-5
 
 ## 8. Current Status & Roadmap
 
-### 8.1 As-Is (2026-06-02)
+### 8.1 As-Is (2026-06-24)
 - ✅ **MVP complete**: Auth, Charter, Milestone (2-depth tree), submissions, Kanban, comments, email (9 triggers)
 - ✅ **Admin Dashboard**: ChampionGanttView + ChampionSummaryTable + "Action needed" section
 - ✅ **Champion Nudge**: NudgePopover + `/api/admin/nudge` + `nudgeChampion()` (3 types)
@@ -390,6 +566,8 @@ MILESTONE_AI_MODEL            # optional, default claude-haiku-4-5
 - ✅ **Check-in workflow**: 4 actions + delay report admin review
 - ✅ **Draft/Publish**: task, Charter, Milestone
 - ✅ **CI/CD**: GitHub Actions (Bun) + Dockerfile + Docker Compose + Jenkins
+- ✅ **1-on-1 (Check-up) Session** _(v2.3)_: audio pipeline (Whisper + Claude), meeting notes (tiptap markdown), action items, comments, Champion session view
+- ✅ **Individual Admin Accounts** _(v2.3)_: 3 individual admin accounts replacing shared account; attribution/audit via `admin_user_id`
 - 🚧 **Remaining**: `/progress` (champion progress dashboard) — skeletal only
 
 ### 8.2 Roadmap
@@ -442,13 +620,15 @@ MILESTONE_AI_MODEL            # optional, default claude-haiku-4-5
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
 | R1 | Gmail SMTP daily limit (500/day) | Medium | Medium | SendGrid/SES migration (P2) |
-| R2 | Single admin mailbox routing | High | Medium | Multi-admin + per-task assignee mapping (P2) |
+| R2 | ~~Single admin mailbox routing~~ | — | — | **Resolved v2.3** — 3 individual admin accounts |
 | R3 | Unidirectional DnD mis-verdict | Medium | High | Admin-only verdict reversal API (P0) |
 | R4 | Nudge spam — no rate limit | Medium | Medium | Same-champion rate limiting (P0) |
 | R5 | Fire-and-forget email unhandled rejection | Medium | Low | try-catch + error logging (P0) |
 | R6 | Charter content jsonb schema migration | Low | Medium | Version field + incremental migration |
 | R7 | Champion email blocked → alert loss | Medium | Medium | In-app notification center (P3) |
 | R8 | Gmail App Password exposure | Low | High | Server env var isolation, rotation, SendGrid |
+| R9 | Audio processing timeout (>100 min sessions) | Low | Medium | processing_status=error + reprocess; `maxDuration=300` |
+| R10 | OpenAI/Anthropic API cost at scale | Medium | Medium | `lib/audio-pipeline/costs` usage tracking; budget alerts |
 
 ---
 
@@ -460,11 +640,11 @@ Champion:                            Admin:
   /                                    /admin
   /my-project/charter                  /admin/homework/[id]
   /my-project/milestones               /admin/homework/new
-  /progress                            /admin/kanban
-  /login                               /admin/requests
-                                       /admin/delay-reports
-                                       /admin/reports
-                                       /admin/champions/[userId]
+  /my-project/sessions                 /admin/kanban
+  /my-project/sessions/[id]            /admin/requests
+  /progress                            /admin/delay-reports
+  /login                               /admin/reports
+                                       /admin/champions/[userId]  ← [1-on-1 세션] tab
                                        /admin/login
 ```
 
@@ -473,10 +653,12 @@ Champion:                            Admin:
 |---|---|---|
 | Champion API | 16 | verifyJWT |
 | Admin API | 14 | verifyJWT + verifyAdmin |
+| Session API | 11 | verifyJWT (+ verifyAdmin for write ops) |
 | Auth | 1 | OAuth callback |
-| **Total** | **31** | — |
+| **Total** | **42** | — |
 
 > v1.1 → v2.0: +4 endpoints (milestone tree, /api/admin/nudge, /api/admin/delay-reports, gantt improvements)
+> v2.2 → v2.3: +11 session endpoints (POST/GET /api/sessions; GET/PATCH/DELETE /api/sessions/[id]; upload-url, audio-url, process, reprocess; action-items CRUD; comments CRUD)
 
 ### C. Reference Documents
 - `docs/ERD.md` — Data model detail
@@ -486,6 +668,14 @@ Champion:                            Admin:
 - `README.md` — Local setup / env var guide
 
 ---
+
+**Version History**
+| Version | Date | Changes |
+|---|---|---|
+| v2.3 | 2026-06-24 | 1-on-1 (Check-up) Session feature (audio pipeline, meeting notes, action items, comments, Champion view); individual admin accounts (3 accounts, shared account deprecated); +3 DB tables; +2 Storage buckets noted; +10 API endpoints |
+| v2.2 | 2026-06-16 | Smart Milestone Input (C15) — AI generate / template / direct, batch save |
+| v2.0 | 2026-06-02 | Milestone 2-depth tree, Champion Nudge, Weekly Reports, Mobile UX, Check-in workflow |
+| v1.1 | 2026-05-21 | Initial internal review release |
 
 **Document metadata**
 - Author: yr.park@dreamus.io

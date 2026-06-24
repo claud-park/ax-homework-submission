@@ -1,8 +1,8 @@
 # 디시인사이드 과제 관리 플랫폼 — 제품 요구사항 명세서 (PRD)
 
-> **문서 버전** 2.2 · **최종 업데이트** 2026-06-16 · **작성자** yr.park@dreamus.io
+> **문서 버전** 2.3 · **최종 업데이트** 2026-06-24 · **작성자** yr.park@dreamus.io
 > **상태** 사내 검토 중 · **저장소** `AX/ax-homework-submission`
-> **이전 버전** v2.1 (2026-06-08) · v2.0 (2026-06-02) · v1.2 (2026-05-27)
+> **이전 버전** v2.2 (2026-06-16) · v2.1 (2026-06-08) · v2.0 (2026-06-02) · v1.2 (2026-05-27)
 
 ---
 
@@ -11,8 +11,8 @@
 | 항목 | 내용 |
 |---|---|
 | 프로젝트명 | 디시인사이드 과제 관리 플랫폼 (ax-homework-submission) |
-| 버전 | v2.2 |
-| 작성일 | 2026-06-16 |
+| 버전 | v2.3 |
+| 작성일 | 2026-06-24 |
 | 작성자 | yr.park@dreamus.io |
 | 검토자 | Strategy Lead · Engineering Lead |
 
@@ -67,8 +67,10 @@ AX 프로그램은 다수의 챔피언(수강생)이 멀티-마일스톤 과제�
 | partner user_group 대시보드·Gantt 제외 | ✅ 완료 |
 | 챔피언 진행 대시보드 (`/progress`) | 🚧 골격만 |
 | 유저 그룹 권한 관리 (champion/partner/admin) | ✅ 완료 |
+| 1-on-1 세션(체크업 세션) — 녹음/업로드·AI 요약·미팅 노트·액션 아이템·댓글 | ✅ 완료 |
+| 어드민 개별 계정 전환 (공유→개별 3계정, 귀속/감사) | ✅ 완료 |
 
-**전체 기능 완성도**: 핵심 23개 영역 중 22개 완료 (**96%**)
+**전체 기능 완성도**: 핵심 25개 영역 중 24개 완료 (**96%**)
 
 ---
 
@@ -138,6 +140,21 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 - 모든 API는 JWT 검증 (`verifyJWT`) + 어드민 전용 API는 추가 검증 (`verifyAdmin`)
 - 클라이언트의 직접 DB 접근 금지 (Supabase RLS **DENY ALL**)
 - 챔피언 리스트·Gantt API는 `user_group = 'champion'` 필터 적용 — 파트너는 과제 추적 제외
+
+#### 2.4.1 어드민 계정 모델 (v2.3 변경)
+
+| 항목 | 변경 전 (공유 계정) | 변경 후 (개별 계정) |
+|---|---|---|
+| 계정 수 | 공유 1개 (`admin@dreamus.io`) | 개별 3개 (`admin_alex@`, `admin_claud@`, `admin_jennifer@dreamus.io`) |
+| 식별 방식 | 단일 UUID | 각 어드민의 고유 UUID |
+| 이전 계정 처리 | — | ban + `is_admin=false` 비활성화 (FK 보존, 삭제 아님) |
+
+**변경 이유**:
+- **작업 귀속·감사**: `check_up_sessions.admin_user_id`, `session_comments.author_id` 등에 개별 UUID가 기록되어 누가 녹음·수정·댓글을 달았는지 자동 추적 가능
+- **비용 귀속**: 오디오 처리(Whisper/Claude) 호출 주체를 admin별로 구분
+- **동시 작업 충돌 방지**: 낙관적 동시성(`expectedUpdatedAt`)과 결합하여 동시 편집 충돌 감지
+
+**프로비저닝**: `scripts/create-admins.ts` (멱등 실행, `.env`로 이메일·비밀번호 주입, `SUPABASE_SERVICE_KEY` 사용)
 
 ---
 
@@ -302,7 +319,214 @@ depth-0 (parent_milestone_id IS NULL)  → 과제 그룹 (날짜 선택적)
 | `no_milestone` | `[AX] 마일스톤 등록을 기다리고 있습니다 🙏` | 마일스톤 등록하기 |
 | `delayed_milestone` | `[AX] '{{title}}' 마일스톤을 확인해주세요 🙏` | 마일스톤 확인하기 |
 
-### 4.3 이메일 알림 매트릭스 (9 트리거)
+### 4.3 1-on-1 세션 (체크업 세션) — 신규 (v2.3)
+
+Admin ↔ Champion 간 주간 1-on-1 면담을 기록·관리하는 기능입니다. 어드민이 브라우저 녹음 또는 오디오 파일을 업로드하면 Whisper STT → Claude 요약 파이프라인이 자동으로 미팅 노트와 액션 아이템을 생성합니다. 챔피언은 자신의 세션을 조회하고 액션 아이템 완료 토글·댓글을 달 수 있습니다.
+
+#### 4.3.1 사용자 시나리오
+
+**어드민 (세션 생성·처리)**
+
+```
+[생성] 버튼 클릭
+  → session_date·session_time 자동 기록 (클릭 시점 KST)
+  → 브라우저 실시간 녹음(32kbps mono Opus webm) 또는 파일 업로드(wav/mp3/m4a/webm, 최대 25MB)
+  → 서버로부터 서명 업로드 URL 발급 → 클라이언트가 Supabase Storage에 직접 PUT
+  → [처리] 클릭 → Whisper STT(ko) → Claude 요약(JSON: notes + actionItems) → DB 저장
+  → 미팅 노트(markdown) + 액션 아이템 목록 확인
+  → 필요 시 노트 인라인 편집 또는 [재처리]로 AI 재요약
+```
+
+**챔피언 (세션 열람·완료 처리)**
+
+```
+/(champion)/my-project/sessions 접속
+  → 세션 목록(날짜 HH:mm, Link 기반) 확인
+  → 세션 상세 이동 → 미팅 노트(read-only 렌더) 읽기
+  → 액션 아이템 완료 토글 (완료 시 completed_at 기록)
+  → 댓글 작성 (author_role = 'champion')
+```
+
+#### 4.3.2 오디오 처리 파이프라인
+
+| 항목 | 내용 |
+|---|---|
+| 입력 | 브라우저 실시간 녹음(32kbps mono Opus webm) 또는 파일 업로드(wav/mp3/m4a/webm) |
+| 최대 크기 | Whisper 25MB (32kbps 녹음은 약 100분까지 안전) |
+| 직접 업로드 방식 | 서버 발급 서명 URL(`createSignedUploadUrl`)로 클라이언트가 Storage에 직접 PUT → **Vercel 함수 본문 4.5MB 한도(413) 우회** |
+| STT | OpenAI Whisper (`whisper-1`, 언어: `ko`) |
+| 요약 | Claude (`claude-sonnet-4-6`, JSON 출력: `notes` + `actionItems`) |
+| 코드 위치 | `lib/audio-pipeline/`(transcribe/summarize/costs/notes/process) + `lib/sessions/processAudio.ts` 오케스트레이션 |
+| Vercel 설정 | `maxDuration=300` (오디오 처리 타임아웃 대응) |
+| 드래그앤드롭 | 업로드 UI에 drag/drop 영역 제공 |
+
+**처리 락 (동시 처리 충돌 방지)**
+
+- `/api/sessions/[id]/process` · `/reprocess` 시작 시 원자적 status 클레임
+- 조건: `processing_status NOT IN (uploading, transcribing, summarizing)`
+- 이미 처리 중이면 **HTTP 409** 반환
+
+**processing_status 상태 흐름**
+
+```
+idle → uploading(클라이언트) → transcribing → summarizing → done | error
+```
+
+#### 4.3.3 미팅 노트
+
+| 항목 | 내용 |
+|---|---|
+| 저장 포맷 | markdown (TEXT 컬럼) |
+| 편집 에디터 | Tiptap + tiptap-markdown + 서식 툴바 (굵게/기울임/취소선/제목1·2·3/글머리·번호 목록/인용/코드) |
+| 읽기 렌더 | react-markdown (GFM) |
+| read-only / 편집 토글 | 저장된 노트가 있으면 read-only 기본 + [수정] 버튼; 빈 첫 세션(녹음 중)은 편집 뷰 기본 열림; 저장 시 read-only로 복귀 |
+| 낙관적 동시성 | PATCH 시 `expectedUpdatedAt`(마지막으로 읽은 `updated_at`) 전송; 서버가 불일치 감지 시 **HTTP 409** ("다른 관리자가 먼저 수정했습니다"); 처리/재처리 후 `updated_at` 재동기화 |
+
+**LLM 노트 구조 (수기 + AI 요약 구분)**
+
+```
+[수기 노트 영역]
+
+---
+🤖 AI 요약
+
+[AI 요약 영역]
+```
+
+재처리 시 정규식 split으로 수기 파트를 보존하고 AI 파트만 교체합니다. 에디터 마크다운 라운드트립에도 견고하게 작동합니다.
+
+#### 4.3.4 세션 생성 및 메타데이터
+
+- `session_date` (date): [생성] 클릭 시점의 날짜 (어드민 로컬 = KST) 자동 기록
+- `session_time` (TIME, nullable, HH:mm): [생성] 클릭 시점의 시각 자동 기록 (수동 입력 제거)
+- 목록·상세 화면에 `날짜 HH:mm` 형식으로 표시
+
+#### 4.3.5 액션 아이템
+
+| 역할 | 허용 액션 |
+|---|---|
+| 어드민 | 텍스트 인라인 편집 (PATCH body), 완료 토글, 추가, 삭제 |
+| 챔피언 | 완료 토글만 (`is_completed` PATCH, `completed_at` 자동 기록) |
+
+- `display_order`로 정렬, `session_id` 기준 CASCADE 삭제
+
+#### 4.3.6 댓글
+
+- 어드민·챔피언 모두 작성 가능 (`author_role`: `admin` | `champion`)
+- 표시는 `author_role` 기반 fallback ("관리자" / "챔피언")
+- 버그 수정: 댓글 POST에서 `public.users` author 조인 제거 — admin은 `public.users`에 없어 조인 시 500 발생하던 문제 해결
+
+#### 4.3.7 Admin 챔피언 상세 UI (`/admin/champions/[userId]`)
+
+| 항목 | 내용 |
+|---|---|
+| 기본 탭 | [과제정의서] 탭 기본 진입 |
+| Charter 버튼 | [과제정의서 보기] outlined 버튼 |
+| 마일스톤 hover | 마일스톤 이름 hover 시 전체 이름 tooltip 표시 |
+| 헤더 스크롤 동작 | 스크롤 다운 시 [챔피언 이름 / 팀 / 프로젝트] 3줄 → [챔피언 \| 프로젝트] 컴팩트 고정 바로 전환 |
+
+#### 4.3.8 ERD — 신규 테이블 3개 + Storage 버킷
+
+**check_up_sessions**
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| id | uuid PK | gen_random_uuid() |
+| champion_user_id | uuid NOT NULL | FK users(id) ON DELETE CASCADE |
+| admin_user_id | uuid | FK auth.users(id) ON DELETE SET NULL (개별 admin 귀속) |
+| session_date | date NOT NULL | 생성 클릭 시점 자동 |
+| session_time | time | **신규**, nullable, HH:mm, 생성 클릭 시점 자동 |
+| title | text NOT NULL | |
+| notes | text | markdown, [수기]+구분선+[AI요약] |
+| audio_file_path | text | `sessions/{id}/audio.{ext}` |
+| recording_duration_sec | int | |
+| processing_status | text NOT NULL | default 'idle', CHECK IN (idle, uploading, transcribing, summarizing, done, error) |
+| raw_transcript | text | Whisper 전사 결과 |
+| created_at / updated_at | timestamptz | |
+
+- INDEX: `(champion_user_id, session_date DESC)`
+- RLS: champion 본인 SELECT, admin 전체(ALL)
+
+**session_action_items**
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| id | uuid PK | |
+| session_id | uuid NOT NULL | FK check_up_sessions(id) CASCADE |
+| body | text NOT NULL | |
+| is_completed | bool | default false |
+| completed_at | timestamptz | |
+| display_order | int | default 0 |
+| created_at / updated_at | timestamptz | |
+
+- INDEX: `(session_id, display_order)`
+- RLS: champion 본인 세션 read + `is_completed` 토글, admin 전체
+
+**session_comments**
+
+| 컬럼 | 타입 | 비고 |
+|---|---|---|
+| id | uuid PK | |
+| session_id | uuid NOT NULL | FK check_up_sessions(id) CASCADE |
+| body | text NOT NULL | |
+| author_id | uuid NOT NULL | FK auth.users(id) CASCADE |
+| author_role | text NOT NULL | CHECK (admin \| champion) |
+| created_at / updated_at | timestamptz | |
+
+- INDEX: `(session_id, created_at)`
+- RLS 적용
+
+**Storage 버킷**: `check-up-sessions` (private). admin RLS(ALL). 클라이언트는 서명 업로드 URL로 직접 PUT.
+
+#### 4.3.9 녹음 종료 버튼 레이블
+
+브라우저 실시간 녹음 중 표시되는 종료 버튼의 레이블이 변경되었습니다.
+
+| 변경 전 | 변경 후 |
+|---|---|
+| 녹음 종료 & 처리 | 녹음 종료 & AI 요약 |
+
+#### 4.3.10 저장된 세션의 녹음/업로드 패널 ↔ 다운로드 영역 분기
+
+| 상태 | `audio_file_path` | 표시 영역 |
+|---|---|---|
+| 신규 세션 (녹음 없음) | `null` | 기존 녹음/업로드 패널 ([녹음하기 / 파일 올리기 / 녹음 시작]) |
+| 저장된 세션 (녹음 있음) | 값 있음 | **다운로드 영역** (하단 3개 버튼, 녹음/업로드 패널 완전 비노출) |
+
+**다운로드 영역 구성 (audio_file_path 존재 시)**
+
+| 다운로드 항목 | 소스 | API | 조건 |
+|---|---|---|---|
+| 녹음 파일 | Supabase Storage | `GET /api/sessions/[sessionId]/audio-url` → 서명 URL 반환 | 항상 표시 |
+| 전사 (transcript) | `raw_transcript` → `.txt` | 클라이언트 생성 Blob | `raw_transcript` 존재 시만 표시; 없으면 "전사 결과 없음" 안내 |
+| AI 요약 | `notes` (markdown) → `.md` | 클라이언트 생성 Blob | `notes` 존재 시만 표시 |
+
+#### 4.3.11 세션 제목 인라인 수정
+
+세션 상세 페이지 헤더 영역에서 제목을 바로 수정할 수 있습니다.
+
+| 단계 | 동작 |
+|---|---|
+| 1 | 제목 옆 연필(✏️) 버튼 클릭 → 인라인 텍스트 입력 모드 전환 |
+| 2 | 제목 입력 후 저장 버튼(또는 Enter) 클릭 |
+| 3 | `PATCH /api/sessions/[sessionId]` — `{ title, expectedUpdatedAt }` body 전송 |
+| 4 | 낙관적 동시성: `expectedUpdatedAt` 불일치 시 서버가 **HTTP 409** 반환 |
+| 5 | 저장 성공 시 인라인 편집 모드 종료, 새 제목 표시 |
+
+#### 4.3.12 API 라우트
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| POST / GET | `/api/sessions` | 세션 생성 (admin) / 목록 조회 (champion 본인·admin championId 필터) |
+| GET / PATCH / DELETE | `/api/sessions/[sessionId]` | 상세 조회·수정(낙관적 동시성 `expectedUpdatedAt`)·삭제 |
+| POST | `/api/sessions/[sessionId]/upload-url` | 서명 업로드 URL 발급 |
+| GET | `/api/sessions/[sessionId]/audio-url` | 저장된 오디오 파일 서명 다운로드 URL 반환 (admin only) |
+| POST | `/api/sessions/[sessionId]/process` | 오디오 경로 수신 → STT+요약 (처리 락, 409) |
+| POST | `/api/sessions/[sessionId]/reprocess` | 저장된 오디오 재처리 (처리 락, 409) |
+| POST / PATCH / DELETE | `/api/sessions/[sessionId]/action-items[/[itemId]]` | 액션 아이템 CRUD |
+| POST / PATCH / DELETE | `/api/sessions/[sessionId]/comments[/[commentId]]` | 댓글 CRUD |
+
+### 4.5 이메일 알림 매트릭스 (9 트리거)
 
 | # | 트리거 이벤트 | 발신 대상 | 함수 |
 |---|---|---|---|
@@ -316,7 +540,7 @@ depth-0 (parent_milestone_id IS NULL)  → 과제 그룹 (날짜 선택적)
 | E8 | 어드민이 지연신고 이메일 링크 → delay-reports 이동 | — | 링크 수정 완료 |
 | E9 | 어드민이 Nudge 발송 (3 타입) | 챔피언 | `nudgeChampion` |
 
-### 4.4 임시저장 (Drafting) 기능 상세
+### 4.6 임시저장 (Drafting) 기능 상세
 
 `publish_status` 열(`draft` | `published`)을 `homeworks`, `charter_submissions`, `milestones` 세 테이블에 적용.
 
@@ -390,7 +614,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 
 ## 6. 데이터 모델
 
-### 6.1 핵심 테이블 (9개)
+### 6.1 핵심 테이블 (12개)
 
 | 테이블 | 역할 | 주요 열 |
 |---|---|---|
@@ -403,9 +627,13 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | `milestones` | 챔피언의 WBS 항목 (2-depth 트리) | id(PK), user_id, homework_id, parent_milestone_id(FK→milestones), week_number, start_date?, due_date?, status, publish_status, bottleneck_type, bottleneck_note, **source**(manual·ai·template, v2.2) |
 | `deadline_change_requests` | 기한변경 요청 | id(PK), milestone_id, user_id, original_due_date, requested_due_date, status(pending·approved·rejected) |
 | `bottleneck_replies` | 지연 신고 어드민 답변 | id(PK), milestone_id, admin_id, body |
+| `check_up_sessions` | 1-on-1 세션 헤더 + 미팅 노트 + 오디오 처리 상태 | id(PK), champion_user_id, admin_user_id, session_date, session_time, title, notes(markdown), audio_file_path, processing_status, raw_transcript |
+| `session_action_items` | 세션별 액션 아이템 | id(PK), session_id(FK), body, is_completed, completed_at, display_order |
+| `session_comments` | 세션 댓글 (어드민·챔피언) | id(PK), session_id(FK), body, author_id(FK auth.users), author_role(admin\|champion) |
 
 > **v2.0 변경**: `sub_tasks` 테이블 제거 → `milestones.parent_milestone_id`로 통합.
 > `milestone_deliverables` 테이블 제거 (산출물 첨부 기능 단순화).
+> **v2.3 추가**: `check_up_sessions`, `session_action_items`, `session_comments` 3개 신규 테이블.
 
 ### 6.2 Milestone 상태 자동 계산 규칙 (서버사이드, 우선순위 순)
 
@@ -431,6 +659,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 버킷 | 경로 형식 | 접근 |
 |---|---|---|
 | `submissions` | `{user_id}/{homework_id}/{attempt}/{filename}` | 비공개, 서명 URL (60s TTL) |
+| `check-up-sessions` | `sessions/{sessionId}/audio.{ext}` | 비공개, admin RLS(ALL); 클라이언트는 서명 업로드 URL로 직접 PUT |
 
 ---
 
@@ -468,7 +697,10 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | DOCX | docx | ^9.6.1 | Charter 내보내기 |
 | 알림 | sonner | ^2.0.7 | 토스트 UI |
 | AI | ai (Vercel AI SDK) | v6 | `generateText` + `Output.object` — Charter 기반 마일스톤 생성 |
-| AI 프로바이더 | @ai-sdk/anthropic | ^3 | Anthropic 직접 연결 (Claude `claude-haiku-4-5`) |
+| AI 프로바이더 | @ai-sdk/anthropic | ^3 | Anthropic 직접 연결 (마일스톤 생성: `claude-haiku-4-5`, 세션 요약: `claude-sonnet-4-6`) |
+| STT | openai | — | Whisper `whisper-1` (세션 오디오 전사) |
+| 노트 에디터 (세션) | tiptap-markdown | — | Tiptap ↔ markdown 직렬화/역직렬화 |
+| 노트 렌더 (세션) | react-markdown + remark-gfm | — | 세션 미팅 노트 read-only 렌더 |
 | 스키마 검증 | zod | ^4 | AI 구조화 출력 검증 |
 | 패키지 관리 | bun | 1.x | 의존성·빌드 |
 
@@ -483,8 +715,10 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | `GMAIL_APP_PASSWORD` | Gmail 앱 비밀번호 | 런타임 |
 | `ADMIN_NOTIFICATION_EMAIL` | 알림 수신 어드민 이메일 | 런타임 |
 | `APP_BASE_URL` | 이메일 본문 링크 기반 URL | 런타임 |
-| `ANTHROPIC_API_KEY` | 마일스톤 AI 생성용 (Anthropic 직접 연결, 서버 전용) | 런타임 전용 |
+| `ANTHROPIC_API_KEY` | 마일스톤 AI 생성 + 세션 요약 (Anthropic 직접 연결, 서버 전용) | 런타임 전용 |
 | `MILESTONE_AI_MODEL` | 마일스톤 생성 모델 (선택, 기본 `claude-haiku-4-5`) | 런타임 |
+| `OPENAI_API_KEY` | Whisper STT 전사 (서버 전용) | 런타임 전용 |
+| `SUPABASE_SERVICE_KEY` | admin 계정 프로비저닝 스크립트용 (`scripts/create-admins.ts`) | 런타임 전용 |
 
 ### 8.3 인프라 및 CI/CD
 
@@ -516,7 +750,9 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 어드민 | `/admin/reports` | 주간 리포트 (PDF 인쇄·주차 네비) |
 | 어드민 | `/admin/hotline` | 핫라인 인박스 (챔피언별 메시지 스레드) |
 | 어드민 | `/admin/champions` | 챔피언 목록 |
-| 어드민 | `/admin/champions/[userId]` | 챔피언 개별 상세 (제출·댓글·Charter 피드백) |
+| 어드민 | `/admin/champions/[userId]` | 챔피언 개별 상세 (제출·댓글·Charter 피드백·1-on-1 세션) |
+| 챔피언 | `/(champion)/my-project/sessions` | 1-on-1 세션 목록 |
+| 챔피언 | `/(champion)/my-project/sessions/[sessionId]` | 세션 상세 (노트·액션 아이템·댓글) |
 
 ---
 
@@ -528,9 +764,11 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 어드민 API | 20 | `verifyJWT` + `verifyAdmin` |
 | 인증 | 1 | OAuth 콜백 |
 | 핫라인 API | 6 | champion: verifyJWT / admin: verifyAdmin |
-| **합계** | **43** | — |
+| 1-on-1 세션 API | 12 | champion: verifyJWT / admin: verifyAdmin |
+| **합계** | **55** | — |
 
 > v1.2 대비 +4 (milestones 트리 지원, `/api/admin/nudge`, `/api/admin/delay-reports`, `/api/champions/gantt` 개선)
+> v2.3 대비 +12 (`/api/sessions/**` 세션·업로드·처리·오디오 다운로드 URL·액션 아이템·댓글 API 추가)
 
 ---
 
@@ -647,6 +885,17 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | 2026-06-02 | 확인 요함 섹션, Champion Nudge, 리포트 재설계, 모바일 UX, 기한 변경 모달 |
 | 2026-06-05 | 핫라인 Tiptap 에디터·파일 첨부·안 읽음, Charter 서식 툴바·DOCX 서식 보존, 제출 피드백 직접 접근·파일 다운로드·댓글, partner 대시보드 제외, admin sidebar 홈 링크 |
 | 2026-06-08 | 피드백 패널 접힌 상태 레이블 제거, Gantt 독립 스크롤 영역 |
+| 2026-06-17~24 | 1-on-1 세션(체크업 세션) 전체 구현 — Whisper STT + Claude 요약 파이프라인, 오디오 직접 업로드(413 우회), 처리 락(409), Tiptap 미팅 노트(낙관적 동시성), 액션 아이템 인라인 편집, 댓글(admin 조인 버그 수정), Champion 세션 뷰, Admin 챔피언 상세 UI 개선(컴팩트 헤더·tooltip·outlined 버튼); 어드민 개별 계정 3개 전환(공유→개별, 귀속/감사) |
+
+### C. 버전 이력
+
+| 버전 | 날짜 | 주요 변경 사항 |
+|---|---|---|
+| v1.2 | 2026-05-27 | MVP 구현 완료 (Charter·Milestone·칸반·이메일) |
+| v2.0 | 2026-06-02 | 확인 요함·Nudge·리포트·모바일 UX·기한 변경 모달 추가; sub_tasks→parent_milestone_id 통합 |
+| v2.1 | 2026-06-08 | partner 제외, 핫라인 Tiptap, Charter 서식 툴바 |
+| v2.2 | 2026-06-16 | 스마트 마일스톤 입력(AI 생성·템플릿·직접 입력) 설계 완료 |
+| v2.3 | 2026-06-24 | 1-on-1 세션(체크업 세션) 신규 기능 전체; 어드민 공유→개별 3계정 전환; Storage `check-up-sessions` 버킷; 신규 테이블 3개(`check_up_sessions`, `session_action_items`, `session_comments`); API +11 (세션·업로드·처리·액션 아이템·댓글); 신규 의존성 (openai/Whisper, tiptap-markdown, react-markdown) |
 
 ---
 

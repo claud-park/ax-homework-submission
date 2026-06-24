@@ -23,7 +23,8 @@
 | [HOT] 핫라인 | TC-HOT-01~04 | 4 |
 | [SEC] 보안·API | TC-SEC-01~05 | 5 |
 | [MOB] 모바일 UX | TC-MOB-01~05 | 5 |
-| **합계** | | **82** |
+| [SESS] 1-on-1 세션 | TC-SESS-01~27 | 27 |
+| **합계** | | **109** |
 
 ---
 
@@ -1448,6 +1449,487 @@
 
 ---
 
+## [SESS] 1-on-1 세션
+
+### TC-SESS-01: 세션 생성 — 클릭 시점 날짜·시각 자동 기록
+
+**IF**
+- 어드민이 로그인한 상태 (`is_admin = true`)
+- 챔피언 상세 페이지(`/admin/champions/[userId]`)에서 [1-on-1 세션] 탭을 보고 있음
+
+**WHEN**
+- "세션 만들기" (또는 [생성]) 버튼 클릭
+
+**THEN**
+- `POST /api/sessions`가 호출된다
+- `check_up_sessions.session_date`가 클릭 시점의 KST 날짜로 자동 저장된다
+- `check_up_sessions.session_time`이 클릭 시점의 KST HH:mm으로 자동 저장된다
+- 날짜·시각 수동 입력 UI가 표시되지 않는다
+- 생성된 세션이 목록 상단에 즉시 노출되고 `날짜 HH:mm` 형식으로 표시된다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-02: 세션 생성 — admin 전용 권한
+
+**IF**
+- `is_admin = false`인 챔피언 JWT 보유
+
+**WHEN**
+- `POST /api/sessions` 직접 호출 시도
+
+**THEN**
+- `403 Forbidden`이 반환된다
+- `check_up_sessions` 테이블에 레코드가 생성되지 않는다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-03: 오디오 파일 업로드 — 허용 형식 검증
+
+**IF**
+- 어드민이 세션 상세 페이지에서 오디오 업로드 영역을 보고 있음
+
+**WHEN**
+- wav, mp3, m4a, webm 파일을 각각 파일 선택기 또는 drag/drop으로 업로드
+
+**THEN**
+- 4개 형식 모두 업로드가 허용된다
+- 파일 선택 후 업로드 진행 상태가 표시된다
+- Supabase Storage `check-up-sessions` 버킷 경로 `sessions/{id}/audio.{ext}`에 저장된다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-04: 오디오 파일 업로드 — 25MB 초과 차단
+
+**IF**
+- 어드민이 오디오 업로드 영역에서 파일을 선택
+
+**WHEN**
+- 25MB를 초과하는 오디오 파일 업로드 시도
+
+**THEN**
+- 클라이언트 또는 서버에서 업로드가 차단된다
+- "파일 크기가 25MB를 초과합니다" 또는 동등한 오류 메시지가 표시된다
+- `check_up_sessions.audio_file_path`가 업데이트되지 않는다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-05: 오디오 파일 업로드 — drag/drop
+
+**IF**
+- 어드민이 세션 상세 페이지의 오디오 업로드 영역을 보고 있음
+
+**WHEN**
+- 허용된 형식(wav/mp3/m4a/webm)의 파일을 드래그하여 업로드 영역에 드롭
+
+**THEN**
+- 드롭 이벤트가 인식되어 파일이 업로드된다
+- 드래그 중 업로드 영역에 hover 피드백(테두리 색상 변경 등)이 표시된다
+- 파일 선택기를 통한 업로드와 동일하게 처리된다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-06: 직접 업로드(서명 URL)로 대용량 파일 413 회귀 방지
+
+**IF**
+- 어드민이 30분 이상 녹음된 오디오 파일(4.5MB 초과)을 업로드하려는 상태
+
+**WHEN**
+- 오디오 파일을 업로드 (내부적으로 `POST /api/sessions/[id]/upload-url` 서명 URL 발급 → 클라이언트가 Supabase Storage에 직접 PUT)
+
+**THEN**
+- Vercel 함수 본문 4.5MB 한도(413 오류)가 발생하지 않는다
+- 파일이 Supabase Storage에 직접 업로드된다
+- 업로드 완료 후 `audio_file_path`만 서버 함수로 전달된다
+- 25MB 이하 대용량 파일도 정상 업로드된다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-07: 오디오 처리(STT+요약) — 정상 완료
+
+**IF**
+- 세션에 `audio_file_path`가 설정된 상태
+- `processing_status = 'idle'`
+
+**WHEN**
+- `POST /api/sessions/[id]/process` 호출 (경로 JSON 전달)
+
+**THEN**
+- `processing_status`가 `transcribing → summarizing → done` 순으로 전이된다
+- `raw_transcript`에 Whisper STT 결과가 저장된다
+- `check_up_sessions.notes`에 LLM 요약 결과(markdown 형식)가 저장된다
+- `session_action_items` 테이블에 AI가 추출한 액션 아이템이 생성된다
+- 처리 완료 후 세션 상세 UI가 노트·액션아이템을 표시한다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-08: 처리 락 — 동시 처리 시 409
+
+**IF**
+- 세션 `processing_status`가 `transcribing` 또는 `summarizing` 상태
+
+**WHEN**
+- `POST /api/sessions/[id]/process` 또는 `POST /api/sessions/[id]/reprocess`를 동시에 또는 재호출
+
+**THEN**
+- `409 Conflict`가 반환된다
+- 이미 진행 중인 처리가 중단되거나 중복 실행되지 않는다
+- 에러 응답에 "이미 처리 중입니다" 또는 동등한 메시지가 포함된다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-09: LLM 노트 구조 — 수기 노트 보존 + AI 요약 추가
+
+**IF**
+- 어드민이 세션 노트 편집 화면에서 수기 내용을 작성하고 저장한 상태
+- 이후 오디오 처리 또는 재처리를 실행
+
+**WHEN**
+- `POST /api/sessions/[id]/process` 또는 `/reprocess` 완료
+
+**THEN**
+- 기존 수기 노트 내용이 보존된다
+- 구분선(`---`)과 "🤖 AI 요약" 헤딩이 삽입된다
+- 구분선 아래에 AI 요약 내용이 추가된다
+- 재처리 시 AI 요약 부분만 교체되고 수기 노트는 변경되지 않는다
+- 재처리를 반복해도 AI 요약 섹션이 중첩되지 않는다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-10: 미팅 노트 편집 토글 — 첫 세션 편집뷰 기본 열림
+
+**IF**
+- 세션이 생성되어 있고 `notes`가 비어 있는 상태 (녹음 중 또는 처리 전)
+
+**WHEN**
+- 어드민이 세션 상세 페이지에 진입
+
+**THEN**
+- 미팅 노트 영역이 편집 뷰(tiptap 에디터)로 기본 열린다
+- [수정] 버튼이 표시되지 않는다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-11: 미팅 노트 편집 토글 — 저장 후 read-only 복귀
+
+**IF**
+- 어드민이 세션 노트를 편집 중인 상태
+
+**WHEN**
+- 내용 작성 후 [저장] 버튼 클릭
+
+**THEN**
+- `PATCH /api/sessions/[id]`가 `{ notes, expectedUpdatedAt }` body로 호출된다
+- 저장 성공 후 노트 영역이 read-only 뷰(react-markdown 렌더)로 전환된다
+- [수정] 버튼이 표시된다
+- [수정] 버튼 클릭 시 다시 편집 뷰가 열린다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-12: 미팅 노트 markdown 포매팅 툴바
+
+**IF**
+- 어드민이 세션 노트 편집 뷰에 있는 상태
+
+**WHEN**
+- 툴바의 굵게/기울임/취소선/제목(H1·H2·H3)/글머리·번호 목록/인용/코드 버튼 클릭
+
+**THEN**
+- 각 서식이 에디터에 즉시 적용되어 WYSIWYG으로 표시된다
+- 저장 시 markdown 형식(`**bold**`, `*italic*`, `## heading` 등)으로 DB에 저장된다
+- 저장 후 read-only 뷰에서 react-markdown으로 정상 렌더링된다
+
+**우선순위**: P2
+
+---
+
+### TC-SESS-13: 미팅 노트 낙관적 동시성 — 다른 관리자 수정 시 409
+
+**IF**
+- 어드민 A가 세션 노트를 편집 중인 상태
+- 그 사이 어드민 B가 동일 세션 노트를 먼저 저장하여 `updated_at`이 변경됨
+
+**WHEN**
+- 어드민 A가 [저장] 버튼 클릭 (stale `expectedUpdatedAt` 전송)
+
+**THEN**
+- `PATCH /api/sessions/[id]`가 `409 Conflict`를 반환한다
+- "다른 관리자가 먼저 수정했습니다" 또는 동등한 안내 메시지가 표시된다
+- 어드민 A의 내용이 강제 덮어쓰기되지 않는다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-14: 액션 아이템 인라인 편집 (admin)
+
+**IF**
+- 세션에 AI 생성 또는 수동 생성 액션 아이템이 존재
+- 어드민이 로그인한 상태
+
+**WHEN**
+- 액션 아이템 텍스트 클릭 → 내용 수정 → 저장
+
+**THEN**
+- `PATCH /api/sessions/[id]/action-items/[itemId]`가 호출된다
+- 수정된 텍스트가 `session_action_items.body`에 저장된다
+- 저장 후 인라인 편집 모드가 종료되고 수정 내용이 표시된다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-15: 액션 아이템 완료 토글 (champion)
+
+**IF**
+- Champion이 본인 세션의 상세 페이지를 보고 있음
+- 완료되지 않은 액션 아이템이 존재
+
+**WHEN**
+- 액션 아이템 완료 체크박스 클릭
+
+**THEN**
+- `PATCH /api/sessions/[id]/action-items/[itemId]`가 `{ is_completed: true }` body로 호출된다
+- `session_action_items.is_completed = true`, `completed_at`이 현재 시각으로 저장된다
+- UI에서 해당 아이템이 완료 상태로 표시(취소선 등)된다
+- Champion은 body 텍스트 수정이 불가하다 (403 또는 UI 비노출)
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-16: 세션 댓글 작성 — admin/champion 성공 (500 회귀 방지)
+
+**IF**
+- 어드민 또는 챔피언이 세션 상세 페이지에서 댓글 입력란을 보고 있음
+
+**WHEN**
+- 댓글 내용 입력 후 [등록] 버튼 클릭
+
+**THEN**
+- `POST /api/sessions/[id]/comments`가 호출된다
+- `session_comments`에 `author_role = 'admin'` 또는 `'champion'`으로 저장된다
+- 댓글이 화면에 즉시 표시된다
+- admin이 댓글을 작성할 때 `public.users` 조인으로 인한 500 오류가 발생하지 않는다
+- 작성자가 표시될 때 author_role 기반 fallback("관리자"/"챔피언")이 적용된다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-17: Champion 세션 목록·상세 — 본인 세션만 조회 (RLS)
+
+**IF**
+- Champion A와 Champion B 각각의 세션이 존재
+
+**WHEN**
+- Champion A가 `GET /api/sessions` 또는 세션 목록 페이지(`/(champion)/my-project/sessions`) 접근
+
+**THEN**
+- Champion A 본인의 세션만 반환된다
+- Champion B의 세션이 목록에 노출되지 않는다
+- Champion A가 Champion B의 `session_id`로 `GET /api/sessions/[id]` 직접 호출 시 `403` 또는 `404`가 반환된다
+- RLS 정책에 의해 DB 수준에서 차단된다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-18: Admin 개별 계정 로그인·귀속
+
+**IF**
+- 개별 admin 계정(`admin_alex@`, `admin_claud@`, `admin_jennifer@dreamus.io`) 3개가 프로비저닝된 상태
+
+**WHEN**
+- 각 계정으로 로그인 후 세션 생성, 노트 수정, 댓글 작성 수행
+
+**THEN**
+- `check_up_sessions.admin_user_id`, 노트 수정 로그, `session_comments.author_id`에 각 계정의 개별 UUID가 저장된다
+- 동시에 두 어드민이 로그인하여 각자 작업해도 서로의 작업이 덮어쓰이지 않는다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-19: 기존 공유 admin 계정 비활성화 (로그인 차단)
+
+**IF**
+- 기존 공유 계정 `admin@dreamus.io`가 비활성화(ban + is_admin=false)된 상태
+
+**WHEN**
+- `admin@dreamus.io` 계정으로 로그인 시도
+
+**THEN**
+- 로그인이 차단된다 (Supabase ban 적용)
+- 어드민 UI에 접근할 수 없다
+- 계정이 DB에서 삭제되지 않아 기존 FK(세션·댓글 등)는 유지된다
+
+**우선순위**: P0
+
+---
+
+### TC-SESS-20: UI — 과제정의서 기본 탭·컴팩트 헤더·마일스톤 tooltip
+
+**IF**
+- 어드민이 챔피언 상세 페이지(`/admin/champions/[userId]`)에 처음 진입
+
+**WHEN**
+- 페이지 초기 로딩 및 스크롤 다운
+
+**THEN**
+- 기본 선택 탭이 [과제정의서]로 표시된다
+- 스크롤 다운 시 챔피언 이름·팀·프로젝트 3줄 헤더가 [챔피언 | 프로젝트] 컴팩트 고정 바로 전환된다
+- 컴팩트 바는 스크롤 위치와 무관하게 화면 상단에 고정된다
+- 마일스톤 이름이 긴 경우 hover 시 tooltip으로 전체 이름이 표시된다
+
+**우선순위**: P2
+
+---
+
+### TC-SESS-21: 저장된 세션 — 녹음/업로드 패널 비노출
+
+**IF**
+- 세션에 `audio_file_path`가 설정된 상태 (이미 녹음·업로드 완료)
+
+**WHEN**
+- 어드민이 해당 세션 상세 페이지에 진입
+
+**THEN**
+- 녹음 시작(마이크) 버튼, 파일 올리기 버튼, 녹음 관련 UI가 표시되지 않는다
+- 다운로드 영역(녹음 파일·전사·AI 요약)이 대신 표시된다
+- 신규 세션(`audio_file_path = null`)은 기존 녹음/업로드 패널이 정상 표시된다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-22: 오디오 파일 다운로드
+
+**IF**
+- 세션에 `audio_file_path`가 설정된 상태
+- 어드민이 세션 상세 페이지의 다운로드 영역을 보고 있음
+
+**WHEN**
+- "녹음 파일" 다운로드 버튼 클릭
+
+**THEN**
+- `GET /api/sessions/[sessionId]/audio-url`가 호출된다
+- 서버가 Supabase Storage 서명 URL을 반환한다
+- 브라우저에서 오디오 파일이 다운로드된다
+- champion 또는 미인증 사용자가 호출 시 `403`을 반환한다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-23: 전사(transcript) 다운로드 — raw_transcript 존재 시
+
+**IF**
+- 세션의 `raw_transcript`가 존재하는 상태 (STT 처리 완료)
+
+**WHEN**
+- 어드민이 "전사" 다운로드 버튼 클릭
+
+**THEN**
+- `raw_transcript` 텍스트를 클라이언트에서 `.txt` Blob으로 생성한다
+- 브라우저에서 `.txt` 파일이 다운로드된다
+- 파일 내용이 Whisper 전사 원문과 일치한다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-24: 전사(transcript) 다운로드 — raw_transcript 없을 때 안내
+
+**IF**
+- 세션의 `raw_transcript`가 null 또는 빈 문자열인 상태
+
+**WHEN**
+- 어드민이 전사 다운로드 영역 확인
+
+**THEN**
+- 전사 다운로드 버튼이 표시되지 않거나 비활성화된다
+- "전사 결과 없음" 또는 동등한 안내 문구가 표시된다
+- 다운로드를 시도할 수 없다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-25: AI 요약 다운로드 (.md)
+
+**IF**
+- 세션의 `notes`(markdown)가 존재하는 상태
+
+**WHEN**
+- 어드민이 "AI 요약" 다운로드 버튼 클릭
+
+**THEN**
+- `notes` 값을 클라이언트에서 `.md` Blob으로 생성한다
+- 브라우저에서 `.md` 파일이 다운로드된다
+- 파일 내용이 DB의 `notes` 컬럼과 동일하다
+
+**우선순위**: P2
+
+---
+
+### TC-SESS-26: 세션 제목 인라인 수정 — 성공
+
+**IF**
+- 어드민이 세션 상세 페이지를 보고 있음
+
+**WHEN**
+- 제목 옆 연필(✏️) 버튼 클릭 → 새 제목 입력 → 저장
+
+**THEN**
+- `PATCH /api/sessions/[sessionId]`가 `{ title, expectedUpdatedAt }` body로 호출된다
+- `check_up_sessions.title`이 새 제목으로 저장된다
+- 인라인 편집 모드가 종료되고 변경된 제목이 즉시 표시된다
+- 세션 목록 화면에서도 수정된 제목이 반영된다
+
+**우선순위**: P1
+
+---
+
+### TC-SESS-27: 세션 제목 인라인 수정 — 동시 수정 409
+
+**IF**
+- 어드민 A가 세션 제목을 편집 중인 상태
+- 그 사이 어드민 B가 동일 세션을 먼저 수정하여 `updated_at`이 변경됨
+
+**WHEN**
+- 어드민 A가 저장 버튼 클릭 (stale `expectedUpdatedAt` 전송)
+
+**THEN**
+- `PATCH /api/sessions/[sessionId]`가 `409 Conflict`를 반환한다
+- "다른 관리자가 먼저 수정했습니다" 또는 동등한 안내 메시지가 표시된다
+- 어드민 A의 제목 변경이 강제 적용되지 않는다
+
+**우선순위**: P1
+
+---
+
 ## TC 커버리지 요약
 
 | 영역 | TC 수 | P0 | P1 | P2 |
@@ -1465,4 +1947,5 @@
 | HOT 핫라인 | 4 | 0 | 3 | 1 |
 | SEC 보안·API | 5 | 5 | 0 | 0 |
 | MOB 모바일 UX | 5 | 0 | 0 | 5 |
-| **합계** | **82** | **15** | **47** | **20** |
+| SESS 1-on-1 세션 | 27 | 7 | 15 | 5 |
+| **합계** | **109** | **22** | **62** | **25** |
