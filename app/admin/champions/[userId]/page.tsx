@@ -880,22 +880,12 @@ export default function AdminChampionPage() {
 
       {activeMainTab === 'sessions' && (
         <section className="mb-8">
-          {data.charters[0]?.id && (
-            <div className="flex justify-end mb-3">
-              <button
-                onClick={() => window.open(`/charter-popup/${data.charters[0].id}`, 'charter-popup', 'width=900,height=700,scrollbars=yes')}
-                className="text-xs font-semibold"
-                style={{ background: 'transparent', border: '1px solid var(--blue-600)', color: 'var(--blue-600)', cursor: 'pointer', padding: '4px 12px', borderRadius: 6, fontWeight: 600 }}
-              >
-                과제정의서 보기
-              </button>
-            </div>
-          )}
           {sessionTab === 'list' ? (
             <AdminSessionList
               championUserId={userId}
               sessions={sessions}
               milestones={data?.milestones ?? []}
+              charterId={data.charters[0]?.id ?? null}
               onSelect={(s) => { setSelectedSessionId(s.id); setSessionTab('detail') }}
               onRefresh={() => {
                 apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
