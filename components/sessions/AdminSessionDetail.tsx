@@ -131,11 +131,13 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   }
 
   async function saveItemBody(itemId: string) {
-    const updated = await apiFetch<SessionActionItem>(`/api/sessions/${sessionId}/action-items/${itemId}`, {
-      method: 'PATCH', body: JSON.stringify({ body: editingItemBody.trim() }),
-    })
-    setActionItems(v => v.map(i => i.id === itemId ? updated : i))
-    setEditingItemId(null)
+    try {
+      const updated = await apiFetch<SessionActionItem>(`/api/sessions/${sessionId}/action-items/${itemId}`, {
+        method: 'PATCH', body: JSON.stringify({ body: editingItemBody.trim() }),
+      })
+      setActionItems(v => v.map(i => i.id === itemId ? updated : i))
+      setEditingItemId(null)
+    } catch { toast.error('수정 실패') }
   }
 
   async function postComment() {
