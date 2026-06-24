@@ -13,7 +13,7 @@ const NAV = [
   { icon: FileText,   label: '내 과제정의서',   href: '/my-project/charter',    match: (p: string) => p.startsWith('/my-project/charter') },
   { icon: LayoutList, label: '내 업무 현황',    href: '/my-project/milestones', match: (p: string) => p.startsWith('/my-project/milestones') },
   { icon: Upload,     label: '최종 과제 제출',  href: '/my-project/submission', match: (p: string) => p.startsWith('/my-project/submission') },
-  { icon: Calendar,   label: '체크업 세션',     href: '/my-project/sessions',   match: (p: string) => p.startsWith('/my-project/sessions') },
+  { icon: Calendar,   label: '1-on-1 세션',     href: '/my-project/sessions',   match: (p: string) => p.startsWith('/my-project/sessions') },
   { icon: Video,      label: '1-on-1 신청하기', href: '/my-project/one-on-one', match: (p: string) => p.startsWith('/my-project/one-on-one') },
 ]
 

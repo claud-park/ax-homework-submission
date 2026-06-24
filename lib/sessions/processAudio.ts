@@ -82,7 +82,7 @@ export async function processSessionAudio(
     .eq('id', sessionId)
 
   const prompt = `당신은 1:1 미팅 노트 작성 전문가입니다.
-아래는 Admin과 Champion 간의 체크업 세션 전사 내용입니다.
+아래는 Admin과 Champion 간의 1-on-1 세션 전사 내용입니다.
 
 다음 두 가지를 JSON으로 반환하세요:
 1. "notes": 미팅 주요 내용 요약 (plain text, 한국어, 3~5문단)
