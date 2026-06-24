@@ -366,7 +366,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
             style={{ background: 'var(--error)', color: '#fff', border: 'none', cursor: 'pointer' }}
           >
             <Square className="h-4 w-4" />
-            녹음 종료 & 처리
+            녹음 종료 & AI 요약
           </button>
         </div>
       )}
