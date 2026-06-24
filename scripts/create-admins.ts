@@ -25,10 +25,11 @@ async function main() {
   for (const acc of accounts) {
     const existing = await findUserByEmail(acc.email)
     if (existing) {
-      await supabase.auth.admin.updateUserById(existing.id, {
+      const { error } = await supabase.auth.admin.updateUserById(existing.id, {
         password: acc.password,
         user_metadata: { ...existing.user_metadata, is_admin: true, name: acc.name },
       })
+      if (error) { console.error(`update 실패 ${acc.email}: ${error.message}`); continue }
       console.log(`updated: ${acc.email} (${acc.name})`)
     } else {
       const { error } = await supabase.auth.admin.createUser({
@@ -45,11 +46,12 @@ async function main() {
   if (oldAdminEmail) {
     const old = await findUserByEmail(oldAdminEmail)
     if (old) {
-      await supabase.auth.admin.updateUserById(old.id, {
+      const { error } = await supabase.auth.admin.updateUserById(old.id, {
         ban_duration: '876000h',
         user_metadata: { ...old.user_metadata, is_admin: false },
       })
-      console.log(`deactivated(old shared): ${oldAdminEmail}`)
+      if (error) { console.error(`비활성화 실패 ${oldAdminEmail}: ${error.message}`) } else {
+      console.log(`deactivated(old shared): ${oldAdminEmail}`) }
     } else {
       console.warn(`OLD_ADMIN_EMAIL 계정을 찾지 못함: ${oldAdminEmail}`)
     }
