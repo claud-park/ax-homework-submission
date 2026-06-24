@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Plus, ChevronRight } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { CheckUpSession, Milestone } from '@/lib/types'
@@ -14,36 +14,42 @@ const STATUS_LABEL: Record<string, string> = {
   done: '완료',
   error: '오류',
 }
-const STATUS_COLOR: Record<string, string> = {
-  idle: 'var(--text-disabled)',
-  uploading: 'var(--blue-600)',
-  transcribing: 'var(--blue-600)',
-  summarizing: 'var(--blue-600)',
-  done: 'var(--success)',
-  error: 'var(--error)',
+
+function MicIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.45 }}>
+      <rect x="5.5" y="1" width="5" height="8" rx="2.5" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3 7.5a5 5 0 0 0 10 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M8 12.5V15M6 15h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 interface Props {
   championUserId: string
   sessions: CheckUpSession[]
   milestones: Milestone[]
+  charterId?: string | null
   onSelect: (session: CheckUpSession) => void
   onRefresh: () => void
 }
 
-export function AdminSessionList({ championUserId, sessions, milestones, onSelect, onRefresh }: Props) {
+export function AdminSessionList({ championUserId, sessions, milestones, charterId, onSelect, onRefresh }: Props) {
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [hovered, setHovered] = useState<string | null>(null)
+
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 
   async function createSession() {
     if (!newTitle.trim()) return
     setCreating(true)
     try {
       // 날짜·시각은 [생성] 클릭 시점(관리자 로컬 타임존) 기준으로 자동 기록
-      const now = new Date()
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const session_date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+      const session_date = today
       const session_time = `${pad(now.getHours())}:${pad(now.getMinutes())}`
       const session = await apiFetch<CheckUpSession>('/api/sessions', {
         method: 'POST',
@@ -68,17 +74,37 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
 
   return (
     <div>
+      {/* 헤더: 제목 + [과제정의서 보기] + [새 세션] */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>1-on-1 세션</h3>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-semibold"
-          style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
-        >
-          <Plus className="h-3 w-3" />
-          새 세션
-        </button>
+        <div className="flex items-center gap-2">
+          {charterId && (
+            <button
+              onClick={() => window.open(`/charter-popup/${charterId}`, 'charter-popup', 'width=900,height=700,scrollbars=yes')}
+              className="text-xs font-semibold"
+              style={{ background: 'transparent', border: '1px solid var(--blue-600)', color: 'var(--blue-600)', cursor: 'pointer', padding: '5px 12px', borderRadius: 6 }}
+            >
+              과제정의서 보기
+            </button>
+          )}
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-semibold"
+            style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+          >
+            <Plus className="h-3 w-3" />
+            새 세션
+          </button>
+        </div>
       </div>
+
+      {/* 마일스톤 현황 (현재) — 목록 상단 1개 */}
+      {milestones.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>마일스톤 현황</p>
+          <SessionMiniGantt milestones={milestones} sessionDate={today} />
+        </div>
+      )}
 
       {showForm && (
         <div
@@ -116,33 +142,31 @@ export function AdminSessionList({ championUserId, sessions, milestones, onSelec
         </div>
       )}
 
+      {/* 세션 목록 — champion 뷰와 동일한 컴팩트 행(per-item Gantt 없음) */}
       {sessions.length === 0 ? (
         <p className="text-xs text-center py-8" style={{ color: 'var(--text-disabled)' }}>아직 세션이 없습니다.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col">
           {sessions.map(s => (
             <div
               key={s.id}
               onClick={() => onSelect(s)}
-              className="rounded-xl border p-3"
-              style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', cursor: 'pointer' }}
+              onMouseEnter={() => setHovered(s.id)}
+              onMouseLeave={() => setHovered(null)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
+                background: hovered === s.id ? 'var(--surface-hover, rgba(0,0,0,0.04))' : 'transparent',
+                transition: 'background 0.1s',
+              }}
             >
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{s.title}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{s.session_date}{s.session_time ? ` ${s.session_time.slice(0, 5)}` : ''}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ color: STATUS_COLOR[s.processing_status], background: `${STATUS_COLOR[s.processing_status]}18`, fontWeight: 600 }}
-                  >
-                    {STATUS_LABEL[s.processing_status]}
-                  </span>
-                  <ChevronRight className="h-4 w-4" style={{ color: 'var(--text-disabled)' }} />
-                </div>
-              </div>
-              <SessionMiniGantt milestones={milestones} sessionDate={s.session_date} />
+              <MicIcon />
+              <span style={{ fontSize: 14, color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.title || '제목없음'}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                {s.session_date}{s.session_time ? ` ${s.session_time.slice(0, 5)}` : ''} · {STATUS_LABEL[s.processing_status] ?? s.processing_status}
+              </span>
             </div>
           ))}
         </div>
