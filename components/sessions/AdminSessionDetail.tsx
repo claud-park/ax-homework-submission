@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Trash2, Send, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Trash2, Send, RefreshCw, Download, Pencil } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
@@ -42,6 +42,11 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   const [postingComment, setPostingComment] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editingBody, setEditingBody] = useState('')
+
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [savingTitle, setSavingTitle] = useState(false)
+  const [downloadingAudio, setDownloadingAudio] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -230,6 +235,50 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
     return `${Math.floor(h / 24)}일 전`
   }
 
+  async function saveTitle() {
+    if (!titleDraft.trim()) return
+    setSavingTitle(true)
+    try {
+      const updated = await apiFetch<CheckUpSession>(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: titleDraft.trim(), expectedUpdatedAt: session?.updated_at }),
+      })
+      setSession(updated)
+      setEditingTitle(false)
+      toast.success('제목이 수정되었습니다.')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '제목 수정 실패')
+    } finally {
+      setSavingTitle(false)
+    }
+  }
+
+  function downloadText(filename: string, text: string) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function downloadAudio() {
+    setDownloadingAudio(true)
+    try {
+      const { url } = await apiFetch<{ url: string }>(`/api/sessions/${sessionId}/audio-url`)
+      const a = document.createElement('a')
+      a.href = url
+      a.click()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '오디오 다운로드 실패')
+    } finally {
+      setDownloadingAudio(false)
+    }
+  }
+
+  const safeTitle = (session?.title || 'session').replace(/[^\w가-힣.-]+/g, '_')
+
   return (
     <div>
       {/* Header */}
@@ -252,7 +301,27 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         </button>
       </div>
 
-      <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{session.title}</h3>
+      {editingTitle ? (
+        <div className="flex items-center gap-2 mb-1">
+          <input
+            autoFocus
+            value={titleDraft}
+            onChange={e => setTitleDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setEditingTitle(false) }}
+            className="flex-1 rounded-lg border px-2 py-1 text-base font-bold"
+            style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+          />
+          <button onClick={saveTitle} disabled={savingTitle || !titleDraft.trim()} className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-40" style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}>{savingTitle ? '저장 중...' : '저장'}</button>
+          <button onClick={() => setEditingTitle(false)} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}>취소</button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 mb-1">
+          <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{session.title}</h3>
+          <button onClick={() => { setTitleDraft(session.title); setEditingTitle(true) }} title="제목 수정" className="p-1 rounded-md" style={{ background: 'transparent', border: 'none', color: 'var(--text-disabled)', cursor: 'pointer' }}>
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>{session.session_date}{session.session_time ? ` ${session.session_time.slice(0, 5)}` : ''}</p>
 
       {/* Mini Gantt */}
@@ -280,8 +349,48 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         </div>
       )}
 
-      {/* Recording Panel */}
-      <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} />
+      {/* Recording panel (new session) OR downloads (already-recorded session) */}
+      {!session.audio_file_path ? (
+        <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} />
+      ) : (
+        <div
+          className="rounded-xl border p-3 mb-4"
+          style={{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)' }}
+        >
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>다운로드</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={downloadAudio}
+              disabled={downloadingAudio}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium disabled:opacity-40"
+              style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', cursor: 'pointer' }}
+            >
+              <Download className="h-3.5 w-3.5" /> {downloadingAudio ? '준비 중...' : '녹음 파일'}
+            </button>
+            {session.raw_transcript?.trim() && (
+              <button
+                onClick={() => downloadText(`${safeTitle}-transcript.txt`, session.raw_transcript ?? '')}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
+                style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', cursor: 'pointer' }}
+              >
+                <Download className="h-3.5 w-3.5" /> 전사 (txt)
+              </button>
+            )}
+            {notes.trim() && (
+              <button
+                onClick={() => downloadText(`${safeTitle}-summary.md`, notes)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
+                style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', cursor: 'pointer' }}
+              >
+                <Download className="h-3.5 w-3.5" /> AI 요약 (md)
+              </button>
+            )}
+          </div>
+          {!session.raw_transcript?.trim() && (
+            <p className="text-xs mt-2" style={{ color: 'var(--text-disabled)' }}>전사 텍스트가 아직 없습니다.</p>
+          )}
+        </div>
+      )}
 
       {/* Notes */}
       <div className="mb-4">
