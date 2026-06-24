@@ -51,6 +51,9 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       )
       setSession(data)
       setNotes(data.notes ?? '')
+      // 첫 세션(노트 미저장)은 편집 뷰를 기본 열림 — 녹음 중 바로 작성 가능.
+      // 한 번이라도 저장돼 노트가 있으면 read-only(+[수정])로 진입.
+      setIsEditingNotes(!(data.notes ?? '').trim())
       setActionItems(data.action_items ?? [])
       setComments(data.comments ?? [])
       setMilestones(data.milestones ?? [])
