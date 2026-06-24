@@ -200,7 +200,7 @@ export default function AdminChampionPage() {
   const [sessionTab, setSessionTab] = useState<'list' | 'detail'>('list')
   const [sessions, setSessions] = useState<import('@/lib/types').CheckUpSession[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('submissions')
+  const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('charter')
 
   function loadSubs() {
     return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)

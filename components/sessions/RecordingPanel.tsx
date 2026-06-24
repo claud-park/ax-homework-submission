@@ -1,9 +1,12 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { Mic, Square, RefreshCw } from 'lucide-react'
+import { Mic, Square, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { SessionActionItem } from '@/lib/types'
+import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, MAX_AUDIO_MB, isAcceptedAudio, resolveAudioType } from '@/lib/audio'
+
+const BUCKET = 'check-up-sessions'
 
 interface UsageSummary {
   stt: { durationSec: number; cost: number }
@@ -43,7 +46,9 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   const [remainingSec, setRemainingSec] = useState<number | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [usage, setUsage] = useState<UsageSummary | null>(null)
+  const [mode, setMode] = useState<'record' | 'upload'>('record')
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -74,8 +79,15 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
 
   async function startRecording() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      })
+      // 32kbps mono Opus keeps long recordings small: ~30min ≈ 7MB, ~60min ≈ 14MB,
+      // well under Whisper's 25MB cap. Speech transcription quality is unaffected.
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 32000,
+      })
       chunksRef.current = []
       recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.start(1000)
@@ -108,10 +120,15 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
 
     const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' })
 
-    // Estimate total processing time
-    // Upload: 30s estimate | STT: durationSec * 0.08 | Summarize: 15s
-    const uploadEstimate = 30
-    const sttEstimate = Math.round(durationSec * 0.08)
+    if (audioBlob.size > MAX_AUDIO_BYTES) {
+      setPhase('error')
+      setErrorMsg(`녹음이 너무 깁니다 (${(audioBlob.size / (1024 * 1024)).toFixed(1)}MB). Whisper 한도는 ${MAX_AUDIO_MB}MB입니다. 나눠서 녹음해 주세요.`)
+      return
+    }
+
+    // Estimate processing time | Upload: by size | STT: durationSec * 0.15 | Summarize: 15s
+    const uploadEstimate = Math.max(5, Math.round((audioBlob.size / (1024 * 1024)) * 3))
+    const sttEstimate = Math.max(10, Math.round(durationSec * 0.15))
     const summarizeEstimate = 15
     estimatedTotalRef.current = uploadEstimate + sttEstimate + summarizeEstimate
 
@@ -119,8 +136,36 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     setProgress(0)
     progressStartRef.current = Date.now()
 
-    // Start progress simulation via XHR
-    await processWithXHR(audioBlob, durationSec, uploadEstimate, sttEstimate, summarizeEstimate)
+    await uploadAndProcess(audioBlob, 'audio.webm', durationSec, uploadEstimate, sttEstimate, summarizeEstimate)
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+
+    if (!isAcceptedAudio(file.name)) {
+      toast.error('지원하지 않는 형식입니다. wav, mp3, m4a, webm 파일을 올려주세요.')
+      return
+    }
+    if (file.size > MAX_AUDIO_BYTES) {
+      toast.error(`파일이 너무 큽니다. 최대 ${MAX_AUDIO_MB}MB까지 업로드할 수 있습니다.`)
+      return
+    }
+
+    // Upload duration is unknown; use file size for a rough progress estimate.
+    const fileSizeMB = file.size / (1024 * 1024)
+    const uploadEstimate = Math.max(10, Math.round(fileSizeMB * 3))
+    const sttEstimate = Math.max(15, Math.round(fileSizeMB * 8))
+    const summarizeEstimate = 15
+    estimatedTotalRef.current = uploadEstimate + sttEstimate + summarizeEstimate
+
+    setPhase('uploading')
+    setProgress(0)
+    progressStartRef.current = Date.now()
+
+    // duration unknown for uploads → 0 (Whisper cost shown as estimate)
+    await uploadAndProcess(file, file.name, 0, uploadEstimate, sttEstimate, summarizeEstimate)
   }
 
   function startProgressTimer(fromPct: number, toPct: number, durationMs: number, onDone?: () => void) {
@@ -149,10 +194,16 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     }, 200)
   }
 
-  async function processWithXHR(
+  /**
+   * Upload audio directly to Supabase Storage via a server-issued signed URL
+   * (bypasses Vercel's 4.5MB function body limit), then ask the process route
+   * to transcribe + summarize from the stored path.
+   */
+  async function uploadAndProcess(
     blob: Blob,
+    filename: string,
     durationSec: number,
-    _uploadEstimate: number,
+    uploadEstimate: number,
     sttEstimate: number,
     summarizeEstimate: number
   ) {
@@ -165,67 +216,60 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     }
     if (!session) { setPhase('error'); setErrorMsg('인증 오류'); return }
 
-    const formData = new FormData()
-    formData.append('audio', blob, 'audio.webm')
-    formData.append('recordingDurationSec', String(durationSec))
+    const { ext, contentType } = resolveAudioType(filename, blob.type)
 
-    return new Promise<void>(resolve => {
-      const xhr = new XMLHttpRequest()
+    try {
+      // 1. Get a signed upload URL from the server (tiny request)
+      const urlRes = await fetch(`/api/sessions/${sessionId}/upload-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ ext }),
+      })
+      if (!urlRes.ok) {
+        const err = await urlRes.json().catch(() => ({}))
+        throw new Error(err.error ?? '업로드 URL을 가져오지 못했습니다.')
+      }
+      const { path, token } = await urlRes.json()
 
-      // Upload progress (0 → 20%)
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const uploadPct = (e.loaded / e.total) * 20
-          setProgress(Math.round(uploadPct))
-        }
+      // 2. Upload directly to Storage (progress simulated 0 → 20%)
+      startProgressTimer(0, 20, uploadEstimate * 1000)
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .uploadToSignedUrl(path, token, blob, { contentType, upsert: true })
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
+      if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
+      setProgress(20)
+
+      // 3. Trigger server-side STT + summary (simulate 20 → 95% while it runs)
+      setPhase('transcribing')
+      startProgressTimer(20, 80, sttEstimate * 1000, () => {
+        setPhase('summarizing')
+        startProgressTimer(80, 95, summarizeEstimate * 1000)
+      })
+
+      const procRes = await fetch(`/api/sessions/${sessionId}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ audioPath: path, recordingDurationSec: durationSec }),
+      })
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
+
+      if (!procRes.ok) {
+        const err = await procRes.json().catch(() => ({}))
+        throw new Error(err.error ?? '처리 실패')
       }
 
-      // Upload complete → start STT simulation (20 → 80%)
-      xhr.upload.onload = () => {
-        setPhase('transcribing')
-        startProgressTimer(20, 80, sttEstimate * 1000, () => {
-          // STT done → start summarize simulation (80 → 95%)
-          setPhase('summarizing')
-          startProgressTimer(80, 95, summarizeEstimate * 1000)
-        })
-      }
-
-      xhr.onload = () => {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setProgress(100)
-          setRemainingSec(null)
-          setPhase('done')
-          try {
-            const result = JSON.parse(xhr.responseText)
-            onProcessed(result.notes ?? '', result.actionItems ?? [])
-            if (result.usage) setUsage(result.usage)
-          } catch {
-            onProcessed('', [])
-          }
-        } else {
-          setPhase('error')
-          try {
-            const err = JSON.parse(xhr.responseText)
-            setErrorMsg(err.error ?? '처리 실패')
-          } catch {
-            setErrorMsg('처리 실패')
-          }
-        }
-        resolve()
-      }
-
-      xhr.onerror = () => {
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
-        setPhase('error')
-        setErrorMsg('네트워크 오류')
-        resolve()
-      }
-
-      xhr.open('POST', `/api/sessions/${sessionId}/process`)
-      xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`)
-      xhr.send(formData)
-    })
+      const result = await procRes.json()
+      setProgress(100)
+      setRemainingSec(null)
+      setPhase('done')
+      onProcessed(result.notes ?? '', result.actionItems ?? [])
+      if (result.usage) setUsage(result.usage)
+    } catch (err) {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
+      setPhase('error')
+      setErrorMsg(err instanceof Error ? err.message : '처리 중 오류가 발생했습니다.')
+    }
   }
 
   function reset() {
@@ -246,14 +290,58 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
       <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>녹음</p>
 
       {phase === 'idle' && (
-        <button
-          onClick={startRecording}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-          style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
-        >
-          <Mic className="h-4 w-4" />
-          녹음 시작
-        </button>
+        <div>
+          {/* Mode toggle: record vs upload */}
+          <div className="flex gap-1 mb-3 p-1 rounded-lg w-fit" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)' }}>
+            {([['record', '녹음하기'], ['upload', '파일 올리기']] as const).map(([m, label]) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className="px-3 py-1.5 rounded-md text-xs font-semibold"
+                style={{
+                  background: mode === m ? 'var(--blue-600)' : 'transparent',
+                  color: mode === m ? '#fff' : 'var(--text-secondary)',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'record' ? (
+            <button
+              onClick={startRecording}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+              style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              <Mic className="h-4 w-4" />
+              녹음 시작
+            </button>
+          ) : (
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={AUDIO_ACCEPT}
+                onChange={handleFileSelected}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+              >
+                <Upload className="h-4 w-4" />
+                파일 선택
+              </button>
+              <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+                wav, mp3, m4a, webm · 최대 {MAX_AUDIO_MB}MB
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {phase === 'recording' && (
