@@ -10,6 +10,8 @@ const MODEL = 'claude-sonnet-4-6'
 const BUCKET = 'check-up-sessions'
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+export const AI_DIVIDER = '\n\n---\n\n_🤖 AI 요약_\n\n'
+
 export interface ProcessUsage {
   stt: { durationSec: number; cost: number }
   claude: { inputTokens: number; outputTokens: number; cost: number }
@@ -115,10 +117,19 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
   }
 
   // 4. Persist: replace action items, mark done
+  // 기존 사용자 수기 노트 보존: 이전 AI 구분선 앞부분만 유지(재처리 시 중첩 방지)
+  const { data: prev } = await supabase
+    .from('check_up_sessions')
+    .select('notes')
+    .eq('id', sessionId)
+    .single()
+  const userPart = (prev?.notes ?? '').split(AI_DIVIDER)[0].trimEnd()
+  const combinedNotes = userPart ? `${userPart}${AI_DIVIDER}${notes}` : notes
+
   await supabase.from('session_action_items').delete().eq('session_id', sessionId)
   await supabase
     .from('check_up_sessions')
-    .update({ processing_status: 'done', notes, updated_at: new Date().toISOString() })
+    .update({ processing_status: 'done', notes: combinedNotes, updated_at: new Date().toISOString() })
     .eq('id', sessionId)
 
   let insertedActionItems: SessionActionItem[] = []
@@ -143,7 +154,7 @@ JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요
   const claudeCost = claudeInputCost + claudeOutputCost
 
   return {
-    notes,
+    notes: combinedNotes,
     actionItems: insertedActionItems,
     usage: {
       stt: { durationSec, cost: whisperCost },
