@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { verifyUser } from '@/lib/auth'
+import { createUserServerClient } from '@/lib/supabase/server'
 import { getChampionAuthUrl } from '@/lib/one-on-one/champion-google'
 
 export async function GET(req: NextRequest) {
-  const user = await verifyUser(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const supabase = createUserServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.redirect(new URL('/login', req.url))
 
   const nonce = randomUUID()
   const authUrl = getChampionAuthUrl(user.id, nonce)
