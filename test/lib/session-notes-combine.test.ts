@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { combineSessionNotes, AI_DIVIDER } from '@/lib/sessions/processAudio'
+import { combineSessionNotes, AI_DIVIDER } from '@/lib/audio-pipeline/notes'
 
 describe('combineSessionNotes', () => {
   it('사용자 노트 없으면 요약만', () => {
