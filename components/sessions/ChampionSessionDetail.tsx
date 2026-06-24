@@ -5,6 +5,7 @@ import { ArrowLeft, Send } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
+import { MarkdownView } from '@/components/MarkdownView'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 
@@ -92,81 +93,87 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-2">
-        {[1,2,3].map(i => (
-          <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: 'var(--surface-secondary)' }} />
+      <div className="flex flex-col gap-3 max-w-3xl">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-5 rounded animate-pulse" style={{ background: 'var(--surface-secondary)', width: i === 1 ? '40%' : '100%' }} />
         ))}
       </div>
     )
   }
   if (!session) return null
 
+  // Notion 스타일 섹션: 배경 없이 상단 구분선 + 여백 + 작은 라벨로 그룹 구분
+  const sectionClass = 'mt-10 pt-6 border-t'
+  const sectionBorder = { borderColor: 'var(--border-subtle)' }
+  const labelClass = 'text-xs font-semibold mb-3'
+  const labelStyle = { color: 'var(--text-tertiary)', letterSpacing: '0.02em' }
+
   return (
-    <div>
+    <div className="max-w-3xl">
       <button
         onClick={() => router.push('/my-project/sessions')}
-        className="flex items-center gap-1 text-xs mb-4"
-        style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        className="flex items-center gap-1 text-xs mb-8"
+        style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
-        <ArrowLeft className="h-3 w-3" /> 목록으로
+        <ArrowLeft className="h-3.5 w-3.5" /> 목록으로
       </button>
 
-      <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{session.title}</h3>
-      <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>{session.session_date}</p>
+      {/* Title */}
+      <h1 className="text-2xl font-bold mb-1.5" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{session.title}</h1>
+      <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+        {session.session_date}{session.session_time ? ` · ${session.session_time.slice(0, 5)}` : ''}
+      </p>
 
-      {/* Mini Gantt */}
-      <SessionMiniGantt milestones={milestones} sessionDate={session.session_date} />
-
-      {/* Notes — read only */}
-      {session.notes && (
-        <div
-          className="rounded-xl border p-4 mb-4"
-          style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
-        >
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>📝 미팅 노트</p>
-          <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{session.notes}</p>
-        </div>
+      {/* Milestone status */}
+      {milestones.length > 0 && (
+        <section className={sectionClass} style={sectionBorder}>
+          <SessionMiniGantt milestones={milestones} sessionDate={session.session_date} bare />
+        </section>
       )}
 
-      {/* Action Items — toggle only */}
+      {/* Meeting notes */}
+      {session.notes?.trim() && (
+        <section className={sectionClass} style={sectionBorder}>
+          <h2 className={labelClass} style={labelStyle}>미팅 노트</h2>
+          <MarkdownView markdown={session.notes} />
+        </section>
+      )}
+
+      {/* Action items */}
       {actionItems.length > 0 && (
-        <div className="mb-4">
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>✅ 내 액션 아이템</p>
-          <div className="flex flex-col gap-1.5">
+        <section className={sectionClass} style={sectionBorder}>
+          <h2 className={labelClass} style={labelStyle}>내 액션 아이템</h2>
+          <div className="flex flex-col">
             {actionItems.map(item => (
-              <div
-                key={item.id}
-                className="flex items-center gap-2 p-2 rounded-lg border"
-                style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
-              >
+              <label key={item.id} className="flex items-start gap-2.5 py-1.5 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={item.is_completed}
                   onChange={() => toggleItem(item)}
-                  className="h-4 w-4 cursor-pointer"
+                  className="mt-0.5 h-4 w-4 cursor-pointer flex-shrink-0"
                   style={{ accentColor: 'var(--blue-600)' }}
                 />
                 <span
-                  className="flex-1 text-sm"
+                  className="text-sm leading-relaxed"
                   style={{
-                    color: 'var(--text-primary)',
+                    color: item.is_completed ? 'var(--text-disabled)' : 'var(--text-primary)',
                     textDecoration: item.is_completed ? 'line-through' : 'none',
-                    opacity: item.is_completed ? 0.5 : 1,
                   }}
                 >
                   {item.body}
                 </span>
-              </div>
+              </label>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Comments */}
-      <div>
-        <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>💬 댓글 ({comments.length})</p>
-        <div className="flex flex-col gap-2 mb-2">
-          {comments.map(c => {
+      <section className={sectionClass} style={sectionBorder}>
+        <h2 className={labelClass} style={labelStyle}>댓글{comments.length > 0 ? ` ${comments.length}` : ''}</h2>
+
+        <div className="flex flex-col">
+          {comments.map((c, idx) => {
             const authorName = c.author?.name
               ? parseName(c.author.name).displayName
               : c.author_role === 'admin' ? '관리자' : '챔피언'
@@ -174,31 +181,29 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
             return (
               <div
                 key={c.id}
-                className="rounded-lg border p-2 text-xs"
-                style={{
-                  background: c.author_role === 'admin' ? 'rgba(37,99,235,0.04)' : 'var(--surface-secondary)',
-                  borderColor: 'var(--border-subtle)',
-                }}
+                className="py-3"
+                style={idx > 0 ? { borderTop: '1px solid var(--border-faint, var(--border-subtle))' } : undefined}
               >
-                <div className="flex justify-between mb-0.5">
-                  <span className="font-semibold" style={{ color: c.author_role === 'admin' ? 'var(--blue-600)' : 'var(--text-primary)' }}>
-                    {authorName}
-                  </span>
+                <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span style={{ color: 'var(--text-disabled)' }}>{relativeTime(c.created_at)}</span>
-                    {isOwn && (
-                      <>
-                        <button
-                          onClick={() => { setEditingCommentId(c.id); setEditingBody(c.body) }}
-                          style={{ color: 'var(--text-disabled)', fontSize: '10px', background: 'none', border: 'none', cursor: 'pointer' }}
-                        >편집</button>
-                        <button
-                          onClick={() => deleteComment(c.id)}
-                          style={{ color: 'var(--error)', fontSize: '10px', background: 'none', border: 'none', cursor: 'pointer' }}
-                        >삭제</button>
-                      </>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{authorName}</span>
+                    {c.author_role === 'admin' && (
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>관리자</span>
                     )}
+                    <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>{relativeTime(c.created_at)}</span>
                   </div>
+                  {isOwn && editingCommentId !== c.id && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setEditingCommentId(c.id); setEditingBody(c.body) }}
+                        style={{ color: 'var(--text-disabled)', fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >편집</button>
+                      <button
+                        onClick={() => deleteComment(c.id)}
+                        style={{ color: 'var(--error)', fontSize: '11px', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >삭제</button>
+                    </div>
+                  )}
                 </div>
                 {editingCommentId === c.id ? (
                   <div>
@@ -206,45 +211,51 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
                       value={editingBody}
                       onChange={e => setEditingBody(e.target.value)}
                       rows={2}
-                      className="w-full rounded border p-1.5 resize-none mb-1 text-xs"
-                      style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                      className="w-full rounded-md border p-2 resize-none mb-1.5 text-sm"
+                      style={{ background: 'transparent', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
                     />
                     <div className="flex gap-1.5">
                       <button onClick={() => setEditingCommentId(null)}
-                        className="text-xs px-2 py-0.5 rounded"
-                        style={{ background: 'var(--surface-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer' }}>취소</button>
+                        className="text-xs px-2.5 py-1 rounded-md"
+                        style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer' }}>취소</button>
                       <button onClick={() => saveEditComment(c.id)}
-                        className="text-xs px-2 py-0.5 rounded font-semibold"
+                        className="text-xs px-2.5 py-1 rounded-md font-semibold"
                         style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}>저장</button>
                     </div>
                   </div>
                 ) : (
-                  <p className="whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{c.body}</p>
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-primary)' }}>{c.body}</p>
                 )}
               </div>
             )
           })}
         </div>
-        <div className="flex gap-2">
+
+        {/* Comment input — borderless, only a bottom line */}
+        <div
+          className="flex items-end gap-2 mt-3 pt-1"
+          style={{ borderTop: comments.length > 0 ? '1px solid var(--border-faint, var(--border-subtle))' : 'none' }}
+        >
           <input
             type="text"
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
             onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') postComment() }}
             placeholder="댓글 입력... (Cmd+Enter)"
-            className="flex-1 rounded-lg border px-3 py-2 text-xs"
-            style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)', outline: 'none' }}
+            className="flex-1 text-sm py-2"
+            style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-primary)', outline: 'none', borderRadius: 0 }}
           />
           <button
             onClick={postComment}
             disabled={postingComment || !newComment.trim()}
-            className="text-xs px-3 py-2 rounded-lg disabled:opacity-40"
-            style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+            aria-label="댓글 등록"
+            className="flex items-center justify-center text-xs rounded-md disabled:opacity-30"
+            style={{ width: 32, height: 32, background: 'transparent', color: 'var(--blue-600)', border: 'none', cursor: 'pointer', flexShrink: 0 }}
           >
-            <Send className="h-3 w-3" />
+            <Send className="h-4 w-4" />
           </button>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

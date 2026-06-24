@@ -38,9 +38,11 @@ function fmt(dateStr: string): string {
 interface Props {
   milestones: Milestone[]
   sessionDate: string
+  /** 배경/테두리 없이(투명) 렌더 — Notion 스타일 페이지용 */
+  bare?: boolean
 }
 
-export function SessionMiniGantt({ milestones, sessionDate }: Props) {
+export function SessionMiniGantt({ milestones, sessionDate, bare }: Props) {
   const windowStart = addDays(sessionDate, -3)
   const windowEnd = addDays(sessionDate, 3)
   const totalDays = 7
@@ -62,8 +64,8 @@ export function SessionMiniGantt({ milestones, sessionDate }: Props) {
 
   return (
     <div
-      className="mb-4 rounded-xl border p-3"
-      style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
+      className={bare ? '' : 'mb-4 rounded-xl border p-3'}
+      style={bare ? undefined : { background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
     >
       <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>
         마일스톤 현황 ({fmt(windowStart)} ~ {fmt(windowEnd)})
