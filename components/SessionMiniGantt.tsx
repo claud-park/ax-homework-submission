@@ -35,14 +35,21 @@ function fmt(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+/** sessionDate 기준 간트 표시 구간 라벨 ("M/D ~ M/D"). 외부 라벨에서 재사용. */
+export function ganttWindowLabel(sessionDate: string): string {
+  return `${fmt(addDays(sessionDate, -3))} ~ ${fmt(addDays(sessionDate, 3))}`
+}
+
 interface Props {
   milestones: Milestone[]
   sessionDate: string
   /** 배경/테두리 없이(투명) 렌더 — Notion 스타일 페이지용 */
   bare?: boolean
+  /** 내부 "마일스톤 현황 (범위)" 헤더 숨김 — 외부에 라벨이 따로 있을 때 */
+  hideHeader?: boolean
 }
 
-export function SessionMiniGantt({ milestones, sessionDate, bare }: Props) {
+export function SessionMiniGantt({ milestones, sessionDate, bare, hideHeader }: Props) {
   const windowStart = addDays(sessionDate, -3)
   const windowEnd = addDays(sessionDate, 3)
   const totalDays = 7
@@ -67,9 +74,11 @@ export function SessionMiniGantt({ milestones, sessionDate, bare }: Props) {
       className={bare ? '' : 'mb-4 rounded-xl border p-3'}
       style={bare ? undefined : { background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
     >
-      <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>
-        마일스톤 현황 ({fmt(windowStart)} ~ {fmt(windowEnd)})
-      </p>
+      {!hideHeader && (
+        <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>
+          마일스톤 현황 ({fmt(windowStart)} ~ {fmt(windowEnd)})
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: 8 }}>
         {/* Label column */}

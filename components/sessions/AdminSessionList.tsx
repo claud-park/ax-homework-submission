@@ -4,7 +4,7 @@ import { Plus, Calendar } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { CheckUpSession, Milestone } from '@/lib/types'
-import { SessionMiniGantt } from '@/components/SessionMiniGantt'
+import { SessionMiniGantt, ganttWindowLabel } from '@/components/SessionMiniGantt'
 
 const STATUS_LABEL: Record<string, string> = {
   idle: '미처리',
@@ -91,8 +91,8 @@ export function AdminSessionList({ championUserId, sessions, milestones, charter
       {/* 마일스톤 현황 (현재) — 목록 상단 1개 */}
       {milestones.length > 0 && (
         <div className="mb-4">
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>마일스톤 현황</p>
-          <SessionMiniGantt milestones={milestones} sessionDate={today} />
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>마일스톤 현황 ({ganttWindowLabel(today)})</p>
+          <SessionMiniGantt milestones={milestones} sessionDate={today} hideHeader />
         </div>
       )}
 
