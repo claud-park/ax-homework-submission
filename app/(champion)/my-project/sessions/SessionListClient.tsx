@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { CheckUpSession } from '@/lib/types'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -19,7 +19,6 @@ function MicIcon() {
 }
 
 export function SessionListClient({ sessions }: { sessions: CheckUpSession[] }) {
-  const router = useRouter()
   const [hovered, setHovered] = useState<string | null>(null)
 
   return (
@@ -36,14 +35,15 @@ export function SessionListClient({ sessions }: { sessions: CheckUpSession[] }) 
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {sessions.map(s => (
-            <div
+            <Link
               key={s.id}
-              onClick={() => router.push(`/my-project/sessions/${s.id}`)}
+              href={`/my-project/sessions/${s.id}`}
               onMouseEnter={() => setHovered(s.id)}
               onMouseLeave={() => setHovered(null)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '6px 8px', borderRadius: 6, cursor: 'pointer',
+                textDecoration: 'none', color: 'inherit',
                 background: hovered === s.id ? 'var(--surface-hover, rgba(0,0,0,0.04))' : 'transparent',
                 transition: 'background 0.1s',
               }}
@@ -55,7 +55,7 @@ export function SessionListClient({ sessions }: { sessions: CheckUpSession[] }) 
               <span style={{ fontSize: 12, color: 'var(--text-tertiary)', flexShrink: 0 }}>
                 {s.session_date ? `${s.session_date} · ` : ''}{STATUS_LABEL[s.processing_status] ?? s.processing_status}
               </span>
-            </div>
+            </Link>
           ))}
         </div>
       )}
