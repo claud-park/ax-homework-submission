@@ -56,6 +56,13 @@ function getWeekDates(weekStart: string): Array<{ date: string; label: string; d
 const LUNCH_TOP    = ((11.5 - START_HOUR) / 1) * HOUR_PX   // (1.5h × 80px)
 const LUNCH_HEIGHT = (1.5 / 1) * HOUR_PX                   // 1.5h
 
+// 시간 레이블 (정시 + 30분)
+const TIME_LABELS: string[] = []
+for (let h = START_HOUR; h < END_HOUR; h++) {
+  TIME_LABELS.push(`${String(h).padStart(2,'0')}:00`)
+  TIME_LABELS.push(`${String(h).padStart(2,'0')}:30`)
+}
+
 interface WeekCalendarProps {
   weekStart: string
   duration: 30 | 60
@@ -90,13 +97,6 @@ export function WeekCalendar({
     }
   }
 
-  // 시간 레이블 (정시 + 30분)
-  const timeLabels: string[] = []
-  for (let h = START_HOUR; h < END_HOUR; h++) {
-    timeLabels.push(`${String(h).padStart(2,'0')}:00`)
-    timeLabels.push(`${String(h).padStart(2,'0')}:30`)
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -110,7 +110,7 @@ export function WeekCalendar({
       {/* 요일 헤더 */}
       <div style={{ display: 'flex', marginLeft: 48 }}>
         {weekDates.map(({ date, label, dayNum, month }) => {
-          const isToday = date === new Date(Date.now() + 9*3600*1000).toISOString().slice(0,10)
+          const isToday = date === toKST(new Date()).toISOString().slice(0,10)
           return (
             <div
               key={date}
@@ -137,7 +137,7 @@ export function WeekCalendar({
       <div style={{ display: 'flex' }}>
         {/* 시간 축 */}
         <div style={{ width: 48, flexShrink: 0, position: 'relative', height: gridHeight }}>
-          {timeLabels.map((label, i) => (
+          {TIME_LABELS.map((label, i) => (
             <div
               key={label}
               style={{
@@ -171,7 +171,7 @@ export function WeekCalendar({
               }}
             >
               {/* 시간선 */}
-              {timeLabels.map((_, i) => (
+              {TIME_LABELS.map((_, i) => (
                 <div
                   key={i}
                   style={{
