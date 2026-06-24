@@ -3,10 +3,10 @@ import { formatTimeKST } from '@/lib/one-on-one/slot-utils'
 import type { Slot } from '@/lib/one-on-one/calendar'
 import type { AdminId } from '@/lib/one-on-one/google-auth'
 
-const ADMIN_META: Record<AdminId, { name: string; color: string; bg: string; selectedBg: string }> = {
-  claud:    { name: 'Claud',    color: '#1d4ed8', bg: '#dbeafe', selectedBg: 'rgba(219,234,254,0.3)' },
-  alex:     { name: 'Alex',     color: '#15803d', bg: '#dcfce7', selectedBg: 'rgba(220,252,231,0.3)' },
-  jennifer: { name: 'Jennifer', color: '#7c3aed', bg: '#ede9fe', selectedBg: 'rgba(237,233,254,0.3)' },
+const ADMIN_NAME: Record<AdminId, string> = {
+  claud:    'Claud',
+  alex:     'Alex',
+  jennifer: 'Jennifer',
 }
 
 interface Props {
@@ -52,28 +52,24 @@ export function TimeSlotGrid({ slots, selected, onSelect, loading }: Props) {
               >
                 <span className="text-sm font-bold">{formatTimeKST(slot.start)}</span>
                 <div className="flex flex-wrap gap-0.5 justify-center">
-                  {slot.availableAdmins.map((adminId) => {
-                    const m = ADMIN_META[adminId]
-                    return (
-                      <span
-                        key={adminId}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '1px 5px',
-                          borderRadius: 4,
-                          fontSize: 9,
-                          fontWeight: 700,
-                          background: isSelected ? m.selectedBg : m.bg,
-                          color: isSelected ? '#fff' : m.color,
-                          border: isSelected ? '1px solid rgba(255,255,255,0.4)' : 'none',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {m.name}
-                      </span>
-                    )
-                  })}
+                  {slot.availableAdmins.map((adminId) => (
+                    <span
+                      key={adminId}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        fontSize: 9,
+                        fontWeight: 700,
+                        background: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.07)',
+                        color: isSelected ? '#fff' : 'var(--text-secondary)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {ADMIN_NAME[adminId]}
+                    </span>
+                  ))}
                 </div>
               </button>
             )
