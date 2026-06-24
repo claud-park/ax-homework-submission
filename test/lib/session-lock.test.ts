@@ -24,4 +24,12 @@ describe('claimSessionForProcessing', () => {
     await claimSessionForProcessing(client as never, 's1')
     expect(spies.not).toHaveBeenCalledWith('processing_status', 'in', '(uploading,transcribing,summarizing)')
   })
+  it('DB 에러가 나면 throw 한다 (409로 위장하지 않음)', async () => {
+    const select = vi.fn().mockResolvedValue({ data: null, error: { message: 'boom' } })
+    const not = vi.fn(() => ({ select }))
+    const eq = vi.fn(() => ({ not }))
+    const update = vi.fn(() => ({ eq }))
+    const client = { from: vi.fn(() => ({ update })) }
+    await expect(claimSessionForProcessing(client as never, 's1')).rejects.toBeTruthy()
+  })
 })

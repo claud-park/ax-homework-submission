@@ -10,11 +10,12 @@ export async function claimSessionForProcessing(
   supabase: Pick<SupabaseClient, 'from'>,
   sessionId: string
 ): Promise<boolean> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('check_up_sessions')
     .update({ processing_status: 'transcribing' })
     .eq('id', sessionId)
     .not('processing_status', 'in', `(${IN_FLIGHT.join(',')})`)
     .select('id')
+  if (error) throw error
   return (data?.length ?? 0) > 0
 }
