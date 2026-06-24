@@ -1,10 +1,10 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission, Milestone, Comment, SubmissionStatus } from '@/lib/types'
 import { parseName } from '@/lib/utils'
-import { ArrowLeft, Download, ExternalLink, Send } from 'lucide-react'
+import { Download, ExternalLink, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
 import { AdminSessionList } from '@/components/sessions/AdminSessionList'
@@ -168,7 +168,6 @@ type CharterComment = { id: string; body: string; author_role: 'admin' | 'user';
 
 export default function AdminChampionPage() {
   const { userId } = useParams<{ userId: string }>()
-  const router = useRouter()
   const [data, setData] = useState<ChampionProject | null>(null)
   const [submissions, setSubmissions] = useState<SubWithComments[]>([])
   const [loading, setLoading] = useState(true)
@@ -401,14 +400,6 @@ export default function AdminChampionPage() {
 
   return (
     <div>
-      <button
-        onClick={() => router.push('/admin')}
-        className="flex items-center gap-1 text-xs mb-6"
-        style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-      >
-        <ArrowLeft className="h-3 w-3" /> 대시보드로
-      </button>
-
       {/* sticky 전환 트리거 (헤더 위에 위치 — 헤더 높이 변화에 영향받지 않음) */}
       <div ref={headerSentinelRef} aria-hidden style={{ height: 1 }} />
 
