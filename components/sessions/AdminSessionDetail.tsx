@@ -59,12 +59,20 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   async function saveNotes() {
     setSaving(true)
     try {
-      await apiFetch(`/api/sessions/${sessionId}`, {
+      const updated = await apiFetch<CheckUpSession>(`/api/sessions/${sessionId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ notes, expectedUpdatedAt: session?.updated_at }),
       })
+      setSession(updated)
+      setNotes(updated.notes ?? '')
       toast.success('저장되었습니다.')
-    } catch { toast.error('저장 실패') } finally { setSaving(false) }
+    } catch (e) {
+      // 409 등 서버 메시지를 그대로 노출하고 최신 데이터로 갱신
+      toast.error(e instanceof Error ? e.message : '저장 실패')
+      load()
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function deleteSession() {
