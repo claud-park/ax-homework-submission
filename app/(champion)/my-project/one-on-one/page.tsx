@@ -190,133 +190,153 @@ export default function OneOnOnePage() {
         </div>
       )}
 
-      {booking && booking.status !== 'cancelled' ? (
-        <BookingStatus
-          booking={booking}
-          onCancel={handleCancel}
-          onRebook={() => setBooking(null)}
-          cancelling={cancelling}
-        />
-      ) : (
-        <>
-          <div className="flex items-center justify-between mb-4">
-            <DurationToggle value={duration} onChange={(d) => { setDuration(d); setSelectedSlot(null) }} />
+      {/* 슬롯 선택 폼 — 항상 표시 */}
+      <>
+        <div className="flex items-center justify-between mb-4">
+          <DurationToggle value={duration} onChange={(d) => { setDuration(d); setSelectedSlot(null) }} />
 
-            {/* 뷰 모드 토글 */}
-            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--surface-secondary)' }}>
-              {(['chip', 'calendar'] as ViewMode[]).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => { setViewMode(mode); setSelectedSlot(null) }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-                  style={{
-                    background: viewMode === mode ? '#fff' : 'transparent',
-                    color:      viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    border:     viewMode === mode ? '1px solid var(--border-subtle)' : 'none',
-                    cursor:     'pointer',
-                    boxShadow:  viewMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  }}
-                >
-                  {mode === 'chip' ? '슬롯 뷰' : '캘린더 뷰'}
-                </button>
-              ))}
-            </div>
+          {/* 뷰 모드 토글 */}
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--surface-secondary)' }}>
+            {(['chip', 'calendar'] as ViewMode[]).map(mode => (
+              <button
+                key={mode}
+                onClick={() => { setViewMode(mode); setSelectedSlot(null) }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{
+                  background: viewMode === mode ? '#fff' : 'transparent',
+                  color:      viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  border:     viewMode === mode ? '1px solid var(--border-subtle)' : 'none',
+                  cursor:     'pointer',
+                  boxShadow:  viewMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                }}
+              >
+                {mode === 'chip' ? '슬롯 뷰' : '캘린더 뷰'}
+              </button>
+            ))}
           </div>
+        </div>
 
-          {viewMode === 'chip' ? (
-            <>
-              <DateStrip selectedDate={selectedDate} onSelect={setSelectedDate} />
-              {selectedDate ? (
-                <TimeSlotGrid
-                  slots={filterSlots(chipSlots, chipBusy)}
-                  selected={selectedSlot}
-                  onSelect={setSelectedSlot}
-                  loading={chipLoading}
-                />
-              ) : (
-                <p className="text-xs py-4 text-center" style={{ color: 'var(--text-disabled)' }}>
-                  날짜를 먼저 선택해주세요.
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              {/* 주 네비게이션 */}
-              <div className="flex items-center gap-3 mb-3">
-                {(() => {
-                  const todayMon = getMonday()
-                  const [ty, tm, td] = todayMon.split('-').map(Number)
-                  const nextMonDate = new Date(Date.UTC(ty, tm-1, td+7))
-                  const maxMon = `${nextMonDate.getUTCFullYear()}-${String(nextMonDate.getUTCMonth()+1).padStart(2,'0')}-${String(nextMonDate.getUTCDate()).padStart(2,'0')}`
-                  const [y,m,d] = weekStart.split('-').map(Number)
-                  const prevStr = new Date(Date.UTC(y,m-1,d-7)).toISOString().slice(0,10)
-                  const nextStr = new Date(Date.UTC(y,m-1,d+7)).toISOString().slice(0,10)
-                  const leftDisabled = weekStart === todayMon
-                  const rightDisabled = weekStart === maxMon
-                  return (
-                    <>
-                      <button
-                        disabled={leftDisabled}
-                        onClick={() => { if (prevStr >= todayMon) setWeekStart(prevStr) }}
-                        className="p-1.5 rounded-lg text-sm"
-                        style={{
-                          background: 'var(--surface-secondary)',
-                          border: '1px solid var(--border-subtle)',
-                          cursor: leftDisabled ? 'not-allowed' : 'pointer',
-                          opacity: leftDisabled ? 0.4 : 1,
-                        }}
-                      >←</button>
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                        {weekStart} 주
-                      </span>
-                      <button
-                        disabled={rightDisabled}
-                        onClick={() => { if (nextStr <= maxMon) setWeekStart(nextStr) }}
-                        className="p-1.5 rounded-lg text-sm"
-                        style={{
-                          background: 'var(--surface-secondary)',
-                          border: '1px solid var(--border-subtle)',
-                          cursor: rightDisabled ? 'not-allowed' : 'pointer',
-                          opacity: rightDisabled ? 0.4 : 1,
-                        }}
-                      >→</button>
-                    </>
-                  )
-                })()}
-              </div>
-
-              <WeekCalendar
-                weekStart={weekStart}
-                duration={duration}
-                slots={filterSlots(calSlots, calBusy)}
-                championBusy={calBusy}
+        {viewMode === 'chip' ? (
+          <>
+            <DateStrip selectedDate={selectedDate} onSelect={setSelectedDate} />
+            {selectedDate ? (
+              <TimeSlotGrid
+                slots={filterSlots(chipSlots, chipBusy)}
                 selected={selectedSlot}
                 onSelect={setSelectedSlot}
-                loading={calLoading}
+                loading={chipLoading}
               />
-            </>
-          )}
+            ) : (
+              <p className="text-xs py-4 text-center" style={{ color: 'var(--text-disabled)' }}>
+                날짜를 먼저 선택해주세요.
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            {/* 주 네비게이션 */}
+            <div className="flex items-center gap-3 mb-3">
+              {(() => {
+                const todayMon = getMonday()
+                const [ty, tm, td] = todayMon.split('-').map(Number)
+                const nextMonDate = new Date(Date.UTC(ty, tm-1, td+7))
+                const maxMon = `${nextMonDate.getUTCFullYear()}-${String(nextMonDate.getUTCMonth()+1).padStart(2,'0')}-${String(nextMonDate.getUTCDate()).padStart(2,'0')}`
+                const [y,m,d] = weekStart.split('-').map(Number)
+                const prevStr = new Date(Date.UTC(y,m-1,d-7)).toISOString().slice(0,10)
+                const nextStr = new Date(Date.UTC(y,m-1,d+7)).toISOString().slice(0,10)
+                const leftDisabled = weekStart === todayMon
+                const rightDisabled = weekStart === maxMon
+                return (
+                  <>
+                    <button
+                      disabled={leftDisabled}
+                      onClick={() => { if (prevStr >= todayMon) setWeekStart(prevStr) }}
+                      className="p-1.5 rounded-lg text-sm"
+                      style={{
+                        background: 'var(--surface-secondary)',
+                        border: '1px solid var(--border-subtle)',
+                        cursor: leftDisabled ? 'not-allowed' : 'pointer',
+                        opacity: leftDisabled ? 0.4 : 1,
+                      }}
+                    >←</button>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                      {weekStart} 주
+                    </span>
+                    <button
+                      disabled={rightDisabled}
+                      onClick={() => { if (nextStr <= maxMon) setWeekStart(nextStr) }}
+                      className="p-1.5 rounded-lg text-sm"
+                      style={{
+                        background: 'var(--surface-secondary)',
+                        border: '1px solid var(--border-subtle)',
+                        cursor: rightDisabled ? 'not-allowed' : 'pointer',
+                        opacity: rightDisabled ? 0.4 : 1,
+                      }}
+                    >→</button>
+                  </>
+                )
+              })()}
+            </div>
 
-          {error && (
-            <p className="text-xs mb-3 mt-2" style={{ color: 'var(--error)' }}>{error}</p>
-          )}
+            <WeekCalendar
+              weekStart={weekStart}
+              duration={duration}
+              slots={filterSlots(calSlots, calBusy)}
+              championBusy={calBusy}
+              selected={selectedSlot}
+              onSelect={setSelectedSlot}
+              loading={calLoading}
+            />
+          </>
+        )}
 
-          {selectedSlot && (
-            <button
-              onClick={handleBook}
-              disabled={submitting}
-              className="w-full py-3 rounded-xl text-sm font-bold mt-4"
-              style={{
-                background: submitting ? 'var(--text-disabled)' : 'var(--blue-600)',
-                color: '#fff',
-                border: 'none',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {submitting ? '신청 중...' : '신청하기'}
-            </button>
-          )}
-        </>
+        {error && (
+          <p className="text-xs mb-3 mt-2" style={{ color: 'var(--error)' }}>{error}</p>
+        )}
+
+        {selectedSlot && (
+          <button
+            onClick={handleBook}
+            disabled={submitting}
+            className="w-full py-3 rounded-xl text-sm font-bold mt-4"
+            style={{
+              background: submitting ? 'var(--text-disabled)' : 'var(--blue-600)',
+              color: '#fff',
+              border: 'none',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {submitting ? '신청 중...' : '신청하기'}
+          </button>
+        )}
+      </>
+
+      {/* 내 일정 — 접이식 섹션 */}
+      {booking && booking.status !== 'cancelled' && (
+        <details open style={{ marginTop: 24 }}>
+          <summary
+            className="flex items-center gap-1.5 cursor-pointer select-none"
+            style={{
+              listStyle: 'none',
+              padding: '10px 0',
+              borderTop: '1px solid var(--border-subtle)',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <span style={{ fontSize: 10, color: 'var(--text-disabled)' }}>▼</span>
+            내 일정
+          </summary>
+          <div style={{ marginTop: 8 }}>
+            <BookingStatus
+              booking={booking}
+              onCancel={handleCancel}
+              onRebook={() => setBooking(null)}
+              cancelling={cancelling}
+            />
+          </div>
+        </details>
       )}
     </div>
   )

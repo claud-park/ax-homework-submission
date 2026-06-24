@@ -68,21 +68,9 @@ export function BookingStatus({ booking, onCancel, onRebook, cancelling }: Props
             담당: {booking.confirmed_by.toUpperCase()}
           </p>
         )}
-        <p className="text-xs mb-4" style={{ color: 'var(--text-disabled)' }}>
+        <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>
           Google Calendar에 일정이 추가되었습니다.
         </p>
-        <button
-          onClick={onRebook}
-          className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-          style={{
-            background: 'var(--surface-secondary)',
-            border: '1px solid var(--border-subtle)',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-          }}
-        >
-          새로운 일정 추가
-        </button>
       </div>
     )
   }
