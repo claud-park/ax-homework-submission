@@ -15,14 +15,14 @@ import type { OneOnOneBooking } from '@/lib/types'
 type ViewMode = 'chip' | 'calendar'
 
 function getMonday(kstDateStr?: string | null): string {
-  const now = kstDateStr
+  const ref = kstDateStr
     ? new Date(kstDateStr + 'T00:00:00+09:00')
-    : new Date()
-  const dow = now.getDay()
+    : new Date(Date.now() + 9 * 3600 * 1000)  // shift to KST
+  const dow = ref.getUTCDay()  // 0=Sun when using shifted time
   const daysToMon = dow === 0 ? 1 : dow === 1 ? 0 : -(dow - 1)
-  const mon = new Date(now)
-  mon.setDate(mon.getDate() + daysToMon)
-  return mon.toISOString().slice(0, 10)
+  const monMs = Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate() + daysToMon)
+  const mon = new Date(monMs)
+  return `${mon.getUTCFullYear()}-${String(mon.getUTCMonth()+1).padStart(2,'0')}-${String(mon.getUTCDate()).padStart(2,'0')}`
 }
 
 export default function OneOnOnePage() {
@@ -222,31 +222,44 @@ export default function OneOnOnePage() {
             <>
               {/* 주 네비게이션 */}
               <div className="flex items-center gap-3 mb-3">
-                <button
-                  onClick={() => {
-                    const [y,m,d] = weekStart.split('-').map(Number)
-                    const prev = new Date(Date.UTC(y,m-1,d-7))
-                    const todayMon = getMonday()
-                    const prevStr = prev.toISOString().slice(0,10)
-                    if (prevStr >= todayMon) setWeekStart(prevStr)
-                  }}
-                  className="p-1.5 rounded-lg text-sm"
-                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer' }}
-                >←</button>
-                <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                  {weekStart} 주
-                </span>
-                <button
-                  onClick={() => {
-                    const [y,m,d] = weekStart.split('-').map(Number)
-                    const next = new Date(Date.UTC(y,m-1,d+7))
-                    const nextStr = next.toISOString().slice(0,10)
-                    const maxMon  = getMonday(new Date(Date.now()+7*86400000).toISOString().slice(0,10))
-                    if (nextStr <= maxMon) setWeekStart(nextStr)
-                  }}
-                  className="p-1.5 rounded-lg text-sm"
-                  style={{ background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer' }}
-                >→</button>
+                {(() => {
+                  const todayMon = getMonday()
+                  const maxMon = getMonday(new Date(Date.now() + 9*3600*1000 + 7*86400000).toISOString().slice(0,10))
+                  const [y,m,d] = weekStart.split('-').map(Number)
+                  const prevStr = new Date(Date.UTC(y,m-1,d-7)).toISOString().slice(0,10)
+                  const nextStr = new Date(Date.UTC(y,m-1,d+7)).toISOString().slice(0,10)
+                  const leftDisabled = weekStart === todayMon
+                  const rightDisabled = weekStart === maxMon
+                  return (
+                    <>
+                      <button
+                        disabled={leftDisabled}
+                        onClick={() => { if (prevStr >= todayMon) setWeekStart(prevStr) }}
+                        className="p-1.5 rounded-lg text-sm"
+                        style={{
+                          background: 'var(--surface-secondary)',
+                          border: '1px solid var(--border-subtle)',
+                          cursor: leftDisabled ? 'not-allowed' : 'pointer',
+                          opacity: leftDisabled ? 0.4 : 1,
+                        }}
+                      >←</button>
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                        {weekStart} 주
+                      </span>
+                      <button
+                        disabled={rightDisabled}
+                        onClick={() => { if (nextStr <= maxMon) setWeekStart(nextStr) }}
+                        className="p-1.5 rounded-lg text-sm"
+                        style={{
+                          background: 'var(--surface-secondary)',
+                          border: '1px solid var(--border-subtle)',
+                          cursor: rightDisabled ? 'not-allowed' : 'pointer',
+                          opacity: rightDisabled ? 0.4 : 1,
+                        }}
+                      >→</button>
+                    </>
+                  )
+                })()}
               </div>
 
               <WeekCalendar
