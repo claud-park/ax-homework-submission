@@ -201,6 +201,17 @@ export default function AdminChampionPage() {
   const [sessions, setSessions] = useState<import('@/lib/types').CheckUpSession[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('charter')
+  const [scrolled, setScrolled] = useState(false)
+
+  // 스크롤 시 헤더를 컴팩트 고정 바([챔피언 | 프로젝트])로 전환
+  useEffect(() => {
+    const main = document.querySelector('main')
+    if (!main) return
+    const onScroll = () => setScrolled(main.scrollTop > 48)
+    onScroll()
+    main.addEventListener('scroll', onScroll, { passive: true })
+    return () => main.removeEventListener('scroll', onScroll)
+  }, [])
 
   function loadSubs() {
     return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
@@ -391,11 +402,42 @@ export default function AdminChampionPage() {
         <ArrowLeft className="h-3 w-3" /> 대시보드로
       </button>
 
-      <div className="mb-6">
-        <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{displayName}</h1>
-        {department && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{department}</p>}
-        {data.charters[0]?.project_name && (
-          <p className="text-sm font-medium mt-1" style={{ color: 'var(--text-primary)' }}>{data.charters[0].project_name}</p>
+      <div
+        className="mb-6"
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          transition: 'padding 0.15s ease, background 0.15s ease',
+          ...(scrolled
+            ? {
+                margin: '0 -24px 16px',
+                padding: '10px 24px',
+                background: 'var(--surface-primary)',
+                borderBottom: '1px solid var(--border-subtle)',
+                boxShadow: 'var(--shadow-s)',
+              }
+            : {}),
+        }}
+      >
+        {scrolled ? (
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-bold flex-shrink-0" style={{ color: 'var(--text-primary)' }}>{displayName}</span>
+            {data.charters[0]?.project_name && (
+              <>
+                <span style={{ color: 'var(--text-disabled)' }}>|</span>
+                <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{data.charters[0].project_name}</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <>
+            <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{displayName}</h1>
+            {department && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{department}</p>}
+            {data.charters[0]?.project_name && (
+              <p className="text-sm font-medium mt-1" style={{ color: 'var(--text-primary)' }}>{data.charters[0].project_name}</p>
+            )}
+          </>
         )}
       </div>
 
