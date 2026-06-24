@@ -25,7 +25,7 @@ export function TimeSlotGrid({ slots, selected, onSelect, loading }: Props) {
 
       {loading ? (
         <p className="text-xs py-4 text-center" style={{ color: 'var(--text-disabled)' }}>
-          가용 슬롯 조회 중...
+          가능한 시간을 찾고 있어요...
         </p>
       ) : slots.length === 0 ? (
         <p className="text-xs py-4 text-center" style={{ color: 'var(--text-disabled)' }}>
