@@ -29,7 +29,7 @@ export function BookingStatus({ booking, onCancel, onRebook, cancelling }: Props
           일시: {slotLabel} ({durationLabel})
         </p>
         <p className="text-xs mb-4" style={{ color: 'var(--text-disabled)' }}>
-          어드민이 #ax-tf에서 확정하면 Google Calendar 일정이 생성됩니다.
+          담당자가 일정 확정 시 Google Calendar 일정이 생성됩니다.
         </p>
         <button
           onClick={onCancel}
