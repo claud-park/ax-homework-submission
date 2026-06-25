@@ -24,6 +24,7 @@ export async function GET(
       .from('charter_submissions')
       .select('*')
       .eq('user_id', userId)
+      .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false }),
     supabase
       .from('milestones')
