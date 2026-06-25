@@ -692,7 +692,7 @@ export default function AdminChampionPage() {
                       color: activeCharterId === c.id ? '#fff' : 'var(--text-secondary)',
                     }}
                   >
-                    {c.title ?? c.project_name ?? 'Charter'}
+                    {c.project_name?.trim() || c.title?.trim() || 'Charter'}
                   </button>
                 ))}
               </div>
