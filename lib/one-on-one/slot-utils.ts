@@ -46,6 +46,20 @@ export function formatSlotLabel(isoUtc: string): string {
   return `${month}/${date}(${day}) ${hour}:${min}`
 }
 
+// "2026.06.26 16:00 ~ 16:30" 형태 (취소 DM용)
+export function formatSlotRange(startIsoUtc: string, endIsoUtc: string): string {
+  const s = toKST(new Date(startIsoUtc))
+  const e = toKST(new Date(endIsoUtc))
+  const year  = s.getUTCFullYear()
+  const month = String(s.getUTCMonth() + 1).padStart(2, '0')
+  const date  = String(s.getUTCDate()).padStart(2, '0')
+  const sh = String(s.getUTCHours()).padStart(2, '0')
+  const sm = String(s.getUTCMinutes()).padStart(2, '0')
+  const eh = String(e.getUTCHours()).padStart(2, '0')
+  const em = String(e.getUTCMinutes()).padStart(2, '0')
+  return `${year}.${month}.${date} ${sh}:${sm} ~ ${eh}:${em}`
+}
+
 // "14:00" 형태 (UI 슬롯 버튼용)
 export function formatTimeKST(isoUtc: string): string {
   const kst = toKST(new Date(isoUtc))

@@ -4,7 +4,7 @@ import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, getAdminIdBySlackUserId, type AdminId } from '@/lib/one-on-one/slack'
 import { getAuthenticatedClient } from '@/lib/one-on-one/google-auth'
-import { formatSlotLabel } from '@/lib/one-on-one/slot-utils'
+import { formatSlotLabel, formatSlotRange } from '@/lib/one-on-one/slot-utils'
 
 function verifySlackSignature(
   secret: string,
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (actionId === 'confirm_1on1') {
     await handleConfirm(payload, bookingId)
   } else if (actionId === 'cancel_1on1') {
-    await handleAdminCancel(payload, bookingId)
+    await handleAdminCancel(bookingId)
   }
 
   // Slack은 3초 내 200 응답 필요
@@ -107,14 +107,14 @@ async function handleConfirm(payload: Record<string, unknown>, bookingId: string
   })
 }
 
-async function handleAdminCancel(payload: Record<string, unknown>, bookingId: string) {
+async function handleAdminCancel(bookingId: string) {
   const supabase = createServiceClient()
   const { data: updated } = await supabase
     .from('one_on_one_bookings')
     .update({ status: 'cancelled', updated_at: new Date().toISOString() })
     .eq('id', bookingId)
     .eq('status', 'pending')
-    .select('slack_ts, slack_channel, champion_name, slot_start, duration_minutes')
+    .select('slack_ts, slack_channel, champion_name, champion_email, slot_start, slot_end, duration_minutes')
   if (!updated || updated.length === 0) return
 
   const b = updated[0]
@@ -125,4 +125,18 @@ async function handleAdminCancel(payload: Record<string, unknown>, bookingId: st
     text:    `❌ 취소됨 — ${b.champion_name} ${slotLabel} (${b.duration_minutes}분)`,
     blocks:  [],
   })
+
+  // 신청자에게 취소 안내 DM (이메일로 Slack 유저 조회)
+  try {
+    const found = await slack.users.lookupByEmail({ email: b.champion_email })
+    const dmUserId = found.user?.id
+    if (dmUserId) {
+      await slack.chat.postMessage({
+        channel: dmUserId,
+        text: `제시해주신 타임슬롯 ${formatSlotRange(b.slot_start, b.slot_end)}에 예약이 어렵습니다. 다시 예약해주세요.`,
+      })
+    }
+  } catch (err) {
+    console.error('취소 DM 발송 실패:', err)
+  }
 }
