@@ -672,7 +672,7 @@ export default function AdminChampionPage() {
               position: 'sticky',
               top: 20,
               zIndex: 10,
-              background: 'var(--surface-primary)',
+              background: 'hsl(var(--background))',
               paddingBottom: 10,
               marginBottom: 16,
               borderBottom: '1px solid var(--border-subtle)',
