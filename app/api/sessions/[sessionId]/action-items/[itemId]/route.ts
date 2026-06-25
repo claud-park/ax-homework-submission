@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT, verifyAdmin } from '@/lib/auth'
+import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveSessionRole } from '@/lib/sessions/access'
+import { allowedActionItemUpdateFields } from '@/lib/sessions/permissions'
 
 type Params = { params: { sessionId: string; itemId: string } }
 
@@ -8,11 +10,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const isAdmin = !!user.user_metadata?.is_admin
-  const body = await req.json()
   const supabase = createServiceClient()
+  const role = await resolveSessionRole(supabase, params.sessionId, user)
+  if (!role) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Verify the action item belongs to this session
+  const body = await req.json()
+
+  // 아이템이 이 세션 소속인지 확인
   const { data: item } = await supabase
     .from('session_action_items')
     .select('id, session_id')
@@ -21,34 +25,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single()
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-
-  if (isAdmin) {
-    // Admin can update everything
-    if ('body' in body) updates.body = body.body?.trim()
-    if ('display_order' in body) updates.display_order = body.display_order
-    if ('is_completed' in body) {
+  const now = new Date().toISOString()
+  const updates: Record<string, unknown> = { updated_at: now }
+  let touched = false
+  for (const key of allowedActionItemUpdateFields(role)) {
+    if (!(key in body)) continue
+    if (key === 'is_completed') {
       updates.is_completed = body.is_completed
-      updates.completed_at = body.is_completed ? new Date().toISOString() : null
+      updates.completed_at = body.is_completed ? now : null
+    } else if (key === 'body') {
+      updates.body = body.body?.trim()
+    } else if (key === 'display_order') {
+      updates.display_order = body.display_order
     }
-  } else {
-    // Champion can only toggle is_completed
-    if ('is_completed' in body) {
-      // Verify champion owns the session
-      const { data: session } = await supabase
-        .from('check_up_sessions')
-        .select('champion_user_id')
-        .eq('id', params.sessionId)
-        .single()
-      if (!session || session.champion_user_id !== user.id) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-      updates.is_completed = body.is_completed
-      updates.completed_at = body.is_completed ? new Date().toISOString() : null
-    } else {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    touched = true
   }
+  if (!touched) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { data, error } = await supabase
     .from('session_action_items')
@@ -62,10 +54,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const user = await verifyJWT(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
+  const role = await resolveSessionRole(supabase, params.sessionId, user)
+  if (!role) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const { error } = await supabase
     .from('session_action_items')
     .delete()
