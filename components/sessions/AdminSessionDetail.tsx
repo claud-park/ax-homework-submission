@@ -10,6 +10,7 @@ import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 import { useSessionActionItems } from '@/components/sessions/useSessionActionItems'
+import { useSessionNotes } from '@/components/sessions/useSessionNotes'
 
 interface Props {
   sessionId: string
@@ -31,13 +32,13 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   const [comments, setComments] = useState<SessionComment[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [notes, setNotes] = useState('')
-  const [saving, setSaving] = useState(false)
+  const {
+    notes, setNotes, isEditingNotes, setIsEditingNotes, saving, saveNotes,
+  } = useSessionNotes(sessionId, session, setSession, load)
+
   const [deleting, setDeleting] = useState(false)
 
   const [reprocessing, setReprocessing] = useState(false)
-
-  const [isEditingNotes, setIsEditingNotes] = useState(false)
 
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -77,26 +78,6 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       const data = await apiFetch<CheckUpSession>(`/api/sessions/${sessionId}`)
       setSession(prev => prev ? { ...prev, updated_at: data.updated_at } : prev)
     } catch { /* best-effort: stale updated_at만 갱신 실패, 치명적 아님 */ }
-  }
-
-  async function saveNotes() {
-    setSaving(true)
-    try {
-      const updated = await apiFetch<CheckUpSession>(`/api/sessions/${sessionId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ notes, expectedUpdatedAt: session?.updated_at }),
-      })
-      setSession(updated)
-      setNotes(updated.notes ?? '')
-      toast.success('저장되었습니다.')
-      setIsEditingNotes(false)
-    } catch (e) {
-      // 409 등 서버 메시지를 그대로 노출하고 최신 데이터로 갱신
-      toast.error(e instanceof Error ? e.message : '저장 실패')
-      load()
-    } finally {
-      setSaving(false)
-    }
   }
 
   async function deleteSession() {
