@@ -664,47 +664,62 @@ export default function AdminChampionPage() {
 
       {activeMainTab === 'charter' && data.charters.length > 0 && (
         <section id="charter" className="mb-8">
-          {/* Charter 탭 (2개 이상일 때만 표시) */}
-          {data.charters.length > 1 && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1.5px solid var(--border-subtle)', paddingBottom: 0 }}>
-              {data.charters.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => handleTabChange(c.id)}
-                  style={{
-                    padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
-                    fontSize: 14, fontWeight: activeCharterId === c.id ? 700 : 400,
-                    color: activeCharterId === c.id ? 'var(--primary)' : 'var(--text-secondary)',
-                    borderBottom: activeCharterId === c.id ? '2px solid var(--primary)' : '2px solid transparent',
-                    marginBottom: -1.5,
-                  }}
-                >
-                  {c.title ?? c.project_name ?? 'Charter'}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* sticky 섹션 헤더 — '1-on-1 세션' 탭과 동일 패턴: justify-between
+              top:20 = compact 글로벌 헤더(44px, top:-24 from main) 하단 위치 */}
+          <div
+            className="flex items-center justify-between"
+            style={{
+              position: 'sticky',
+              top: 20,
+              zIndex: 10,
+              background: 'var(--surface-primary)',
+              paddingBottom: 10,
+              marginBottom: 16,
+              borderBottom: '1px solid var(--border-subtle)',
+            }}
+          >
+            {/* 왼쪽: charter 버전 탭(복수) 또는 섹션 제목 */}
+            {data.charters.length > 1 ? (
+              <div style={{ display: 'flex', gap: 4 }}>
+                {data.charters.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => handleTabChange(c.id)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                    style={{
+                      border: 'none', cursor: 'pointer',
+                      background: activeCharterId === c.id ? 'var(--blue-600)' : 'var(--surface-secondary)',
+                      color: activeCharterId === c.id ? '#fff' : 'var(--text-secondary)',
+                    }}
+                  >
+                    {c.title ?? c.project_name ?? 'Charter'}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</h2>
+            )}
 
-          {/* 헤더: 제목 + 승인 버튼 */}
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</h2>
-            {activeCharter?.admin_approved_at ? (
-              <span
-                className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}
-              >
-                ✓ 승인됨 · {new Date(activeCharter.admin_approved_at).toLocaleDateString('ko-KR')}
-              </span>
-            ) : activeCharter ? (
-              <button
-                onClick={() => approveCharter(activeCharter.id)}
-                disabled={approving}
-                className="text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-50"
-                style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer' }}
-              >
-                {approving ? '처리 중…' : '✓ 승인'}
-              </button>
-            ) : null}
+            {/* 오른쪽: 승인 배지 또는 승인 버튼 */}
+            <div>
+              {activeCharter?.admin_approved_at ? (
+                <span
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}
+                >
+                  ✓ 승인됨 · {new Date(activeCharter.admin_approved_at).toLocaleDateString('ko-KR')}
+                </span>
+              ) : activeCharter ? (
+                <button
+                  onClick={() => approveCharter(activeCharter.id)}
+                  disabled={approving}
+                  className="text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-50"
+                  style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer' }}
+                >
+                  {approving ? '처리 중…' : '✓ 승인'}
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {/* 2-column: 좌(과제정의서) + 우(코멘트 패널) */}
@@ -758,8 +773,8 @@ export default function AdminChampionPage() {
                 width: 300,
                 flexShrink: 0,
                 position: 'sticky',
-                top: 0,
-                maxHeight: 'calc(100vh - 120px)',
+                top: 64,
+                maxHeight: 'calc(100vh - 180px)',
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: 12,
