@@ -664,15 +664,10 @@ export default function AdminChampionPage() {
 
       {activeMainTab === 'charter' && data.charters.length > 0 && (
         <section id="charter" className="mb-8">
-          {/* sticky 섹션 헤더 — '1-on-1 세션' 탭과 동일 패턴: justify-between
-              top:20 = compact 글로벌 헤더(44px, top:-24 from main) 하단 위치 */}
+          {/* 섹션 헤더: justify-between (좌: 제목/탭, 우: 승인). 글로벌 헤더만 sticky이므로 여기는 고정하지 않음 */}
           <div
             className="flex items-center justify-between"
             style={{
-              position: 'sticky',
-              top: 20,
-              zIndex: 10,
-              background: 'hsl(var(--background))',
               paddingBottom: 10,
               marginBottom: 16,
               borderBottom: '1px solid var(--border-subtle)',
@@ -773,8 +768,8 @@ export default function AdminChampionPage() {
                 width: 300,
                 flexShrink: 0,
                 position: 'sticky',
-                top: 64,
-                maxHeight: 'calc(100vh - 180px)',
+                top: 0,
+                maxHeight: 'calc(100vh - 120px)',
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: 12,
