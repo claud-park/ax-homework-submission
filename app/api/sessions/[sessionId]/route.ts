@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyJWT, verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { resolveSessionRole } from '@/lib/sessions/access'
+import { allowedSessionUpdateFields } from '@/lib/sessions/permissions'
 
 type Params = { params: { sessionId: string } }
 
@@ -53,18 +55,20 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const user = await verifyJWT(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const supabase = createServiceClient()
+  const role = await resolveSessionRole(supabase, params.sessionId, user)
+  if (!role) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
   const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null
-  const allowed = ['title', 'notes', 'session_date'] as const
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  for (const key of allowed) {
+  for (const key of allowedSessionUpdateFields(role)) {
     if (key in body) updates[key] = body[key]
   }
 
-  const supabase = createServiceClient()
   let query = supabase
     .from('check_up_sessions')
     .update(updates)
@@ -76,7 +80,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!data || data.length === 0) {
     if (expectedUpdatedAt) {
       return NextResponse.json(
-        { error: '다른 관리자가 먼저 수정했습니다. 새로고침 후 다시 시도하세요.' },
+        { error: '다른 사용자가 먼저 수정했습니다. 새로고침 후 다시 시도하세요.' },
         { status: 409 }
       )
     }
