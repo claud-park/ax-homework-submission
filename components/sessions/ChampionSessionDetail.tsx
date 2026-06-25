@@ -1,11 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, Pencil, Send } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { MarkdownView } from '@/components/MarkdownView'
+import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
+import { useSessionNotes } from '@/components/sessions/useSessionNotes'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 
@@ -17,6 +19,8 @@ interface Props {
 export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
   const router = useRouter()
   const [session, setSession] = useState<CheckUpSession | null>(null)
+  const { notes, setNotes, isEditingNotes, setIsEditingNotes, saving, saveNotes } =
+    useSessionNotes(sessionId, session, setSession, () => { /* champion은 새로고침 안내로 충분 */ })
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [actionItems, setActionItems] = useState<SessionActionItem[]>([])
   const [comments, setComments] = useState<SessionComment[]>([])
@@ -32,6 +36,8 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
     )
       .then(data => {
         setSession(data)
+        setNotes(data.notes ?? '')
+        setIsEditingNotes(false)
         setActionItems(data.action_items ?? [])
         setComments(data.comments ?? [])
         setMilestones(data.milestones ?? [])
@@ -132,12 +138,42 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
       )}
 
       {/* Meeting notes */}
-      {session.notes?.trim() && (
-        <section className={sectionClass} style={sectionBorder}>
-          <h2 className={labelClass} style={labelStyle}>미팅 노트</h2>
+      <section className={sectionClass} style={sectionBorder}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className={labelClass} style={{ ...labelStyle, marginBottom: 0 }}>미팅 노트</h2>
+          {!isEditingNotes && (
+            <button
+              onClick={() => setIsEditingNotes(true)}
+              className="flex items-center gap-1 text-xs"
+              style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              <Pencil className="h-3 w-3" /> 수정
+            </button>
+          )}
+        </div>
+        {isEditingNotes ? (
+          <div>
+            <SessionNotesEditor value={notes} onChange={setNotes} />
+            <div className="flex gap-1.5 mt-2">
+              <button
+                onClick={() => { setNotes(session.notes ?? ''); setIsEditingNotes(false) }}
+                className="text-xs px-2.5 py-1 rounded-md"
+                style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer' }}
+              >취소</button>
+              <button
+                onClick={saveNotes}
+                disabled={saving}
+                className="text-xs px-2.5 py-1 rounded-md font-semibold disabled:opacity-50"
+                style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+              >{saving ? '저장 중…' : '저장'}</button>
+            </div>
+          </div>
+        ) : session.notes?.trim() ? (
           <MarkdownView markdown={session.notes} />
-        </section>
-      )}
+        ) : (
+          <p className="text-sm" style={{ color: 'var(--text-disabled)' }}>아직 노트가 없어요. [수정]을 눌러 작성할 수 있어요.</p>
+        )}
+      </section>
 
       {/* Action items */}
       {actionItems.length > 0 && (
