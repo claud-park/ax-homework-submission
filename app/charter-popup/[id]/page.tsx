@@ -46,7 +46,20 @@ export default async function CharterPopupPage({ params }: { params: { id: strin
 
   const charter = charterResult.data as CharterWithUser
   const allMilestones = (milestonesResult.data ?? []) as Milestone[]
-  const charterMilestones = filterMilestonesByCharter(allMilestones, charter.id)
+
+  // orphan 마일스톤(FK null)은 챔피언의 첫 번째 published charter에만 표시
+  // (champion 본인 편집 화면 / Gantt와 동일)
+  const { data: publishedCharters } = await supabase
+    .from('charter_submissions')
+    .select('id')
+    .eq('user_id', charter.user_id)
+    .eq('publish_status', 'published')
+    .order('submitted_at', { ascending: false })
+  const firstCharterId = publishedCharters?.[0]?.id ?? null
+
+  const charterMilestones = filterMilestonesByCharter(allMilestones, charter.id, {
+    includeOrphans: charter.id === firstCharterId,
+  })
 
   return <CharterPopupClient charter={charter} milestones={charterMilestones} isAdmin={isAdmin} />
 }
