@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createUserServerClient, createServiceClient } from '@/lib/supabase/server'
 import CharterPopupClient from './CharterPopupClient'
+import { filterMilestonesByCharter } from '@/lib/milestone-filter'
 import type { Milestone } from '@/lib/types'
 
 type CharterWithUser = {
@@ -45,7 +46,7 @@ export default async function CharterPopupPage({ params }: { params: { id: strin
 
   const charter = charterResult.data as CharterWithUser
   const allMilestones = (milestonesResult.data ?? []) as Milestone[]
-  const userMilestones = allMilestones.filter(m => m.user_id === charter.user_id)
+  const charterMilestones = filterMilestonesByCharter(allMilestones, charter.id)
 
-  return <CharterPopupClient charter={charter} milestones={userMilestones} isAdmin={isAdmin} />
+  return <CharterPopupClient charter={charter} milestones={charterMilestones} isAdmin={isAdmin} />
 }
