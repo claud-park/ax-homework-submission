@@ -44,9 +44,9 @@ export function TimeSlotGrid({ slots, selected, onSelect, loading }: Props) {
                 onClick={() => onSelect(slot)}
                 className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl"
                 style={{
-                  background: isSelected ? 'var(--blue-600)' : 'var(--surface-secondary)',
-                  color:      isSelected ? '#fff' : 'var(--text-primary)',
-                  border:     isSelected ? 'none' : '1px solid var(--border-subtle)',
+                  background: isSelected ? 'rgba(37,99,235,0.1)' : 'var(--surface-secondary)',
+                  color:      isSelected ? 'var(--blue-600)' : 'var(--text-primary)',
+                  border:     isSelected ? '1.5px solid var(--blue-600)' : '1px solid var(--border-subtle)',
                   cursor:     'pointer',
                 }}
               >
@@ -62,8 +62,8 @@ export function TimeSlotGrid({ slots, selected, onSelect, loading }: Props) {
                         borderRadius: 4,
                         fontSize: 9,
                         fontWeight: 700,
-                        background: isSelected ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.07)',
-                        color: isSelected ? '#fff' : 'var(--text-secondary)',
+                        background: isSelected ? 'rgba(37,99,235,0.12)' : 'rgba(0,0,0,0.07)',
+                        color: isSelected ? 'var(--blue-600)' : 'var(--text-secondary)',
                         whiteSpace: 'nowrap',
                       }}
                     >

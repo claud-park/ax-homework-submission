@@ -80,9 +80,9 @@ export function DateStrip({ selectedDate, onSelect }: Props) {
                 disabled={d.isPast}
                 className="flex flex-col items-center px-2 py-2 rounded-xl flex-1"
                 style={{
-                  background:   selected ? 'var(--blue-600)' : 'var(--surface-secondary)',
-                  border:       selected ? 'none' : '1px solid var(--border-subtle)',
-                  color:        d.isPast ? 'var(--text-disabled)' : selected ? '#fff' : 'var(--text-primary)',
+                  background:   selected ? 'rgba(37,99,235,0.1)' : 'var(--surface-secondary)',
+                  border:       selected ? '1.5px solid var(--blue-600)' : '1px solid var(--border-subtle)',
+                  color:        d.isPast ? 'var(--text-disabled)' : selected ? 'var(--blue-600)' : 'var(--text-primary)',
                   cursor:       d.isPast ? 'not-allowed' : 'pointer',
                   opacity:      d.isPast ? 0.5 : 1,
                 }}

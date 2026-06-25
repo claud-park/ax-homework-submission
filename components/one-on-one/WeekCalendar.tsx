@@ -211,7 +211,7 @@ export function WeekCalendar({
                       left:      3,
                       right:     3,
                       height:    height - 4,
-                      background: isSelected ? 'var(--blue-600)' : 'var(--surface-secondary)',
+                      background: isSelected ? 'rgba(37,99,235,0.1)' : 'var(--surface-secondary)',
                       border: `1.5px solid ${isSelected ? 'var(--blue-600)' : 'var(--border-subtle)'}`,
                       borderRadius: 6,
                       cursor:    'pointer',
@@ -226,7 +226,7 @@ export function WeekCalendar({
                       style={{
                         fontSize: 10,
                         fontWeight: 700,
-                        color: isSelected ? '#fff' : 'var(--text-primary)',
+                        color: isSelected ? 'var(--blue-600)' : 'var(--text-primary)',
                         lineHeight: 1.2,
                       }}
                     >
@@ -239,8 +239,8 @@ export function WeekCalendar({
                           style={{
                             padding: '1px 4px',
                             borderRadius: 3,
-                            background: isSelected ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)',
-                            color: isSelected ? '#fff' : 'var(--text-secondary)',
+                            background: isSelected ? 'rgba(37,99,235,0.12)' : 'rgba(0,0,0,0.08)',
+                            color: isSelected ? 'var(--blue-600)' : 'var(--text-secondary)',
                             fontSize: 8,
                             fontWeight: 700,
                             lineHeight: 1.4,
