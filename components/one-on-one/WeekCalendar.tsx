@@ -290,7 +290,7 @@ export function WeekCalendar({
       {championBusy !== null && (
         <div className="flex items-center gap-4 mt-3 px-12">
           <div className="flex items-center gap-1.5">
-            <div style={{ width: 12, height: 12, borderRadius: 3, background: '#dbeafe', border: '1.5px solid #2563eb' }} />
+            <div style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--surface-secondary)', border: '1px solid var(--border-subtle)' }} />
             <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>가용 슬롯</span>
           </div>
           <div className="flex items-center gap-1.5">
