@@ -273,6 +273,7 @@ export interface OneOnOneBooking {
   slot_start: string       // ISO UTC
   slot_end: string         // ISO UTC
   available_admins: string[]
+  agenda: string | null
   status: 'pending' | 'confirmed' | 'cancelled'
   confirmed_by: string | null
   slack_ts: string | null

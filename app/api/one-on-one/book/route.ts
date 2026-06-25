@@ -37,12 +37,14 @@ export async function POST(req: NextRequest) {
   const user = await verifyUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { duration, slotStart, slotEnd, availableAdmins } = await req.json() as {
+  const { duration, slotStart, slotEnd, availableAdmins, agenda: agendaRaw } = await req.json() as {
     duration: 30 | 60
     slotStart: string
     slotEnd: string
     availableAdmins: string[]
+    agenda?: string
   }
+  const agenda = agendaRaw?.trim() ? agendaRaw.trim().slice(0, 3000) : null
 
   const supabase = createServiceClient()
 
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   const channelId = process.env.ONE_ON_ONE_CHANNEL_ID!
   const slotLabel = formatSlotLabel(slotStart)
-  const messageText = `📅 *1-on-1 신청*\n신청자: ${profile.name} (${profile.email})\n일시: ${slotLabel} (${duration}분)\n가능 어드민: ${availableAdmins.join(', ')}`
+  const messageText = `📅 *1-on-1 신청*\n신청자: ${profile.name} (${profile.email})\n일시: ${slotLabel} (${duration}분)\n가능 어드민: ${availableAdmins.join(', ')}${agenda ? `\n📝 아젠다: ${agenda}` : ''}`
 
   // 1. Slack 메시지 전송 (버튼 value는 booking.id 확정 후 업데이트 예정)
   const slackRes = await slack.chat.postMessage({
@@ -105,6 +107,7 @@ export async function POST(req: NextRequest) {
       slot_start:       slotStart,
       slot_end:         slotEnd,
       available_admins: availableAdmins,
+      agenda,
       slack_ts:         slackTs,
       slack_channel:    channelId,
     })

@@ -51,6 +51,7 @@ export default function OneOnOnePage() {
 
   // 공통 state
   const [selectedSlot,   setSelectedSlot]   = useState<Slot | null>(null)
+  const [agenda,         setAgenda]          = useState('')
   const [booking,        setBooking]         = useState<OneOnOneBooking | null>(null)
   const [bookingLoading, setBookingLoading]  = useState(true)
   const [submitting,     setSubmitting]      = useState(false)
@@ -127,10 +128,12 @@ export default function OneOnOnePage() {
           slotStart:       selectedSlot.start,
           slotEnd:         selectedSlot.end,
           availableAdmins: selectedSlot.availableAdmins,
+          agenda:          agenda.trim() || undefined,
         }),
       })
       setBooking(res.booking)
       setSelectedSlot(null)
+      setAgenda('')
     } catch (e) {
       setError(e instanceof Error ? e.message : '신청 실패')
     } finally {
@@ -292,6 +295,32 @@ export default function OneOnOnePage() {
 
         {error && (
           <p className="text-xs mb-3 mt-2" style={{ color: 'var(--error)' }}>{error}</p>
+        )}
+
+        {selectedSlot && (
+          <div className="mt-4">
+            <label
+              className="block text-xs font-semibold mb-1.5"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              아젠다 <span style={{ color: 'var(--text-disabled)', fontWeight: 400 }}>(선택)</span>
+            </label>
+            <textarea
+              value={agenda}
+              onChange={(e) => setAgenda(e.target.value)}
+              placeholder="1-on-1에서 논의하고 싶은 주제를 적어주세요."
+              rows={3}
+              maxLength={3000}
+              className="w-full text-sm rounded-xl px-3 py-2"
+              style={{
+                border: '1px solid var(--border-subtle)',
+                background: 'var(--surface-primary)',
+                color: 'var(--text-primary)',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
         )}
 
         {selectedSlot && (
