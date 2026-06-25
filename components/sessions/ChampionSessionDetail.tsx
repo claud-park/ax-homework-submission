@@ -1,13 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Pencil, Send } from 'lucide-react'
+import { ArrowLeft, Pencil, Send, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { MarkdownView } from '@/components/MarkdownView'
 import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
 import { useSessionNotes } from '@/components/sessions/useSessionNotes'
+import { useSessionActionItems } from '@/components/sessions/useSessionActionItems'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 
@@ -21,8 +22,13 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
   const [session, setSession] = useState<CheckUpSession | null>(null)
   const { notes, setNotes, isEditingNotes, setIsEditingNotes, saving, saveNotes } =
     useSessionNotes(sessionId, session, setSession, () => { /* champion은 새로고침 안내로 충분 */ })
+  const {
+    actionItems, setActionItems,
+    newItemBody, setNewItemBody, addingItem,
+    editingItemId, editingItemBody, setEditingItemBody,
+    addItem, toggleItem, deleteItem, startEdit, cancelEdit, saveItemBody,
+  } = useSessionActionItems(sessionId)
   const [milestones, setMilestones] = useState<Milestone[]>([])
-  const [actionItems, setActionItems] = useState<SessionActionItem[]>([])
   const [comments, setComments] = useState<SessionComment[]>([])
   const [loading, setLoading] = useState(true)
   const [newComment, setNewComment] = useState('')
@@ -45,16 +51,6 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
       .catch(() => toast.error('세션을 불러올 수 없습니다.'))
       .finally(() => setLoading(false))
   }, [sessionId])
-
-  async function toggleItem(item: SessionActionItem) {
-    try {
-      const updated = await apiFetch<SessionActionItem>(
-        `/api/sessions/${sessionId}/action-items/${item.id}`,
-        { method: 'PATCH', body: JSON.stringify({ is_completed: !item.is_completed }) }
-      )
-      setActionItems(v => v.map(i => i.id === item.id ? updated : i))
-    } catch { toast.error('업데이트 실패') }
-  }
 
   async function postComment() {
     if (!newComment.trim()) return
@@ -176,33 +172,81 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
       </section>
 
       {/* Action items */}
-      {actionItems.length > 0 && (
-        <section className={sectionClass} style={sectionBorder}>
-          <h2 className={labelClass} style={labelStyle}>내 액션 아이템</h2>
-          <div className="flex flex-col">
-            {actionItems.map(item => (
-              <label key={item.id} className="flex items-start gap-2.5 py-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={item.is_completed}
-                  onChange={() => toggleItem(item)}
-                  className="mt-0.5 h-4 w-4 cursor-pointer flex-shrink-0"
-                  style={{ accentColor: 'var(--blue-600)' }}
-                />
-                <span
-                  className="text-sm leading-relaxed"
-                  style={{
-                    color: item.is_completed ? 'var(--text-disabled)' : 'var(--text-primary)',
-                    textDecoration: item.is_completed ? 'line-through' : 'none',
-                  }}
-                >
-                  {item.body}
-                </span>
-              </label>
-            ))}
-          </div>
-        </section>
-      )}
+      <section className={sectionClass} style={sectionBorder}>
+        <h2 className={labelClass} style={labelStyle}>내 액션 아이템</h2>
+        <div className="flex flex-col">
+          {actionItems.map(item => (
+            <div key={item.id} className="flex items-start gap-2.5 py-1.5 group">
+              <input
+                type="checkbox"
+                checked={item.is_completed}
+                onChange={() => toggleItem(item)}
+                className="mt-0.5 h-4 w-4 cursor-pointer flex-shrink-0"
+                style={{ accentColor: 'var(--blue-600)' }}
+              />
+              {editingItemId === item.id ? (
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={editingItemBody}
+                    onChange={e => setEditingItemBody(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveItemBody(item.id); if (e.key === 'Escape') cancelEdit() }}
+                    autoFocus
+                    className="w-full text-sm py-1"
+                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-primary)', outline: 'none', borderRadius: 0 }}
+                  />
+                  <div className="flex gap-1.5 mt-1">
+                    <button onClick={cancelEdit} className="text-xs px-2 py-0.5 rounded"
+                      style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', cursor: 'pointer' }}>취소</button>
+                    <button onClick={() => saveItemBody(item.id)} className="text-xs px-2 py-0.5 rounded font-semibold"
+                      style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}>저장</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span
+                    className="text-sm leading-relaxed flex-1 cursor-text"
+                    onClick={() => startEdit(item)}
+                    style={{
+                      color: item.is_completed ? 'var(--text-disabled)' : 'var(--text-primary)',
+                      textDecoration: item.is_completed ? 'line-through' : 'none',
+                    }}
+                  >
+                    {item.body}
+                  </span>
+                  <button
+                    onClick={() => deleteItem(item.id)}
+                    aria-label="삭제"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                    style={{ color: 'var(--text-disabled)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* 추가 입력 */}
+        <div className="flex items-center gap-2 mt-2 pt-1">
+          <input
+            type="text"
+            value={newItemBody}
+            onChange={e => setNewItemBody(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addItem() }}
+            placeholder="액션 아이템 추가..."
+            className="flex-1 text-sm py-2"
+            style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-primary)', outline: 'none', borderRadius: 0 }}
+          />
+          <button
+            onClick={addItem}
+            disabled={addingItem || !newItemBody.trim()}
+            className="text-xs font-semibold px-2.5 py-1 rounded-md disabled:opacity-30"
+            style={{ background: 'transparent', color: 'var(--blue-600)', border: 'none', cursor: 'pointer', flexShrink: 0 }}
+          >추가</button>
+        </div>
+      </section>
 
       {/* Comments */}
       <section className={sectionClass} style={sectionBorder}>
