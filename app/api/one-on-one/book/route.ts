@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { slack } from '@/lib/one-on-one/slack'
+import { slack, renderAdminMentions } from '@/lib/one-on-one/slack'
 import { formatSlotLabel, isWorkingHour, overlapsLunchBreak } from '@/lib/one-on-one/slot-utils'
 import type { OneOnOneBooking } from '@/lib/types'
 
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   const channelId = process.env.ONE_ON_ONE_CHANNEL_ID!
   const slotLabel = formatSlotLabel(slotStart)
-  const messageText = `📅 *1-on-1 신청*\n신청자: ${profile.name} (${profile.email})\n일시: ${slotLabel} (${duration}분)\n가능 어드민: ${availableAdmins.join(', ')}${agenda ? `\n📝 아젠다: ${agenda}` : ''}`
+  const messageText = `📅 *1-on-1 신청*\n신청자: ${profile.name} (${profile.email})\n일시: ${slotLabel} (${duration}분)\n가능 어드민: ${renderAdminMentions(availableAdmins)}${agenda ? `\n📝 아젠다: ${agenda}` : ''}`
 
   // 1. Slack 메시지 전송 (버튼 value는 booking.id 확정 후 업데이트 예정)
   const slackRes = await slack.chat.postMessage({
