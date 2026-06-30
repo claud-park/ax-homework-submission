@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, getAdminIdBySlackUserId, type AdminId } from '@/lib/one-on-one/slack'
-import { getAuthenticatedClient } from '@/lib/one-on-one/google-auth'
+import { getAuthenticatedClient, getAdminEmails } from '@/lib/one-on-one/google-auth'
 import { formatSlotLabel, formatSlotRange } from '@/lib/one-on-one/slot-utils'
 
 function verifySlackSignature(
@@ -79,17 +79,28 @@ async function handleConfirm(payload: Record<string, unknown>, bookingId: string
     .select('id')
   if (!updated || updated.length === 0) return  // 다른 어드민이 이미 확정
 
+  // 초대 대상: 해당 슬롯의 모든 가능 어드민 + 신청자
+  const availableAdmins = (booking.available_admins ?? []) as AdminId[]
+  const adminEmails = await getAdminEmails(availableAdmins)
+  const attendeeEmails = [
+    ...adminEmails,
+    ...(booking.champion_email ? [booking.champion_email] : []),
+  ]
+  const attendees = [...new Set(attendeeEmails)].map((email) => ({ email }))
+  const adminLabel = availableAdmins.map((a) => a.toUpperCase()).join(', ')
+
   // Google Calendar 이벤트 생성
   try {
     const auth = await getAuthenticatedClient(confirmedAdminId)
     const calendar = google.calendar({ version: 'v3', auth })
     await calendar.events.insert({
       calendarId: 'primary',
+      sendUpdates: 'all',
       requestBody: {
-        summary: `[AX] 1-on-1: ${booking.champion_name} × ${confirmedAdminId.toUpperCase()}`,
+        summary: `[AX] 1-on-1: ${booking.champion_name} × ${adminLabel}`,
         start: { dateTime: booking.slot_start, timeZone: 'Asia/Seoul' },
         end:   { dateTime: booking.slot_end,   timeZone: 'Asia/Seoul' },
-        attendees: [{ email: booking.champion_email }],
+        attendees,
       },
     })
   } catch (err) {
