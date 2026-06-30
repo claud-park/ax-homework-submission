@@ -26,7 +26,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   idle: '대기',
   recording: '녹음 중',
   uploading: '파일 업로드 중',
-  transcribing: '음성 전사 중 (Whisper AI)',
+  transcribing: '음성 전사 중 (AI)',
   summarizing: 'AI 요약 생성 중 (Claude)',
   done: '완료',
   error: '오류 발생',
@@ -122,7 +122,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
 
     if (audioBlob.size > MAX_AUDIO_BYTES) {
       setPhase('error')
-      setErrorMsg(`녹음이 너무 깁니다 (${(audioBlob.size / (1024 * 1024)).toFixed(1)}MB). Whisper 한도는 ${MAX_AUDIO_MB}MB입니다. 나눠서 녹음해 주세요.`)
+      setErrorMsg(`녹음이 너무 깁니다 (${(audioBlob.size / (1024 * 1024)).toFixed(1)}MB). STT 한도는 ${MAX_AUDIO_MB}MB입니다. 나눠서 녹음해 주세요.`)
       return
     }
 
@@ -407,7 +407,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
           </div>
           {usage && (
             <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-disabled)' }}>
-              {`Whisper ${formatTime(usage.stt.durationSec)} ($${usage.stt.cost.toFixed(3)})`}
+              {`STT ${formatTime(usage.stt.durationSec)} ($${usage.stt.cost.toFixed(3)})`}
               {' · '}
               Claude {(usage.claude.inputTokens + usage.claude.outputTokens).toLocaleString()} 토큰
               {' '}(입력 {usage.claude.inputTokens.toLocaleString()} / 출력 {usage.claude.outputTokens.toLocaleString()})

@@ -26,7 +26,7 @@ export function assessTranscript(
   let reason: TranscriptQuality['reason']
   if (segs.length === 0) reason = 'empty'
   else if (repetitionRatio < minRepetitionRatio) reason = 'repetitive'
-  else if (charsPerSec < minCharsPerSec) reason = 'low-yield'
+  else if (durationSec > 0 && charsPerSec < minCharsPerSec) reason = 'low-yield'
 
   return { ok: !reason, charsPerSec, repetitionRatio, reason }
 }

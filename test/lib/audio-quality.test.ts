@@ -32,4 +32,10 @@ describe('assessTranscript', () => {
   it('flags empty transcript', () => {
     expect(assessTranscript('   ', 100).reason).toBe('empty')
   })
+
+  it('accepts a varied transcript with unknown duration (durationSec=0)', () => {
+    const r = assessTranscript(GOOD, 0)
+    expect(r.ok).toBe(true)
+    expect(r.reason).toBeUndefined()
+  })
 })
