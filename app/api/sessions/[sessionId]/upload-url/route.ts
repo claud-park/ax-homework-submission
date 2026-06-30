@@ -34,7 +34,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single()
   if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
-  const path = `sessions/${params.sessionId}/audio.${ext}`
+  const index = typeof body?.index === 'number' ? body.index : undefined
+  const path = index !== undefined
+    ? `sessions/${params.sessionId}/chunk_${String(index).padStart(3, '0')}.${ext}`
+    : `sessions/${params.sessionId}/audio.${ext}`
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .createSignedUploadUrl(path, { upsert: true })
