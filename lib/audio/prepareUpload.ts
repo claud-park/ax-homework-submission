@@ -16,11 +16,15 @@ export async function prepareAudioForUpload(
   const arrayBuf = await blob.arrayBuffer()
 
   // 임시 컨텍스트로 디코드 (브라우저가 원본 SR로 디코드)
-  const AC: typeof AudioContext =
-    (window as any).AudioContext ?? (window as any).webkitAudioContext
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const AC: typeof AudioContext = (window as any).AudioContext ?? (window as any).webkitAudioContext
   const tmp = new AC()
-  const decoded = await tmp.decodeAudioData(arrayBuf.slice(0))
-  await tmp.close()
+  let decoded: AudioBuffer
+  try {
+    decoded = await tmp.decodeAudioData(arrayBuf.slice(0))
+  } finally {
+    await tmp.close()
+  }
 
   // 16kHz mono로 리샘플/다운믹스
   const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * sampleRate), sampleRate)

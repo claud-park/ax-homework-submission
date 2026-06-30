@@ -213,7 +213,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
         if (!urlRes.ok) throw new Error('업로드 URL을 가져오지 못했습니다.')
         const { path, token } = await urlRes.json()
         const { error: upErr } = await supabase.storage.from(BUCKET)
-          .uploadToSignedUrl(path, token, new Blob([wav.buffer as ArrayBuffer], { type: 'audio/wav' }), { contentType: 'audio/wav', upsert: true })
+          .uploadToSignedUrl(path, token, new Blob([new Uint8Array(wav.buffer as ArrayBuffer, wav.byteOffset, wav.byteLength)], { type: 'audio/wav' }), { contentType: 'audio/wav', upsert: true })
         if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
         audioPaths.push(path)
       }
