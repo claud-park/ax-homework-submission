@@ -31,3 +31,8 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          # 모듈 스코프에서 createClient(...) / new OpenAI(...)가 평가되므로 빌드 시 placeholder 필요
+          SUPABASE_SERVICE_KEY: placeholder-service-key
+          SCHEDULER_SUPABASE_URL: https://placeholder.supabase.co
+          SCHEDULER_SUPABASE_SERVICE_KEY: placeholder-service-key
+          OPENAI_API_KEY: placeholder-openai-key
