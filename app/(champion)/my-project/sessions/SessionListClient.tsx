@@ -6,7 +6,7 @@ import type { CheckUpSession } from '@/lib/types'
 
 const STATUS_LABEL: Record<string, string> = {
   idle: '미처리', uploading: '업로드 중', transcribing: '전사 중',
-  summarizing: '요약 중', done: '완료', error: '오류',
+  summarizing: '요약 중', done: '완료', error: '오류', low_quality: '품질 낮음',
 }
 
 export function SessionListClient({ sessions }: { sessions: CheckUpSession[] }) {
