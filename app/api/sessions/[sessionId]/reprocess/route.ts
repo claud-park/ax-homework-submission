@@ -22,8 +22,20 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single()
 
   if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
-  if (!session.audio_file_path) {
-    return NextResponse.json({ error: '저장된 오디오 파일이 없습니다.' }, { status: 400 })
+
+  const BUCKET = 'check-up-sessions'
+  const { data: listed } = await supabase.storage.from(BUCKET).list(`sessions/${params.sessionId}`, { limit: 100 })
+  const chunkNames = (listed ?? [])
+    .map(o => o.name)
+    .filter(n => /^chunk_\d+\.wav$/.test(n))
+    .sort()
+  let audioPaths: string[]
+  if (chunkNames.length > 0) {
+    audioPaths = chunkNames.map(n => `sessions/${params.sessionId}/${n}`)
+  } else if (session.audio_file_path) {
+    audioPaths = [session.audio_file_path]   // 레거시 단일 파일
+  } else {
+    return NextResponse.json({ error: '오디오가 없습니다.' }, { status: 400 })
   }
 
   try {
@@ -35,8 +47,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       )
     }
 
-    const durationSec = session.recording_duration_sec ?? 0
-    const result = await processSessionAudio(supabase, params.sessionId, session.audio_file_path, durationSec)
+    const result = await processSessionAudio(supabase, params.sessionId, audioPaths, session.recording_duration_sec ?? 0)
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof SummaryParseError) {
