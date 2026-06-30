@@ -4,7 +4,8 @@ import { Mic, Square, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { SessionActionItem } from '@/lib/types'
-import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, MAX_AUDIO_MB, isAcceptedAudio, resolveAudioType } from '@/lib/audio'
+import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, MAX_AUDIO_MB, isAcceptedAudio } from '@/lib/audio'
+import { prepareAudioForUpload } from '@/lib/audio/prepareUpload'
 
 const BUCKET = 'check-up-sessions'
 
@@ -25,7 +26,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   idle: '대기',
   recording: '녹음 중',
   uploading: '파일 업로드 중',
-  transcribing: '음성 전사 중 (Whisper AI)',
+  transcribing: '음성 전사 중 (AI)',
   summarizing: 'AI 요약 생성 중 (Claude)',
   done: '완료',
   error: '오류 발생',
@@ -121,7 +122,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
 
     if (audioBlob.size > MAX_AUDIO_BYTES) {
       setPhase('error')
-      setErrorMsg(`녹음이 너무 깁니다 (${(audioBlob.size / (1024 * 1024)).toFixed(1)}MB). Whisper 한도는 ${MAX_AUDIO_MB}MB입니다. 나눠서 녹음해 주세요.`)
+      setErrorMsg(`녹음이 너무 깁니다 (${(audioBlob.size / (1024 * 1024)).toFixed(1)}MB). STT 한도는 ${MAX_AUDIO_MB}MB입니다. 나눠서 녹음해 주세요.`)
       return
     }
 
@@ -190,75 +191,54 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
    * (bypasses Vercel's 4.5MB function body limit), then ask the process route
    * to transcribe + summarize from the stored path.
    */
-  async function uploadAndProcess(
-    blob: Blob,
-    filename: string,
-    durationSec: number,
-    uploadEstimate: number,
-    sttEstimate: number,
-    summarizeEstimate: number
-  ) {
+  async function uploadAndProcess(blob: Blob, _filename: string, durationSec: number, uploadEstimate: number, sttEstimate: number, summarizeEstimate: number) {
     const supabase = createSupabaseBrowserClient()
-    // Refresh token before upload to avoid stale JWT on long recordings
     let { data: { session } } = await supabase.auth.refreshSession()
-    if (!session) {
-      const fallback = await supabase.auth.getSession()
-      session = fallback.data.session
-    }
+    if (!session) session = (await supabase.auth.getSession()).data.session
     if (!session) { setPhase('error'); setErrorMsg('인증 오류'); return }
 
-    const { ext, contentType } = resolveAudioType(filename, blob.type)
-
     try {
-      // 1. Get a signed upload URL from the server (tiny request)
-      const urlRes = await fetch(`/api/sessions/${sessionId}/upload-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ext }),
-      })
-      if (!urlRes.ok) {
-        const err = await urlRes.json().catch(() => ({}))
-        throw new Error(err.error ?? '업로드 URL을 가져오지 못했습니다.')
-      }
-      const { path, token } = await urlRes.json()
+      const chunks = await prepareAudioForUpload(blob)
+      if (chunks.length === 0) throw new Error('오디오를 처리할 수 없습니다.')
 
-      // 2. Upload directly to Storage (progress simulated 0 → 20%)
+      setPhase('uploading'); setProgress(0)
       startProgressTimer(0, 20, uploadEstimate * 1000)
-      const { error: upErr } = await supabase.storage
-        .from(BUCKET)
-        .uploadToSignedUrl(path, token, blob, { contentType, upsert: true })
+      const audioPaths: string[] = []
+      for (const { index, wav } of chunks) {
+        const urlRes = await fetch(`/api/sessions/${sessionId}/upload-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ ext: 'wav', index }),
+        })
+        if (!urlRes.ok) throw new Error('업로드 URL을 가져오지 못했습니다.')
+        const { path, token } = await urlRes.json()
+        const { error: upErr } = await supabase.storage.from(BUCKET)
+          .uploadToSignedUrl(path, token, new Blob([new Uint8Array(wav.buffer as ArrayBuffer, wav.byteOffset, wav.byteLength)], { type: 'audio/wav' }), { contentType: 'audio/wav', upsert: true })
+        if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
+        audioPaths.push(path)
+      }
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
-      if (upErr) throw new Error(`업로드 실패: ${upErr.message}`)
       setProgress(20)
 
-      // 3. Trigger server-side STT + summary (simulate 20 → 95% while it runs)
       setPhase('transcribing')
-      startProgressTimer(20, 80, sttEstimate * 1000, () => {
-        setPhase('summarizing')
-        startProgressTimer(80, 95, summarizeEstimate * 1000)
-      })
+      startProgressTimer(20, 80, sttEstimate * 1000, () => { setPhase('summarizing'); startProgressTimer(80, 95, summarizeEstimate * 1000) })
 
       const procRes = await fetch(`/api/sessions/${sessionId}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ audioPath: path, recordingDurationSec: durationSec }),
+        body: JSON.stringify({ audioPaths, recordingDurationSec: durationSec }),
       })
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
-
-      if (!procRes.ok) {
-        const err = await procRes.json().catch(() => ({}))
-        throw new Error(err.error ?? '처리 실패')
-      }
+      if (!procRes.ok) { const e = await procRes.json().catch(() => ({})); throw new Error(e.error ?? '처리 실패') }
 
       const result = await procRes.json()
-      setProgress(100)
-      setPhase('done')
+      setProgress(100); setPhase('done')
       onProcessed(result.notes ?? '', result.actionItems ?? [])
       if (result.usage) setUsage(result.usage)
+      if (result.lowQuality) toast.warning('전사 품질이 낮을 수 있습니다. 필요 시 재처리하세요.')
     } catch (err) {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
-      setPhase('error')
-      setErrorMsg(err instanceof Error ? err.message : '처리 중 오류가 발생했습니다.')
+      setPhase('error'); setErrorMsg(err instanceof Error ? err.message : '처리 실패')
     }
   }
 
@@ -427,7 +407,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
           </div>
           {usage && (
             <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-disabled)' }}>
-              {`Whisper ${formatTime(usage.stt.durationSec)} ($${usage.stt.cost.toFixed(3)})`}
+              {`STT ${formatTime(usage.stt.durationSec)} ($${usage.stt.cost.toFixed(3)})`}
               {' · '}
               Claude {(usage.claude.inputTokens + usage.claude.outputTokens).toLocaleString()} 토큰
               {' '}(입력 {usage.claude.inputTokens.toLocaleString()} / 출력 {usage.claude.outputTokens.toLocaleString()})

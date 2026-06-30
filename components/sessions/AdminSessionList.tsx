@@ -13,6 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
   summarizing: '요약 중',
   done: '완료',
   error: '오류',
+  low_quality: '품질 낮음',
 }
 
 interface Props {

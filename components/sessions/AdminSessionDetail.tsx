@@ -291,6 +291,32 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         </div>
       )}
 
+      {/* Low quality banner — shown when transcript quality was too low */}
+      {session.processing_status === 'low_quality' && (
+        <div
+          className="rounded-xl border p-3 mb-4 flex items-center justify-between"
+          style={{ background: 'rgba(245,158,11,0.08)', borderColor: 'rgba(245,158,11,0.3)' }}
+        >
+          <div>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6, color: 'var(--amber)', background: 'rgba(245,158,11,0.12)' }}>
+              ⚠️ 전사 품질 낮음
+            </span>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-secondary)' }}>전사 품질이 낮습니다. 오디오 상태를 확인 후 재처리하세요.</p>
+          </div>
+          {session.audio_file_path && (
+            <button
+              onClick={reprocess}
+              disabled={reprocessing}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-40"
+              style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              <RefreshCw className={`h-3 w-3 ${reprocessing ? 'animate-spin' : ''}`} />
+              {reprocessing ? '처리 중...' : '재처리'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Recording panel (new session) OR downloads (already-recorded session) */}
       {!session.audio_file_path ? (
         <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} />

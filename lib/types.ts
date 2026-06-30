@@ -220,7 +220,7 @@ export interface UserManagementEntry {
 
 // ─── Check-up Sessions ───────────────────────────────────────────────────────
 
-export type SessionProcessingStatus = 'idle' | 'uploading' | 'transcribing' | 'summarizing' | 'done' | 'error'
+export type SessionProcessingStatus = 'idle' | 'uploading' | 'transcribing' | 'summarizing' | 'done' | 'error' | 'low_quality'
 
 export interface CheckUpSession {
   id: string

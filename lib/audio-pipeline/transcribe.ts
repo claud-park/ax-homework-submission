@@ -1,10 +1,12 @@
+// gpt-4o-transcribe: whisper-1 대비 저음량/무음에서 환각 반복 루프가 없음.
+// 단 1400초(~23분) 상한이 있어 호출부에서 청크 분할 후 청크 단위로 호출한다.
 import OpenAI from 'openai'
 import { toFile } from 'openai'
 import { MAX_AUDIO_BYTES, MAX_AUDIO_MB, resolveAudioType } from '@/lib/audio'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-/** Whisper STT — no Supabase or DB dependencies. */
+/** STT (gpt-4o-transcribe) — no Supabase or DB dependencies. */
 export async function transcribeAudio(
   audioBuffer: ArrayBuffer,
   filename: string
@@ -12,7 +14,7 @@ export async function transcribeAudio(
   if (audioBuffer.byteLength > MAX_AUDIO_BYTES) {
     const mb = (audioBuffer.byteLength / (1024 * 1024)).toFixed(1)
     throw new Error(
-      `오디오가 너무 큽니다 (${mb}MB). Whisper 전사 한도는 ${MAX_AUDIO_MB}MB입니다. 더 짧게 녹음하거나 나눠서 업로드하세요.`
+      `오디오가 너무 큽니다 (${mb}MB). STT 전사 한도는 ${MAX_AUDIO_MB}MB입니다. 더 짧게 녹음하거나 나눠서 업로드하세요.`
     )
   }
 
@@ -21,7 +23,7 @@ export async function transcribeAudio(
   const whisperFile = await toFile(audioBlob, `audio.${ext}`, { type: contentType })
   const transcription = await openai.audio.transcriptions.create({
     file: whisperFile,
-    model: 'whisper-1',
+    model: 'gpt-4o-transcribe',
     language: 'ko',
   })
   return transcription.text
