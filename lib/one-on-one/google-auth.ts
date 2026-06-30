@@ -11,6 +11,21 @@ const schedulerSupabase = createClient(
 export type AdminId = 'claud' | 'alex' | 'jennifer'
 export const ADMIN_IDS: AdminId[] = ['claud', 'alex', 'jennifer']
 
+// 캘린더 초대용: 주어진 어드민들의 Google 이메일 조회 (연결 안 된 어드민은 제외)
+export async function getAdminEmails(adminIds: AdminId[]): Promise<string[]> {
+  if (adminIds.length === 0) return []
+  const { data, error } = await schedulerSupabase
+    .from('admin_google_tokens')
+    .select('email')
+    .in('admin_id', adminIds)
+
+  if (error || !data) {
+    console.error('어드민 이메일 조회 실패:', error?.message)
+    return []
+  }
+  return data.map((r) => r.email).filter((e): e is string => !!e)
+}
+
 export async function getAuthenticatedClient(adminId: AdminId): Promise<OAuth2Client> {
   const { data, error } = await schedulerSupabase
     .from('admin_google_tokens')
