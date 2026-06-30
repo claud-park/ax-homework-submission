@@ -24,7 +24,7 @@ describe('assessTranscript', () => {
   })
 
   it('accepts a normal varied transcript', () => {
-    const r = assessTranscript(GOOD, 120)
+    const r = assessTranscript(GOOD, 30)
     expect(r.ok).toBe(true)
     expect(r.reason).toBeUndefined()
   })

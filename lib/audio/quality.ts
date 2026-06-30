@@ -15,17 +15,17 @@ export function assessTranscript(
   durationSec: number,
   opts: { minCharsPerSec?: number; minRepetitionRatio?: number } = {}
 ): TranscriptQuality {
-  const minCharsPerSec = opts.minCharsPerSec ?? 0.5
+  const minCharsPerSec = opts.minCharsPerSec ?? 1.2
   const minRepetitionRatio = opts.minRepetitionRatio ?? 0.4
 
   const t = text.trim()
-  const segs = t.split(/[\s.?!\n,]+/).map(s => s.trim()).filter(s => s.length > 2)
+  const segs = t.split(/[\s.?!\n,]+/).map(s => s.trim()).filter(s => s.length >= 1)
   const repetitionRatio = segs.length ? new Set(segs).size / segs.length : 0
   const charsPerSec = durationSec > 0 ? t.length / durationSec : 0
 
   let reason: TranscriptQuality['reason']
-  if (t.length === 0) reason = 'empty'
-  else if (segs.length > 0 && repetitionRatio < minRepetitionRatio) reason = 'repetitive'
+  if (segs.length === 0) reason = 'empty'
+  else if (repetitionRatio < minRepetitionRatio) reason = 'repetitive'
   else if (charsPerSec < minCharsPerSec) reason = 'low-yield'
 
   return { ok: !reason, charsPerSec, repetitionRatio, reason }

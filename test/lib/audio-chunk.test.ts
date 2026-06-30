@@ -26,6 +26,17 @@ describe('planChunks', () => {
     const sr = 16000
     expect(planChunks(sr * 60, sr)).toEqual([{ start: 0, end: sr * 60 }])
   })
+
+  it('clamps to hard limits when caller passes larger maxSec/maxBytes', () => {
+    const sr = 16000
+    const chunks = planChunks(sr * 5000, sr, { maxSec: 2000, maxBytes: 30 * 1024 * 1024 })
+    const hardBySec = 1400 * sr
+    const hardByBytes = Math.floor((25 * 1024 * 1024 - 44) / 2)
+    for (const c of chunks) {
+      expect(c.end - c.start).toBeLessThanOrEqual(hardBySec)
+      expect(c.end - c.start).toBeLessThanOrEqual(hardByBytes)
+    }
+  })
 })
 
 describe('encodeWav', () => {

@@ -1,5 +1,7 @@
 // lib/audio/chunk.ts
 const WAV_HEADER_BYTES = 44
+const HARD_MAX_SEC = 1400
+const HARD_MAX_BYTES = 25 * 1024 * 1024
 
 export interface ChunkOpts {
   maxSec?: number
@@ -17,8 +19,10 @@ export function planChunks(
   const maxBytes = opts.maxBytes ?? 24 * 1024 * 1024
   const bytesPerSample = opts.bytesPerSample ?? 2
 
-  const byBytes = Math.floor((maxBytes - WAV_HEADER_BYTES) / bytesPerSample)
-  const bySec = Math.floor(maxSec * sampleRate)
+  const effMaxSec = Math.min(maxSec, HARD_MAX_SEC)
+  const effMaxBytes = Math.min(maxBytes, HARD_MAX_BYTES)
+  const byBytes = Math.floor((effMaxBytes - WAV_HEADER_BYTES) / bytesPerSample)
+  const bySec = Math.floor(effMaxSec * sampleRate)
   const maxSamples = Math.max(1, Math.min(byBytes, bySec))
 
   const chunks: { start: number; end: number }[] = []
