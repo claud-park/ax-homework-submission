@@ -31,7 +31,7 @@ describe('processSessionAudio (chunked)', () => {
     ;(transcribeAudio as any).mockResolvedValueOnce('첫번째 청크 내용 다양함 한국어 문장 여러개')
       .mockResolvedValueOnce('두번째 청크 또다른 내용 정상적인 대화')
     const { client } = fakeSupabase()
-    const res = await processSessionAudio(client, 's1', ['sessions/s1/chunk_000.wav', 'sessions/s1/chunk_001.wav'], 120)
+    const res = await processSessionAudio(client, 's1', ['sessions/s1/chunk_000.wav', 'sessions/s1/chunk_001.wav'], 10)
     expect((transcribeAudio as any).mock.calls.length).toBe(2)
     expect(res.notes).toContain('요약')
     expect(res.lowQuality).toBeFalsy()

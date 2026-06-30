@@ -87,8 +87,7 @@ export async function processSessionAudio(
   }
   const transcript = parts.join(' ').trim()
 
-  // Korean syllable chars are information-dense; 0.3 chars/sec is a practical floor
-  const quality = assessTranscript(transcript, durationSec, { minCharsPerSec: 0.3 })
+  const quality = assessTranscript(transcript, durationSec)
 
   await supabase.from('check_up_sessions')
     .update({ processing_status: 'summarizing', raw_transcript: transcript }).eq('id', sessionId)

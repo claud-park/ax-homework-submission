@@ -24,19 +24,6 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   const BUCKET = 'check-up-sessions'
-  const { data: listed } = await supabase.storage.from(BUCKET).list(`sessions/${params.sessionId}`, { limit: 100 })
-  const chunkNames = (listed ?? [])
-    .map(o => o.name)
-    .filter(n => /^chunk_\d+\.wav$/.test(n))
-    .sort()
-  let audioPaths: string[]
-  if (chunkNames.length > 0) {
-    audioPaths = chunkNames.map(n => `sessions/${params.sessionId}/${n}`)
-  } else if (session.audio_file_path) {
-    audioPaths = [session.audio_file_path]   // 레거시 단일 파일
-  } else {
-    return NextResponse.json({ error: '오디오가 없습니다.' }, { status: 400 })
-  }
 
   try {
     const claimed = await claimSessionForProcessing(supabase, params.sessionId)
@@ -45,6 +32,20 @@ export async function POST(req: NextRequest, { params }: Params) {
         { error: '이미 처리 중인 세션입니다. 잠시 후 다시 시도하세요.' },
         { status: 409 }
       )
+    }
+
+    const { data: listed } = await supabase.storage.from(BUCKET).list(`sessions/${params.sessionId}`, { limit: 100 })
+    const chunkNames = (listed ?? [])
+      .map(o => o.name)
+      .filter(n => /^chunk_\d+\.wav$/.test(n))
+      .sort()
+    let audioPaths: string[]
+    if (chunkNames.length > 0) {
+      audioPaths = chunkNames.map(n => `sessions/${params.sessionId}/${n}`)
+    } else if (session.audio_file_path) {
+      audioPaths = [session.audio_file_path]   // 레거시 단일 파일
+    } else {
+      return NextResponse.json({ error: '오디오가 없습니다.' }, { status: 400 })
     }
 
     const result = await processSessionAudio(supabase, params.sessionId, audioPaths, session.recording_duration_sec ?? 0)
