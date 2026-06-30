@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
-import { slack, getAdminIdBySlackUserId, type AdminId } from '@/lib/one-on-one/slack'
+import { slack, getAdminIdBySlackUserId, getSlackUserIdByAdminId, type AdminId } from '@/lib/one-on-one/slack'
 import { getAuthenticatedClient, getAdminEmails } from '@/lib/one-on-one/google-auth'
 import { formatSlotLabel, formatSlotRange } from '@/lib/one-on-one/slot-utils'
 
@@ -108,12 +108,20 @@ async function handleConfirm(payload: Record<string, unknown>, bookingId: string
     // Calendar 실패해도 confirmed 상태는 유지 (Slack 메시지는 업데이트)
   }
 
+  // 확정 어드민 멘션 + 함께 가능했던 다른 어드민 cc 태그
+  const mentionAdmin = (adminId: AdminId) => {
+    const sid = getSlackUserIdByAdminId(adminId)
+    return sid ? `<@${sid}>` : adminId.toUpperCase()
+  }
+  const otherAdmins = availableAdmins.filter((a) => a !== confirmedAdminId)
+  const ccText = otherAdmins.length ? ` cc. ${otherAdmins.map(mentionAdmin).join(', ')}` : ''
+
   // Slack 메시지 업데이트 (버튼 제거)
   const slotLabel = formatSlotLabel(booking.slot_start)
   await slack.chat.update({
     channel: booking.slack_channel!,
     ts:      booking.slack_ts!,
-    text:    `✅ 확정 (${confirmedAdminId.toUpperCase()}) — ${booking.champion_name} ${slotLabel} (${booking.duration_minutes}분)`,
+    text:    `✅ ${mentionAdmin(confirmedAdminId)}이 확정, 미팅 초대했습니다.${ccText} — ${booking.champion_name} ${slotLabel} (${booking.duration_minutes}분)`,
     blocks:  [],
   })
 }
