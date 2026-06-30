@@ -1,3 +1,5 @@
+// gpt-4o-transcribe: whisper-1 대비 저음량/무음에서 환각 반복 루프가 없음.
+// 단 1400초(~23분) 상한이 있어 호출부에서 청크 분할 후 청크 단위로 호출한다.
 import OpenAI from 'openai'
 import { toFile } from 'openai'
 import { MAX_AUDIO_BYTES, MAX_AUDIO_MB, resolveAudioType } from '@/lib/audio'
@@ -21,7 +23,7 @@ export async function transcribeAudio(
   const whisperFile = await toFile(audioBlob, `audio.${ext}`, { type: contentType })
   const transcription = await openai.audio.transcriptions.create({
     file: whisperFile,
-    model: 'whisper-1',
+    model: 'gpt-4o-transcribe',
     language: 'ko',
   })
   return transcription.text
