@@ -409,6 +409,9 @@ export default function AdminChampionPage() {
           position: 'sticky',
           top: 0,
           zIndex: 20,
+          // 항상 불투명 배경을 깔아 sticky 상태에서 본문이 비쳐 보이지 않도록 함.
+          // 평상시엔 페이지 배경과 동일(--background)하고, 스크롤 시 아래에서 --surface-primary로 덮어씀.
+          background: 'var(--background)',
           transition: 'padding 0.15s ease, background 0.15s ease',
           ...(scrolled
             ? {
