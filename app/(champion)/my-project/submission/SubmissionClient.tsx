@@ -1,10 +1,11 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch, apiUpload } from '@/lib/api-client'
 import type { Submission, Comment } from '@/lib/types'
 import { toast } from 'sonner'
 import { Upload, FileCheck, Link, Download, Send } from 'lucide-react'
 import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
+import { track, AnalyticsEvent } from '@/lib/analytics'
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -35,6 +36,16 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
   const [newComment, setNewComment] = useState<Record<string, string>>({})
   const [posting, setPosting] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const viewedDeclinedRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    submissions.forEach(sub => {
+      if (sub.status === 'declined' && !viewedDeclinedRef.current.has(sub.id)) {
+        viewedDeclinedRef.current.add(sub.id)
+        track(AnalyticsEvent.SUBMISSION_DECLINED_VIEWED, { attempt_number: sub.attempt_number })
+      }
+    })
+  }, [submissions])
 
   async function downloadFile(subId: string) {
     setDownloadingId(subId)
@@ -83,6 +94,11 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
       formData.append('file', file)
       await apiUpload('/api/submissions', formData)
       toast.success('제출되었습니다.')
+      track(AnalyticsEvent.SUBMISSION_COMPLETED, {
+        type: 'file',
+        attempt_number: submissions.length + 1,
+        is_resubmission: submissions.length > 0,
+      })
       load()
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : '제출 실패')
@@ -102,6 +118,11 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
         body: JSON.stringify({ link_url: trimmed }),
       })
       toast.success('제출되었습니다.')
+      track(AnalyticsEvent.SUBMISSION_COMPLETED, {
+        type: 'link',
+        attempt_number: submissions.length + 1,
+        is_resubmission: submissions.length > 0,
+      })
       setLinkUrl('')
       load()
     } catch (e: unknown) {

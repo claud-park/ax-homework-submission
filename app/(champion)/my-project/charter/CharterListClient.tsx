@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { CharterSubmission } from '@/lib/types'
+import { track, AnalyticsEvent } from '@/lib/analytics'
 
 const STATUS_LABEL: Record<string, string> = {
   draft: '초안',
@@ -64,6 +65,7 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
         method: 'POST',
         body: JSON.stringify({ title: '', publish_status: 'draft', content: {} }),
       })
+      track(AnalyticsEvent.CHARTER_CREATION_STARTED)
       router.push(`/my-project/charter/${data.id}`)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)

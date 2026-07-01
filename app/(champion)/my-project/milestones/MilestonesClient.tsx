@@ -11,6 +11,7 @@ import { CheckinTab } from '@/components/CheckinTab'
 import { MobileMilestoneCard } from '@/components/MobileMilestoneCard'
 import type { BottleneckType, CharterSubmission } from '@/lib/types'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { track, AnalyticsEvent } from '@/lib/analytics'
 
 const inputStyle = { background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', padding: '8px 12px', fontSize: '13px' }
 
@@ -31,6 +32,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
 
   async function handleCheckinComplete(id: string) {
     try {
+      const isFirstCheckin = !milestones.some(m => m.id !== id && m.status === 'completed')
       const { milestone: updated, parentUpdated } = await apiFetch<{ milestone: Milestone, parentUpdated: Milestone | null }>(`/api/milestones/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ is_manual_completed: true, bottleneck_type: null, bottleneck_note: null }),
@@ -40,6 +42,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
         return parentUpdated ? next.map(m => m.id === parentUpdated.id ? parentUpdated : m) : next
       })
       toast.success('완료로 표시되었습니다.')
+      track(AnalyticsEvent.MILESTONE_MARKED_COMPLETE, { is_first_checkin: isFirstCheckin })
     } catch (e: unknown) {
       toast.error('완료 처리에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
     }
@@ -53,6 +56,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
       toast.success('이슈가 보고되었습니다. 관리자에게 알림이 전송되었습니다.')
+      track(AnalyticsEvent.MILESTONE_ISSUE_REPORTED, { bottleneck_type: type })
     } catch (e: unknown) {
       toast.error('이슈 보고에 실패했습니다: ' + (e instanceof Error ? e.message : String(e)))
     }
@@ -108,6 +112,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
       setDeadlineModal(null)
       setReqForm({ requested_start_date: '', requested_due_date: '', reason: '' })
       toast.success('기한이 변경되었습니다.')
+      track(AnalyticsEvent.MILESTONE_DEADLINE_EXTENDED)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       setError('기한 변경에 실패했습니다.')

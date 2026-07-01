@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/api-client'
+import { track, AnalyticsEvent } from '@/lib/analytics'
 import { DurationToggle }  from '@/components/one-on-one/DurationToggle'
 import { DateStrip }       from '@/components/one-on-one/DateStrip'
 import { TimeSlotGrid }    from '@/components/one-on-one/TimeSlotGrid'
@@ -134,6 +135,10 @@ export default function OneOnOnePage() {
       setBooking(res.booking)
       setSelectedSlot(null)
       setAgenda('')
+      track(AnalyticsEvent.ONE_ON_ONE_BOOKED, {
+        duration,
+        has_agenda: agenda.trim().length > 0,
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : '신청 실패')
     } finally {
