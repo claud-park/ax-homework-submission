@@ -56,6 +56,16 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordingStartRef = useRef<number>(0)
   const estimatedTotalRef = useRef<number>(0)
+  // Holds the last upload+process job so "다시 시도" can retry with the already-recorded
+  // audio instead of discarding it. Null when there is nothing to retry (e.g. record again).
+  const lastJobRef = useRef<{
+    blob: Blob
+    filename: string
+    durationSec: number
+    uploadEstimate: number
+    sttEstimate: number
+    summarizeEstimate: number
+  } | null>(null)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -89,6 +99,7 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
         audioBitsPerSecond: 32000,
       })
       chunksRef.current = []
+      lastJobRef.current = null
       recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.start(1000)
       mediaRecorderRef.current = recorder
@@ -191,7 +202,11 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
    * (bypasses Vercel's 4.5MB function body limit), then ask the process route
    * to transcribe + summarize from the stored path.
    */
-  async function uploadAndProcess(blob: Blob, _filename: string, durationSec: number, uploadEstimate: number, sttEstimate: number, summarizeEstimate: number) {
+  async function uploadAndProcess(blob: Blob, filename: string, durationSec: number, uploadEstimate: number, sttEstimate: number, summarizeEstimate: number) {
+    // Retain the job so a failure can be retried with the same recorded audio
+    // (the record path's blob is otherwise never persisted and would be lost).
+    lastJobRef.current = { blob, filename, durationSec, uploadEstimate, sttEstimate, summarizeEstimate }
+
     const supabase = createSupabaseBrowserClient()
     let { data: { session } } = await supabase.auth.refreshSession()
     if (!session) session = (await supabase.auth.getSession()).data.session
@@ -243,10 +258,21 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   }
 
   function reset() {
+    lastJobRef.current = null
     setPhase('idle')
     setProgress(0)
     setElapsed(0)
     setErrorMsg(null)
+  }
+
+  /** Re-run the failed upload+process with the already-recorded audio (no re-recording). */
+  function retry() {
+    const job = lastJobRef.current
+    if (!job) { reset(); return }
+    setErrorMsg(null)
+    setProgress(0)
+    setPhase('uploading')
+    void uploadAndProcess(job.blob, job.filename, job.durationSec, job.uploadEstimate, job.sttEstimate, job.summarizeEstimate)
   }
 
   const isProcessing = ['uploading', 'transcribing', 'summarizing'].includes(phase)
@@ -422,19 +448,30 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
       )}
 
       {phase === 'error' && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--error)' }}>
             <span>❌</span>
             <span>{errorMsg ?? '처리 중 오류가 발생했습니다.'}</span>
           </div>
-          <button
-            onClick={reset}
-            className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg"
-            style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
-          >
-            <RefreshCw className="h-3 w-3" />
-            다시 시도
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {lastJobRef.current && (
+              <button
+                onClick={retry}
+                className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-semibold"
+                style={{ background: 'var(--blue-600)', border: 'none', color: '#fff', cursor: 'pointer' }}
+              >
+                <RefreshCw className="h-3 w-3" />
+                다시 시도
+              </button>
+            )}
+            <button
+              onClick={reset}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg"
+              style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >
+              새로 시작
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -28,7 +28,10 @@ function buildSummaryPrompt(transcript: string): string {
 아래는 Admin과 Champion 간의 1-on-1 세션 전사 내용입니다.
 
 다음 두 가지를 JSON으로 반환하세요:
-1. "notes": 미팅 주요 내용 요약 (plain text, 한국어, 3~5문단)
+1. "notes": 미팅 주요 내용 요약 (한국어, 마크다운 불릿 포인트 목록).
+   - 각 항목은 "- "로 시작하는 한 줄로 작성하고, 핵심 논의 사항을 5~8개 정도로 정리하세요.
+   - 세부 내용이 있으면 두 칸 들여쓴 하위 불릿("  - ")으로 추가하세요.
+   - 문단(줄글) 대신 반드시 불릿 포인트로만 작성하세요.
 2. "actionItems": 액션 아이템 배열 (각 항목은 { "body": string } 형식)
 
 전사 내용:
