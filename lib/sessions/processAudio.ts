@@ -43,25 +43,32 @@ async function persistPipelineResult(
   actionItems: { body: string }[],
   status: 'done' | 'low_quality' = 'done'
 ): Promise<SessionActionItem[]> {
+  // action_items를 먼저 확정한 뒤 마지막에 status/notes를 flip한다.
+  // status 플립이 커밋 배리어 역할 → 폴링이 status=done 을 본 시점엔 action_items가 이미 존재.
+  // (기존엔 status flip이 insert보다 앞서 있어, 폴링 모드에서 빈 action_items를 읽는 레이스가 있었음)
   await supabase.from('session_action_items').delete().eq('session_id', sessionId)
+
+  let inserted: SessionActionItem[] = []
+  if (actionItems.length > 0) {
+    const { data } = await supabase
+      .from('session_action_items')
+      .insert(
+        actionItems.map((item, idx) => ({
+          session_id: sessionId,
+          body: item.body,
+          display_order: idx,
+        }))
+      )
+      .select()
+    inserted = data ?? []
+  }
+
   await supabase
     .from('check_up_sessions')
     .update({ processing_status: status, notes, updated_at: new Date().toISOString() })
     .eq('id', sessionId)
 
-  if (actionItems.length === 0) return []
-
-  const { data } = await supabase
-    .from('session_action_items')
-    .insert(
-      actionItems.map((item, idx) => ({
-        session_id: sessionId,
-        body: item.body,
-        display_order: idx,
-      }))
-    )
-    .select()
-  return data ?? []
+  return inserted
 }
 
 /**
