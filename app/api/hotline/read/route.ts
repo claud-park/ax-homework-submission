@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT, isAdminUser } from '@/lib/auth'
+import { isAdminUser } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   let body: { champion_user_id?: string }
   try { body = await req.json() } catch {

@@ -1,12 +1,12 @@
 // app/api/admin/hotline/messages/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { HotlineMessage } from '@/lib/types'
+import { requireAdmin } from '@/lib/api/guard'
 
 export async function GET(req: NextRequest) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const { searchParams } = new URL(req.url)
   const championUserId = searchParams.get('champion')
@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   let body: { champion_user_id?: string; body?: string }
   try { body = await req.json() } catch {

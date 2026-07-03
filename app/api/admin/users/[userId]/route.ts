@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin, isAdminUser } from '@/lib/auth'
+import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/api/guard'
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { userId: string } },
 ) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const { userId } = params
   const body = await req.json() as { userGroup: string }

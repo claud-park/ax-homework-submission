@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { isAcceptedAudio } from '@/lib/audio'
 import { processSessionAudio, SummaryParseError } from '@/lib/sessions/processAudio'
 import { claimSessionForProcessing } from '@/lib/sessions/lock'
+import { requireAdmin } from '@/lib/api/guard'
 
 // Whisper + Claude on long recordings can take a while.
 export const maxDuration = 300
@@ -17,8 +17,8 @@ type Params = { params: { sessionId: string } }
  * STT → summary pipeline.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const supabase = createServiceClient()
 

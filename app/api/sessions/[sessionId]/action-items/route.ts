@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveSessionRole } from '@/lib/sessions/access'
+import { requireUser } from '@/lib/api/guard'
 
 type Params = { params: { sessionId: string } }
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
   const role = await resolveSessionRole(supabase, params.sessionId, user)

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { processSessionAudio, SummaryParseError } from '@/lib/sessions/processAudio'
 import { claimSessionForProcessing } from '@/lib/sessions/lock'
+import { requireAdmin } from '@/lib/api/guard'
 
 export const maxDuration = 300
 
@@ -10,8 +10,8 @@ type Params = { params: { sessionId: string } }
 
 /** Re-run STT + summary on the audio already stored for this session. */
 export async function POST(req: NextRequest, { params }: Params) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const supabase = createServiceClient()
 

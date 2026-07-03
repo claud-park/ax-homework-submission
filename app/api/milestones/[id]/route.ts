@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyMilestoneCompleted, notifyBottleneck } from '@/lib/notifications'
 import type { MilestoneStatus, User } from '@/lib/types'
@@ -38,8 +38,8 @@ function computeStatus(
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const body = await req.json()
   const supabase = createServiceClient()
 
@@ -142,8 +142,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const supabase = createServiceClient()
   const { data: toDelete } = await supabase
     .from('milestones').select('parent_milestone_id').eq('id', params.id).eq('user_id', user.id).single()

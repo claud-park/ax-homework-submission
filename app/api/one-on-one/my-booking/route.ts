@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyUser } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { isChampionConnected } from '@/lib/one-on-one/champion-google'
 
 export async function GET(req: NextRequest) {
-  const user = await verifyUser(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
   const [{ data: booking }, championConnected] = await Promise.all([

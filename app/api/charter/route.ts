@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const supabase = createServiceClient()
 
   const { data } = await supabase
@@ -18,8 +18,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const body = await req.json()
   const supabase = createServiceClient()
 

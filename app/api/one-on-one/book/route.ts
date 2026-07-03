@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyUser } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, renderAdminMentions } from '@/lib/one-on-one/slack'
 import { formatSlotLabel, isWorkingHour, overlapsLunchBreak } from '@/lib/one-on-one/slot-utils'
@@ -34,8 +34,8 @@ function buildBlocks(bookingId: string, text: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await verifyUser(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const { duration, slotStart, slotEnd, availableAdmins, agenda: agendaRaw } = await req.json() as {
     duration: 30 | 60

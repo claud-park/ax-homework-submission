@@ -1,13 +1,14 @@
 // app/api/hotline/messages/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT, isAdminUser } from '@/lib/auth'
+import { isAdminUser } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyHotlineMessage } from '@/lib/notifications'
 import type { HotlineMessage } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
   const { data, error } = await supabase
@@ -21,8 +22,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   if (isAdminUser(user)) {
     return NextResponse.json({ error: 'Admins use /api/admin/hotline/messages' }, { status: 403 })
   }
