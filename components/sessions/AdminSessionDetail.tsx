@@ -209,10 +209,16 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   async function downloadAudio() {
     setDownloadingAudio(true)
     try {
-      const { url } = await apiFetch<{ url: string }>(`/api/sessions/${sessionId}/audio-url`)
-      const a = document.createElement('a')
-      a.href = url
-      a.click()
+      const res = await apiFetch<{ url: string; urls?: string[] }>(`/api/sessions/${sessionId}/audio-url`)
+      const urls = res.urls?.length ? res.urls : [res.url]
+      // 멀티청크는 순차 다운로드 (브라우저가 연속 다운로드를 묶어 처리하도록 약간의 간격)
+      for (let i = 0; i < urls.length; i++) {
+        const a = document.createElement('a')
+        a.href = urls[i]
+        a.click()
+        if (i < urls.length - 1) await new Promise(r => setTimeout(r, 600))
+      }
+      if (urls.length > 1) toast.success(`녹음 ${urls.length}개 파일을 내려받았어요.`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '오디오 다운로드 실패')
     } finally {

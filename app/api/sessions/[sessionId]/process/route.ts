@@ -54,7 +54,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: '이미 처리 중인 세션입니다. 잠시 후 다시 시도하세요.' }, { status: 409 })
     }
     await supabase.from('check_up_sessions')
-      .update({ audio_file_path: rawPaths[0], recording_duration_sec: recordingDurationSec })
+      .update({
+        audio_file_path: rawPaths[0], // 하위호환: 첫 청크
+        audio_chunk_paths: rawPaths,  // 전체 청크(다운로드용)
+        recording_duration_sec: recordingDurationSec,
+      })
       .eq('id', params.sessionId)
     const result = await processSessionAudio(supabase, params.sessionId, rawPaths, recordingDurationSec)
     return NextResponse.json(result)
