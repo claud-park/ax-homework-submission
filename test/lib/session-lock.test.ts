@@ -1,35 +1,33 @@
 import { describe, it, expect, vi } from 'vitest'
 import { claimSessionForProcessing } from '@/lib/sessions/lock'
 
-function fakeSupabase(returnedRows: { id: string }[]) {
-  const select = vi.fn().mockResolvedValue({ data: returnedRows, error: null })
-  const not = vi.fn(() => ({ select }))
-  const eq = vi.fn(() => ({ not }))
-  const update = vi.fn(() => ({ eq }))
-  const from = vi.fn(() => ({ update }))
-  return { client: { from }, spies: { from, update, eq, not, select } }
+function fakeSupabase(result: { data: boolean | null; error: unknown }) {
+  const rpc = vi.fn().mockResolvedValue(result)
+  return { client: { rpc }, spies: { rpc } }
 }
 
 describe('claimSessionForProcessing', () => {
-  it('영향 행이 있으면 true (클레임 성공)', async () => {
-    const { client } = fakeSupabase([{ id: 's1' }])
+  it('RPC가 true를 반환하면 true (클레임 성공)', async () => {
+    const { client } = fakeSupabase({ data: true, error: null })
     expect(await claimSessionForProcessing(client as never, 's1')).toBe(true)
   })
-  it('영향 행이 없으면 false (이미 처리 중)', async () => {
-    const { client } = fakeSupabase([])
+
+  it('RPC가 false를 반환하면 false (이미 처리 중, 비-stale)', async () => {
+    const { client } = fakeSupabase({ data: false, error: null })
     expect(await claimSessionForProcessing(client as never, 's1')).toBe(false)
   })
-  it('in-flight 상태를 NOT IN으로 제외한다', async () => {
-    const { client, spies } = fakeSupabase([{ id: 's1' }])
+
+  it('stale 복구 파라미터와 함께 claim RPC를 호출한다', async () => {
+    const { client, spies } = fakeSupabase({ data: true, error: null })
     await claimSessionForProcessing(client as never, 's1')
-    expect(spies.not).toHaveBeenCalledWith('processing_status', 'in', '(uploading,transcribing,summarizing)')
+    expect(spies.rpc).toHaveBeenCalledWith('claim_session_for_processing', {
+      p_session_id: 's1',
+      p_stale_seconds: 360,
+    })
   })
+
   it('DB 에러가 나면 throw 한다 (409로 위장하지 않음)', async () => {
-    const select = vi.fn().mockResolvedValue({ data: null, error: { message: 'boom' } })
-    const not = vi.fn(() => ({ select }))
-    const eq = vi.fn(() => ({ not }))
-    const update = vi.fn(() => ({ eq }))
-    const client = { from: vi.fn(() => ({ update })) }
+    const { client } = fakeSupabase({ data: null, error: { message: 'boom' } })
     await expect(claimSessionForProcessing(client as never, 's1')).rejects.toBeTruthy()
   })
 })

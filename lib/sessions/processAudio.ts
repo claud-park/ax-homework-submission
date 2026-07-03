@@ -41,27 +41,35 @@ async function persistPipelineResult(
   sessionId: string,
   notes: string,
   actionItems: { body: string }[],
-  status: 'done' | 'low_quality' = 'done'
+  status: 'done' | 'low_quality' = 'done',
+  usage?: ProcessUsage,
 ): Promise<SessionActionItem[]> {
+  // action_items를 먼저 확정한 뒤 마지막에 status/notes를 flip한다.
+  // status 플립이 커밋 배리어 역할 → 폴링이 status=done 을 본 시점엔 action_items가 이미 존재.
+  // (기존엔 status flip이 insert보다 앞서 있어, 폴링 모드에서 빈 action_items를 읽는 레이스가 있었음)
   await supabase.from('session_action_items').delete().eq('session_id', sessionId)
+
+  let inserted: SessionActionItem[] = []
+  if (actionItems.length > 0) {
+    const { data } = await supabase
+      .from('session_action_items')
+      .insert(
+        actionItems.map((item, idx) => ({
+          session_id: sessionId,
+          body: item.body,
+          display_order: idx,
+        }))
+      )
+      .select()
+    inserted = data ?? []
+  }
+
   await supabase
     .from('check_up_sessions')
-    .update({ processing_status: status, notes, updated_at: new Date().toISOString() })
+    .update({ processing_status: status, notes, processing_usage: usage ?? null, updated_at: new Date().toISOString() })
     .eq('id', sessionId)
 
-  if (actionItems.length === 0) return []
-
-  const { data } = await supabase
-    .from('session_action_items')
-    .insert(
-      actionItems.map((item, idx) => ({
-        session_id: sessionId,
-        body: item.body,
-        display_order: idx,
-      }))
-    )
-    .select()
-  return data ?? []
+  return inserted
 }
 
 /**
@@ -114,10 +122,12 @@ export async function processSessionAudio(
   const qualityBanner = quality.ok ? '' : '> ⚠️ 전사 품질이 낮을 수 있습니다. 녹음 음량이 작거나 잡음이 많으면 재녹음/재처리를 권장합니다.\n\n'
   const combinedNotes = combineSessionNotes(prev?.notes ?? '', qualityBanner + summary.notes)
 
+  // usage를 먼저 계산해 persist에 함께 저장(폴링 모드에서 비용 표시가 사라지지 않도록).
+  const usage = computeUsage(durationSec, summary.inputTokens, summary.outputTokens)
+
   const insertedActionItems = await persistPipelineResult(
-    supabase, sessionId, combinedNotes, summary.actionItems, quality.ok ? 'done' : 'low_quality'
+    supabase, sessionId, combinedNotes, summary.actionItems, quality.ok ? 'done' : 'low_quality', usage
   )
 
-  const usage = computeUsage(durationSec, summary.inputTokens, summary.outputTokens)
   return { notes: combinedNotes, actionItems: insertedActionItems, usage, lowQuality: !quality.ok }
 }

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { isAcceptedAudio } from '@/lib/audio'
-import { processSessionAudio, SummaryParseError } from '@/lib/sessions/processAudio'
 import { claimSessionForProcessing } from '@/lib/sessions/lock'
+import { runProcessingInBackground } from '@/lib/sessions/runProcessingInBackground'
 import { requireAdmin } from '@/lib/api/guard'
 
-// Whisper + Claude on long recordings can take a while.
+// Whisper + Claude on long recordings can take a while. The pipeline runs in the
+// background (waitUntil) so the client no longer has to keep the tab open; it polls
+// GET /api/sessions/[sessionId] for processing_status. Still bounded by maxDuration.
 export const maxDuration = 300
 
 type Params = { params: { sessionId: string } }
@@ -48,28 +50,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  try {
-    const claimed = await claimSessionForProcessing(supabase, params.sessionId)
-    if (!claimed) {
-      return NextResponse.json({ error: '이미 처리 중인 세션입니다. 잠시 후 다시 시도하세요.' }, { status: 409 })
-    }
-    await supabase.from('check_up_sessions')
-      .update({ audio_file_path: rawPaths[0], recording_duration_sec: recordingDurationSec })
-      .eq('id', params.sessionId)
-    const result = await processSessionAudio(supabase, params.sessionId, rawPaths, recordingDurationSec)
-    return NextResponse.json(result)
-  } catch (err) {
-    if (err instanceof SummaryParseError) {
-      return NextResponse.json(
-        { error: err.message, notes: err.rawText, actionItems: [] },
-        { status: 422 }
-      )
-    }
-    await supabase
-      .from('check_up_sessions')
-      .update({ processing_status: 'error' })
-      .eq('id', params.sessionId)
-    const message = err instanceof Error ? err.message : 'Processing failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+  // 클레임 + 오디오 경로 저장은 동기로 수행(409/실패를 즉시 반환).
+  const claimed = await claimSessionForProcessing(supabase, params.sessionId)
+  if (!claimed) {
+    return NextResponse.json({ error: '이미 처리 중인 세션입니다. 잠시 후 다시 시도하세요.' }, { status: 409 })
   }
+  await supabase.from('check_up_sessions')
+    .update({
+      audio_file_path: rawPaths[0], // 하위호환: 첫 청크
+      audio_chunk_paths: rawPaths,  // 전체 청크(다운로드용)
+      recording_duration_sec: recordingDurationSec,
+    })
+    .eq('id', params.sessionId)
+
+  // STT→요약은 응답 후 백그라운드에서 실행. 클라이언트는 processing_status 를 폴링한다.
+  runProcessingInBackground(supabase, params.sessionId, rawPaths, recordingDurationSec)
+
+  return NextResponse.json({ status: 'processing' }, { status: 202 })
 }
