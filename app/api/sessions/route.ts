@@ -10,10 +10,14 @@ export async function GET(req: NextRequest) {
   const isAdmin = !!user.user_metadata?.is_admin
   const championId = req.nextUrl.searchParams.get('championId')
 
+  // 결정적 정렬: session_date 동률 시 session_time → created_at 순으로 타이브레이크.
+  // (기존엔 session_date 만 있어 같은 날짜 세션들의 순서가 비결정적이었음)
   let query = supabase
     .from('check_up_sessions')
     .select('*')
     .order('session_date', { ascending: false })
+    .order('session_time', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
 
   if (isAdmin && championId) {
     query = query.eq('champion_user_id', championId)
