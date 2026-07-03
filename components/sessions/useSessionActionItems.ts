@@ -35,6 +35,7 @@ export function useSessionActionItems(sessionId: string) {
   }
 
   async function deleteItem(itemId: string) {
+    if (!window.confirm('이 액션 아이템을 삭제할까요?')) return
     try {
       await apiFetch(`/api/sessions/${sessionId}/action-items/${itemId}`, { method: 'DELETE' })
       setActionItems(v => v.filter(i => i.id !== itemId))

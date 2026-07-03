@@ -86,9 +86,9 @@ export default function AdminUsersPage() {
       ) : (
         <div style={{
           border: '1px solid var(--border-subtle)', borderRadius: 8,
-          background: 'var(--surface-primary)', overflow: 'hidden',
+          background: 'var(--surface-primary)', overflowX: 'auto',
         }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
             <thead>
               <tr style={{ background: 'var(--surface-secondary)' }}>
                 <th style={thStyle}>이름</th>
