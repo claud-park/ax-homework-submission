@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { SessionActionItem } from '@/lib/types'
 import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, MAX_AUDIO_MB, isAcceptedAudio } from '@/lib/audio'
 import { prepareAudioForUpload } from '@/lib/audio/prepareUpload'
+import { pollProcessing } from '@/lib/sessions/pollProcessing'
 
 const BUCKET = 'check-up-sessions'
 
@@ -75,13 +76,14 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
     }
   }, [])
 
-  // Warn before leaving page while recording or processing
+  // 녹음 중이거나 업로드 중일 때만 이탈 경고.
+  // 전사/요약은 서버 백그라운드에서 진행되므로 탭을 닫아도 유실되지 않는다(폴링으로 재확인 가능).
   useEffect(() => {
-    const active = phase === 'recording' || phase === 'uploading' || phase === 'transcribing' || phase === 'summarizing'
+    const active = phase === 'recording' || phase === 'uploading'
     if (!active) return
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = '세션 녹음이 진행되고 있습니다. 페이지를 벗어나면 녹음 내용이 저장되지 않습니다.'
+      e.returnValue = '녹음/업로드가 진행 중입니다. 페이지를 벗어나면 이 작업이 중단됩니다.'
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
@@ -235,22 +237,33 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
       setProgress(20)
 
-      setPhase('transcribing')
-      startProgressTimer(20, 80, sttEstimate * 1000, () => { setPhase('summarizing'); startProgressTimer(80, 95, summarizeEstimate * 1000) })
+      setPhase('transcribing'); setProgress(40)
 
       const procRes = await fetch(`/api/sessions/${sessionId}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ audioPaths, recordingDurationSec: durationSec }),
       })
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
       if (!procRes.ok) { const e = await procRes.json().catch(() => ({})); throw new Error(e.error ?? '처리 실패') }
 
-      const result = await procRes.json()
+      // 202: 서버가 백그라운드에서 처리한다. 탭을 닫아도 처리는 계속되며, 여기선 상태를 폴링한다.
+      const final = await pollProcessing(
+        sessionId,
+        async () => (await supabase.auth.getSession()).data.session?.access_token ?? session!.access_token,
+        status => {
+          if (status === 'summarizing') { setPhase('summarizing'); setProgress(85) }
+          else if (status === 'transcribing') { setPhase('transcribing'); setProgress(60) }
+        },
+      )
+
+      if (final.processing_status === 'error') {
+        throw new Error('처리에 실패했어요. [다시 시도]하거나 세션 화면에서 상태를 확인하세요.')
+      }
+
       setProgress(100); setPhase('done')
-      onProcessed(result.notes ?? '', result.actionItems ?? [])
-      if (result.usage) setUsage(result.usage)
-      if (result.lowQuality) toast.warning('전사 품질이 낮을 수 있습니다. 필요 시 재처리하세요.')
+      onProcessed(final.notes ?? '', final.action_items ?? [])
+      if (final.processing_usage) setUsage(final.processing_usage)
+      if (final.processing_status === 'low_quality') toast.warning('전사 품질이 낮을 수 있습니다. 필요 시 재처리하세요.')
     } catch (err) {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current)
       setPhase('error'); setErrorMsg(err instanceof Error ? err.message : '처리 실패')

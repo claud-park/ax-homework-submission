@@ -1,3 +1,5 @@
+import type { ProcessUsage } from '@/lib/audio-pipeline/types'
+
 export type SubmissionStatus = 'pending' | 'accepted' | 'declined'
 export type MilestoneStatus = 'not_started' | 'in_progress' | 'completed' | 'delayed'
 export type MilestoneSource = 'manual' | 'ai' | 'template'
@@ -234,6 +236,8 @@ export interface CheckUpSession {
   audio_chunk_paths: string[] | null
   recording_duration_sec: number | null
   processing_status: SessionProcessingStatus
+  processing_started_at?: string | null
+  processing_usage?: ProcessUsage | null
   raw_transcript: string | null
   created_at: string
   updated_at: string

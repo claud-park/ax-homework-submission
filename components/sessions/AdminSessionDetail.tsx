@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Trash2, Send, RefreshCw, Download, Pencil } from 'lucide-react'
-import { apiFetch } from '@/lib/api-client'
+import { apiFetch, getAuthToken } from '@/lib/api-client'
+import { pollProcessing } from '@/lib/sessions/pollProcessing'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { RecordingPanel } from '@/components/sessions/RecordingPanel'
@@ -133,21 +134,27 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
     setReprocessing(true)
     setSession(prev => prev ? { ...prev, processing_status: 'transcribing' } : prev)
     try {
-      const result = await apiFetch<{
-        notes: string
-        actionItems: SessionActionItem[]
-        usage?: { stt: { durationSec: number; cost: number }; claude: { inputTokens: number; outputTokens: number; cost: number }; totalCost: number }
-      }>(`/api/sessions/${sessionId}/reprocess`, { method: 'POST' })
-      setNotes(result.notes)
-      setActionItems(result.actionItems)
-      setSession(prev => prev ? { ...prev, processing_status: 'done', notes: result.notes } : prev)
+      // 202: 서버가 백그라운드에서 재처리. 상태를 폴링해 완료를 기다린다.
+      await apiFetch(`/api/sessions/${sessionId}/reprocess`, { method: 'POST' })
+      const final = await pollProcessing(
+        sessionId,
+        getAuthToken,
+        status => setSession(prev => prev ? { ...prev, processing_status: status } : prev),
+      )
+      if (final.processing_status === 'error') {
+        throw new Error('재처리에 실패했어요. 잠시 후 다시 시도하세요.')
+      }
+      setNotes(final.notes ?? '')
+      setActionItems(final.action_items ?? [])
+      setSession(prev => prev ? { ...prev, processing_status: final.processing_status, notes: final.notes } : prev)
       await refreshSessionMeta()
-      if (result.usage) {
-        const u = result.usage
+      const u = final.processing_usage
+      if (u) {
         toast.success(`재처리 완료! Whisper $${u.stt.cost.toFixed(3)} · Claude $${u.claude.cost.toFixed(4)} · 합계 $${u.totalCost.toFixed(4)}`)
       } else {
         toast.success('재처리 완료!')
       }
+      if (final.processing_status === 'low_quality') toast.warning('전사 품질이 낮을 수 있습니다.')
     } catch (e) {
       const msg = e instanceof Error ? e.message : '재처리 실패'
       toast.error(msg)
