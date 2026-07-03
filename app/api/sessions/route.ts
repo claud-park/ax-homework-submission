@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT, verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireUser, requireAdmin } from '@/lib/api/guard'
 
 export async function GET(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
   const isAdmin = !!user.user_metadata?.is_admin
@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const { champion_user_id, session_date, session_time, title } = await req.json()
   if (!champion_user_id || !session_date || !title?.trim()) {

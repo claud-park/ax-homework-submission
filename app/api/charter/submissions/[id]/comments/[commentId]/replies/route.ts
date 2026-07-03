@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyNewComment } from '@/lib/notifications'
 
@@ -7,8 +7,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string; commentId: string } }
 ) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const isAdmin = !!user.user_metadata?.is_admin
   const supabase = createServiceClient()
 

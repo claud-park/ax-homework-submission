@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyDeadlineChangeRequest } from '@/lib/notifications'
 
 export async function GET(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('deadline_change_requests')
@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const { milestone_id, requested_due_date, reason } = await req.json()
   if (!milestone_id || !requested_due_date || !reason)
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })

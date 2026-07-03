@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 
 function stripHtml(s: string | undefined | null) {
@@ -16,8 +16,8 @@ function validateCharter(content: Record<string, string>, projectName: string | 
 }
 
 export async function GET(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const isAdmin = !!user.user_metadata?.is_admin
   const targetUserId = req.nextUrl.searchParams.get('user_id')
@@ -49,8 +49,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const { title, project_name, content, publish_status } = await req.json()
   const status = publish_status === 'published' ? 'published' : 'draft'
 

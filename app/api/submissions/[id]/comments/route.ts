@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyNewComment } from '@/lib/notifications'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const { body: commentBody } = await req.json()
   if (!commentBody?.trim())
     return NextResponse.json({ error: 'Comment body required' }, { status: 400 })

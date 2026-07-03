@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT, verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveSessionRole } from '@/lib/sessions/access'
 import { allowedSessionUpdateFields } from '@/lib/sessions/permissions'
+import { requireUser, requireAdmin } from '@/lib/api/guard'
 
 type Params = { params: { sessionId: string } }
 
 export async function GET(req: NextRequest, { params }: Params) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
   const isAdmin = !!user.user_metadata?.is_admin
@@ -55,8 +55,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
   const role = await resolveSessionRole(supabase, params.sessionId, user)
@@ -90,8 +90,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const supabase = createServiceClient()
   const { error } = await supabase

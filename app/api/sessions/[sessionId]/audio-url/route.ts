@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/api/guard'
 
 const BUCKET = 'check-up-sessions'
 
@@ -8,8 +8,8 @@ type Params = { params: { sessionId: string } }
 
 /** Issue a short-lived signed URL to download the session's recorded audio (admin only). */
 export async function GET(req: NextRequest, { params }: Params) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const supabase = createServiceClient()
   const { data: session } = await supabase

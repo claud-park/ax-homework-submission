@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateText, Output } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import {
   GenerationOutputSchema,
@@ -13,8 +13,8 @@ import { scheduleRelativeMilestones } from '@/lib/milestone-schedule'
 const MODEL = process.env.MILESTONE_AI_MODEL ?? 'claude-haiku-4-5'
 
 export async function POST(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const body = await req.json().catch(() => ({}))
   const prompt: string | undefined = body?.prompt

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { MilestoneStatus } from '@/lib/types'
 
@@ -35,8 +35,8 @@ async function syncParentDates(
 }
 
 export async function GET(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const isAdmin = !!user.user_metadata?.is_admin
   const targetUserId = req.nextUrl.searchParams.get('user_id')
@@ -66,8 +66,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
   const body = await req.json()
   const { title, start_date, due_date, description, publish_status, parent_milestone_id, charter_submission_id } = body
   const status = publish_status === 'published' ? 'published' : 'draft'

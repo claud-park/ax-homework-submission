@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyUser } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { getAvailableSlots } from '@/lib/one-on-one/calendar'
 import { getChampionBusy, isChampionConnected } from '@/lib/one-on-one/champion-google'
 import { KST_OFFSET_MS } from '@/lib/one-on-one/slot-utils'
@@ -14,8 +14,8 @@ function getWeekDates(weekStart: string): string[] {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await verifyUser(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const weekStart = req.nextUrl.searchParams.get('weekStart')
   const durStr    = req.nextUrl.searchParams.get('duration')
