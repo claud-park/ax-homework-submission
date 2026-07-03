@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { verifyJWT, isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(req: NextRequest) {
@@ -11,7 +11,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const isAdmin = user.user_metadata?.is_admin === true
+  const isAdmin = isAdminUser(user)
   const supabase = createServiceClient()
 
   if (isAdmin) {
