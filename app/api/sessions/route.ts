@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT, verifyAdmin } from '@/lib/auth'
+import { verifyJWT, verifyAdmin, isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: NextRequest) {
@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = createServiceClient()
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
   const championId = req.nextUrl.searchParams.get('championId')
 
   // 결정적 정렬: session_date 동률 시 session_time → created_at 순으로 타이브레이크.

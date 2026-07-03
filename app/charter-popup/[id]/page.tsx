@@ -19,7 +19,7 @@ export default async function CharterPopupPage({ params }: { params: { id: strin
   const userClient = createUserServerClient()
   const { data: { user } } = await userClient.auth.getUser()
   if (!user) redirect('/login')
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = user.app_metadata?.is_admin === true
 
   const supabase = createServiceClient()
 

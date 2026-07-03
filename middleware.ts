@@ -26,9 +26,9 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
 
   // Already-authenticated redirects for login pages
-  if (path === '/login' && user && !user.user_metadata?.is_admin)
+  if (path === '/login' && user && user.app_metadata?.is_admin !== true)
     return NextResponse.redirect(new URL('/', request.url))
-  if (path === '/admin/login' && user?.user_metadata?.is_admin)
+  if (path === '/admin/login' && user?.app_metadata?.is_admin === true)
     return NextResponse.redirect(new URL('/admin', request.url))
 
   // Protect champion routes
@@ -40,7 +40,7 @@ export async function middleware(request: NextRequest) {
   // Protect admin routes
   if (path.startsWith('/admin') && !path.startsWith('/admin/login')) {
     if (!user) return NextResponse.redirect(new URL('/admin/login', request.url))
-    if (!user.user_metadata?.is_admin)
+    if (user.app_metadata?.is_admin !== true)
       return NextResponse.redirect(new URL('/admin/login', request.url))
   }
 

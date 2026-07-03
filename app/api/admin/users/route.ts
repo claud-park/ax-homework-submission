@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin } from '@/lib/auth'
+import { verifyAdmin, isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { UserManagementEntry } from '@/lib/types'
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   for (const u of authData.users) {
     authMap.set(u.id, {
       email: u.email ?? '',
-      isAdmin: !!u.user_metadata?.is_admin,
+      isAdmin: isAdminUser(u),
     })
   }
 

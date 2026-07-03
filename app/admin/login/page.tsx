@@ -14,7 +14,7 @@ export default function AdminLoginPage() {
     setError(null)
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
-    if (authError || !data.user?.user_metadata?.is_admin) {
+    if (authError || data.user?.app_metadata?.is_admin !== true) {
       setError('관리자 계정이 아니거나 비밀번호가 틀렸습니다.')
       await supabase.auth.signOut()
       return

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { verifyJWT, isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyNewComment } from '@/lib/notifications'
 
@@ -22,7 +22,7 @@ async function getCharterAndVerifyAccess(
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
   const supabase = createServiceClient()
   const charter = await getCharterAndVerifyAccess(supabase, params.id, user.id, isAdmin)
   if (charter === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
   const supabase = createServiceClient()
   const charter = await getCharterAndVerifyAccess(supabase, params.id, user.id, isAdmin)
   if (charter === null) return NextResponse.json({ error: 'Not found' }, { status: 404 })

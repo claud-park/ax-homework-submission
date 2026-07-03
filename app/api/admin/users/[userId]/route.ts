@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin } from '@/lib/auth'
+import { verifyAdmin, isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(
@@ -24,7 +24,7 @@ export async function PATCH(
 
   const { data: authUser, error: authErr } = await supabase.auth.admin.getUserById(userId)
   if (authErr) return NextResponse.json({ error: authErr.message }, { status: 500 })
-  if (authUser.user?.user_metadata?.is_admin) {
+  if (isAdminUser(authUser.user)) {
     return NextResponse.json(
       { error: 'admin 유저의 그룹은 변경할 수 없습니다' },
       { status: 400 },
