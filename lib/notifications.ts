@@ -1,5 +1,6 @@
 import type { User, Milestone, Submission, DeadlineChangeRequest } from '@/lib/types'
 import { sendEmail } from '@/lib/email'
+import { postAdminSlack } from '@/lib/notifications/slack'
 
 function appBaseUrl(): string {
   return process.env.APP_BASE_URL ?? 'http://localhost:3000'
@@ -22,11 +23,13 @@ export async function notifyNewSubmission(params: {
   user: User
   submission: Submission
 }): Promise<void> {
+  const { user, submission } = params
+  const link = `${appBaseUrl()}/admin/kanban`
+  await postAdminSlack(`📝 *새 과제 제출* — ${user.name} (${submission.attempt_number}회)\n<${link}|칸반에서 검토>`)
+
   const to = adminEmail()
   if (!to) return
-  const { user, submission } = params
   const subject = `[과제 제출] ${user.name}`
-  const link = `${appBaseUrl()}/admin/kanban`
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
   <div style="border-bottom:2px solid #2563eb;padding-bottom:12px;margin-bottom:20px">
@@ -55,11 +58,13 @@ export async function notifyDeadlineChangeRequest(params: {
   milestone: Milestone
   request: DeadlineChangeRequest
 }): Promise<void> {
+  const { user, milestone, request } = params
+  const link = `${appBaseUrl()}/admin/requests`
+  await postAdminSlack(`⚠️ *기한변경 요청* — ${user.name} · ${milestone.title}\n${request.original_due_date} → *${request.requested_due_date}*\n<${link}|요청 검토>`)
+
   const to = adminEmail()
   if (!to) return
-  const { user, milestone, request } = params
   const subject = `[기한변경 요청] ${user.name} - ${milestone.title}`
-  const link = `${appBaseUrl()}/admin/requests`
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
   <div style="border-bottom:2px solid #dc2626;padding-bottom:12px;margin-bottom:20px">
@@ -132,12 +137,14 @@ export async function notifyMilestoneCompleted(params: {
   milestone: Milestone
   fileName?: string
 }): Promise<void> {
-  const to = adminEmail()
-  if (!to) return
   const { user, milestone, fileName = '(수동 완료)' } = params
   const weekLabel = milestone.week_number ? `W${String(milestone.week_number).padStart(2, '0')} · ` : ''
-  const subject = `[마일스톤 완료] ${user.name} - ${weekLabel}${milestone.title}`
   const link = `${appBaseUrl()}/admin/progress`
+  await postAdminSlack(`✅ *마일스톤 완료* — ${user.name} · ${weekLabel}${milestone.title}\n<${link}|진척 현황 보기>`)
+
+  const to = adminEmail()
+  if (!to) return
+  const subject = `[마일스톤 완료] ${user.name} - ${weekLabel}${milestone.title}`
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
   <div style="border-bottom:2px solid #16a34a;padding-bottom:12px;margin-bottom:20px">
@@ -174,13 +181,15 @@ export async function notifyBottleneck(params: {
   type: string
   note: string | null
 }): Promise<void> {
-  const to = adminEmail()
-  if (!to) return
   const { user, milestone, type, note } = params
   const weekLabel = milestone.week_number ? `W${String(milestone.week_number).padStart(2, '0')} ` : ''
-  const subject = `[AX] 지연 신고 — ${user.name} · ${weekLabel}${milestone.title}`
   const link = `${appBaseUrl()}/admin/delay-reports`
   const typeLabel = BOTTLENECK_LABEL[type] ?? type
+  await postAdminSlack(`⚠️ *지연 신고* — ${user.name} · ${weekLabel}${milestone.title} (${typeLabel})\n<${link}|요청 검토>`)
+
+  const to = adminEmail()
+  if (!to) return
+  const subject = `[AX] 지연 신고 — ${user.name} · ${weekLabel}${milestone.title}`
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
   <div style="border-bottom:2px solid #dc2626;padding-bottom:12px;margin-bottom:20px">
@@ -259,10 +268,12 @@ export async function notifyHotlineMessage(params: {
   champion: Pick<User, 'id' | 'name'>
   body: string
 }): Promise<void> {
-  const to = adminEmail()
-  if (!to) return
   const { champion, body } = params
   const link = `${appBaseUrl()}/admin/hotline?champion=${encodeURIComponent(champion.id)}`
+  await postAdminSlack(`💬 *핫라인 메시지* — ${champion.name}\n${body.length > 140 ? body.slice(0, 140) + '…' : body}\n<${link}|대화 보기>`)
+
+  const to = adminEmail()
+  if (!to) return
   const subject = `[핫라인] ${escapeHtml(champion.name)} 에서 메시지가 도착했습니다`
   const html = `
 <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
