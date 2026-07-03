@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "husky",
-    "create-admins": "bun --bun scripts/create-admins.ts"
+    "create-admins": "bun --bun scripts/create-admins.ts",
+    "backfill-admin-meta": "bun --bun scripts/backfill-admin-app-metadata.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.84",

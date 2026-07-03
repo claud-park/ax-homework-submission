@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createUserServerClient, createServiceClient } from '@/lib/supabase/server'
+import { isAdminUser } from '@/lib/auth'
 import { parseName } from '@/lib/utils'
 import { AdminSidebar } from './AdminSidebar'
 
@@ -16,7 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const supabase = createUserServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user?.user_metadata?.is_admin) redirect('/admin/login')
+  if (!user || !isAdminUser(user)) redirect('/admin/login')
 
   const raw = user.user_metadata?.name ?? user.email ?? ''
   const { displayName } = parseName(raw)

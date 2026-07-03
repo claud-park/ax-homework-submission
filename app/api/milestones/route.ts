@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { verifyJWT, isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { MilestoneStatus } from '@/lib/types'
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   const user = await verifyJWT(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
   const targetUserId = req.nextUrl.searchParams.get('user_id')
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 
