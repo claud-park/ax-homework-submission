@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { AUDIO_CONTENT_TYPES } from '@/lib/audio'
+import { requireAdmin } from '@/lib/api/guard'
 
 const BUCKET = 'check-up-sessions'
 
@@ -13,8 +13,8 @@ type Params = { params: { sessionId: string } }
  * creates the URL (RLS-exempt); the returned token authorizes the upload.
  */
 export async function POST(req: NextRequest, { params }: Params) {
-  const admin = await verifyAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(req)
+  if (admin instanceof NextResponse) return admin
 
   const body = await req.json().catch(() => null)
   const ext = (body?.ext as string | undefined)?.toLowerCase()

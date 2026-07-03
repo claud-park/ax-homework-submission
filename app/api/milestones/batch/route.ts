@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT } from '@/lib/auth'
+import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizeBatch, type BatchInput } from '@/lib/milestone-batch'
 
 export async function POST(req: NextRequest) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const body = await req.json().catch(() => ({}))
   const charter_submission_id: string | null = body?.charter_submission_id ?? null

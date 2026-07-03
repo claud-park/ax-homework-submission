@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyJWT, isAdminUser } from '@/lib/auth'
+import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/api/guard'
 
 type Params = { params: { sessionId: string; commentId: string } }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const { body } = await req.json()
   if (!body?.trim()) return NextResponse.json({ error: 'body required' }, { status: 400 })
@@ -34,8 +35,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
-  const user = await verifyJWT(req)
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
 
   const isAdmin = isAdminUser(user)
   const supabase = createServiceClient()
