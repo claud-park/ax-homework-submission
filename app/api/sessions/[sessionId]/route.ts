@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveSessionRole } from '@/lib/sessions/access'
 import { allowedSessionUpdateFields } from '@/lib/sessions/permissions'
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
 
   const { data: session, error } = await supabase
     .from('check_up_sessions')

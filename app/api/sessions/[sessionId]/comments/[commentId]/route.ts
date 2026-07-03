@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/api/guard'
 
@@ -37,7 +38,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const user = await requireUser(req)
   if (user instanceof NextResponse) return user
 
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
   const supabase = createServiceClient()
 
   const { data: existing } = await supabase

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminUser } from '@/lib/auth'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   const user = await requireUser(req)
   if (user instanceof NextResponse) return user
 
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
   const targetUserId = req.nextUrl.searchParams.get('user_id')
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 

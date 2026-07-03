@@ -27,7 +27,8 @@ async function main() {
     if (existing) {
       const { error } = await supabase.auth.admin.updateUserById(existing.id, {
         password: acc.password,
-        user_metadata: { ...existing.user_metadata, is_admin: true, name: acc.name },
+        app_metadata: { ...existing.app_metadata, is_admin: true },
+        user_metadata: { ...existing.user_metadata, name: acc.name },
       })
       if (error) { console.error(`update 실패 ${acc.email}: ${error.message}`); continue }
       console.log(`updated: ${acc.email} (${acc.name})`)
@@ -36,7 +37,8 @@ async function main() {
         email: acc.email,
         password: acc.password,
         email_confirm: true,
-        user_metadata: { is_admin: true, name: acc.name },
+        app_metadata: { is_admin: true },
+        user_metadata: { name: acc.name },
       })
       if (error) { console.error(`create 실패 ${acc.email}: ${error.message}`); continue }
       console.log(`created: ${acc.email} (${acc.name})`)
@@ -48,6 +50,7 @@ async function main() {
     if (old) {
       const { error } = await supabase.auth.admin.updateUserById(old.id, {
         ban_duration: '876000h',
+        app_metadata: { ...old.app_metadata, is_admin: false },
         user_metadata: { ...old.user_metadata, is_admin: false },
       })
       if (error) { console.error(`비활성화 실패 ${oldAdminEmail}: ${error.message}`) } else {

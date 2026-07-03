@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAdminUser } from '@/lib/auth'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyNewComment } from '@/lib/notifications'
@@ -9,7 +10,7 @@ export async function POST(
 ) {
   const user = await requireUser(req)
   if (user instanceof NextResponse) return user
-  const isAdmin = !!user.user_metadata?.is_admin
+  const isAdmin = isAdminUser(user)
   const supabase = createServiceClient()
 
   // Verify charter access
