@@ -369,7 +369,7 @@ function TimelineSection({ milestones, onAdded, onUpdated, onDeleted, charterId 
         <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{isChild ? '└' : '·'}</span>
         <span className="text-xs font-semibold flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{m.title}</span>
         {dateStr && <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-disabled)' }}>{dateStr}</span>}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0">
           <button type="button" onClick={() => openEdit(m)} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="수정">✏</button>
           <button type="button" onClick={() => { setConfirmDeleteId(m.id); setEditingId(null); setSubFormParentId(null) }} className="text-xs px-1.5 py-0.5 rounded" style={{ color: 'var(--text-disabled)', background: 'none' }} title="삭제">✕</button>
         </div>

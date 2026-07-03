@@ -77,6 +77,7 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
   }
 
   async function deleteComment(commentId: string) {
+    if (!window.confirm('이 댓글을 삭제할까요?')) return
     try {
       await apiFetch(`/api/sessions/${sessionId}/comments/${commentId}`, { method: 'DELETE' })
       setComments(v => v.filter(c => c.id !== commentId))
