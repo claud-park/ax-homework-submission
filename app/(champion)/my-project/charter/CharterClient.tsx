@@ -508,6 +508,9 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
   const projectNameRef = useRef(projectName)
   const [autoSavingDisplay, setAutoSavingDisplay] = useState(false)
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null)
+  const [autoSaveFailed, setAutoSaveFailed] = useState(false)
+  // 저장되지 않은 편집이 있는지 추적 (이탈 경고용). 편집 시 true, 저장 성공 시 false.
+  const dirtyRef = useRef(false)
   useEffect(() => { projectNameRef.current = projectName }, [projectName])
 
   // Auto-save state (edit mode)
@@ -534,8 +537,10 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
       }
       autoSavedSubRef.current = result
       setLastAutoSavedAt(new Date())
+      dirtyRef.current = false
+      setAutoSaveFailed(false)
       onAutoSaved?.(result)
-    } catch { /* silent */ }
+    } catch { setAutoSaveFailed(true) }
     finally {
       autoSavePendingRef.current = false
       setAutoSavingDisplay(false)
@@ -565,12 +570,33 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
       })
       onUpdated(updated)
       setLastAutoSavedAt(new Date())
-    } catch { /* silent — 자동저장 실패는 toast 없이 무시 */ }
+      dirtyRef.current = false
+      setAutoSaveFailed(false)
+    } catch { setAutoSaveFailed(true) }
     finally {
       editAutoSavePendingRef.current = false
       setAutoSavingDisplay(false)
     }
   }
+
+  // 자동저장 실패 시 사용자가 직접 재시도.
+  function retryAutoSave() {
+    if (mode === 'edit') void editAutoSaveRef.current()
+    else void triggerAutoSaveRef.current()
+  }
+
+  // 저장되지 않은 편집이 있거나 자동저장이 실패한 상태에서 탭 닫기/새로고침/외부
+  // 이동 시 브라우저 기본 이탈 경고를 띄운다. (SPA 내부 링크 이동은 대상 아님)
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current || autoSaveFailed) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [autoSaveFailed])
 
   function scheduleAutoSave() {
     if (mode !== 'edit') return
@@ -596,6 +622,7 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
 
   function handleSectionBlur(key: SectionKey, html: string) {
     contentRef.current = { ...contentRef.current, [key]: html }
+    dirtyRef.current = true
   }
 
   async function handleSave(targetStatus: 'draft' | 'published'): Promise<boolean> {
@@ -623,6 +650,8 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
         })
         onUpdated(updated)
       }
+      dirtyRef.current = false
+      setAutoSaveFailed(false)
       toast.success(targetStatus === 'draft' ? '임시저장되었습니다.' : '게시되었습니다.')
       return true
     } catch (e: unknown) {
@@ -825,20 +854,29 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
             id="charter-project-name"
             type="text"
             value={projectName}
-            onChange={e => { setProjectName(e.target.value); scheduleAutoSave() }}
+            onChange={e => { setProjectName(e.target.value); dirtyRef.current = true; scheduleAutoSave() }}
             placeholder="프로젝트명을 입력하세요"
             className="text-flo-h400 font-semibold bg-transparent outline-none w-full"
             style={{ color: 'var(--text-primary)' }}
           />
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {(autoSavingDisplay || lastAutoSavedAt) && (
-            <span className="flex items-center gap-1.5 flex-shrink-0" style={{ color: 'var(--text-disabled)', fontSize: 12 }}>
+          {(autoSavingDisplay || autoSaveFailed || lastAutoSavedAt) && (
+            <span
+              className="flex items-center gap-1.5 flex-shrink-0"
+              style={{ color: autoSaveFailed && !autoSavingDisplay ? 'var(--error)' : 'var(--text-disabled)', fontSize: 12 }}
+            >
               {autoSavingDisplay
                 ? <><Spinner size="sm" className="inline" /> 저장 중...</>
-                : lastAutoSavedAt
-                  ? `마지막 자동저장 ${lastAutoSavedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
-                  : null}
+                : autoSaveFailed
+                  ? <>저장 실패 <button
+                      onClick={retryAutoSave}
+                      className="underline"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', font: 'inherit' }}
+                    >다시 시도</button></>
+                  : lastAutoSavedAt
+                    ? `마지막 자동저장 ${lastAutoSavedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                    : null}
             </span>
           )}
           <button
