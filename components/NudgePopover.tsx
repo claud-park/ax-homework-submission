@@ -45,8 +45,10 @@ export function NudgePopover({ userId, name, nudgeType, milestoneTitle, anchorX,
       setSending(false)
       onClose()
       toast.success('📧 넛지 메일을 발송했습니다')
-    } catch {
-      toast.error('메일 발송에 실패했습니다. 다시 시도해주세요.')
+    } catch (e) {
+      // 서버 메시지(쿨다운 안내 등)를 그대로 노출. 없으면 일반 문구.
+      const msg = e instanceof Error && e.message ? e.message : '메일 발송에 실패했습니다. 다시 시도해주세요.'
+      toast.error(msg)
       setSending(false)
     }
   }

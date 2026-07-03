@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { nudgeChampion } from '@/lib/notifications'
+import { findRecentNudge, recordNudge } from '@/lib/nudge/cooldown'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -53,30 +54,29 @@ export async function GET(req: NextRequest) {
     (milestonesResult.data ?? []).map(m => m.user_id)
   )
 
-  const results: { userId: string; name: string; nudgeType: string; ok: boolean }[] = []
+  const results: { userId: string; name: string; nudgeType: string; ok: boolean; skipped?: boolean }[] = []
 
   for (const user of champions) {
     const hasCharter = publishedCharterUserIds.has(user.id)
     const hasMilestone = milestoneUserIds.has(user.id)
 
-    if (!hasCharter) {
-      // 과제정의서 미제출
-      try {
-        await nudgeChampion({ user, nudgeType: 'no_charter' })
-        results.push({ userId: user.id, name: user.name, nudgeType: 'no_charter', ok: true })
-      } catch (e) {
-        console.error(`[cron/daily-nudge] no_charter nudge failed for ${user.id}:`, e)
-        results.push({ userId: user.id, name: user.name, nudgeType: 'no_charter', ok: false })
-      }
-    } else if (!hasMilestone) {
-      // 과제정의서는 있지만 마일스톤 미등록
-      try {
-        await nudgeChampion({ user, nudgeType: 'no_milestone' })
-        results.push({ userId: user.id, name: user.name, nudgeType: 'no_milestone', ok: true })
-      } catch (e) {
-        console.error(`[cron/daily-nudge] no_milestone nudge failed for ${user.id}:`, e)
-        results.push({ userId: user.id, name: user.name, nudgeType: 'no_milestone', ok: false })
-      }
+    // 미제출 → no_charter, 과제정의서는 있지만 마일스톤 미등록 → no_milestone
+    const nudgeType = !hasCharter ? 'no_charter' : !hasMilestone ? 'no_milestone' : null
+    if (!nudgeType) continue
+
+    // 쿨다운: 최근(수동/크론 포함)에 이미 같은 넛지를 보냈으면 건너뜀(중복 방지·크론 재실행 안전).
+    if (await findRecentNudge(supabase, user.id, nudgeType)) {
+      results.push({ userId: user.id, name: user.name, nudgeType, ok: true, skipped: true })
+      continue
+    }
+
+    try {
+      await nudgeChampion({ user, nudgeType })
+      await recordNudge(supabase, user.id, nudgeType, 'cron')
+      results.push({ userId: user.id, name: user.name, nudgeType, ok: true })
+    } catch (e) {
+      console.error(`[cron/daily-nudge] ${nudgeType} nudge failed for ${user.id}:`, e)
+      results.push({ userId: user.id, name: user.name, nudgeType, ok: false })
     }
   }
 
