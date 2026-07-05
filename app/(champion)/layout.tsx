@@ -1,19 +1,37 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { createUserServerClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import { ChampionSidebar } from './ChampionSidebar'
 import { HotlineFAB } from '@/components/HotlineFAB'
+import { ChampionAnalytics } from '@/components/analytics/ChampionAnalytics'
 
 export default async function ChampionLayout({ children }: { children: React.ReactNode }) {
   const supabase = createUserServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('user_group')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = Boolean(user.user_metadata?.is_admin)
+
   const raw = user.user_metadata?.name ?? user.email ?? ''
   const { displayName } = parseName(raw)
 
   return (
     <div className="flex min-h-screen" style={{ background: 'hsl(var(--background))' }}>
+      <Suspense fallback={null}>
+        <ChampionAnalytics
+          userId={user.id}
+          email={user.email}
+          userGroup={(userRow?.user_group as string | null) ?? null}
+          isAdmin={isAdmin}
+        />
+      </Suspense>
       <ChampionSidebar />
 
       <div className="flex-1 flex flex-col min-w-0">

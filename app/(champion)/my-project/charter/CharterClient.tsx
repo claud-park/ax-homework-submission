@@ -15,6 +15,7 @@ import DateRangePicker from '@/components/DateRangePicker'
 import MilestoneDraftDrawer from '@/components/milestones/MilestoneDraftDrawer'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
 import { toast } from 'sonner'
+import { track, AnalyticsEvent } from '@/lib/analytics'
 import { Spinner } from '@/components/ui/spinner'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ChevronsLeft, ChevronsRight, FileText, FileDown, ChevronLeft } from 'lucide-react'
@@ -653,6 +654,9 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
       dirtyRef.current = false
       setAutoSaveFailed(false)
       toast.success(targetStatus === 'draft' ? '임시저장되었습니다.' : '게시되었습니다.')
+      if (targetStatus === 'published') {
+        track(AnalyticsEvent.CHARTER_PUBLISHED, {})
+      }
       return true
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)

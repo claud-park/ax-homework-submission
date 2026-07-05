@@ -7,6 +7,7 @@ import { TEMPLATES } from '@/lib/milestone-templates'
 import { scheduleRelativeMilestones } from '@/lib/milestone-schedule'
 import MilestoneDraftRow, { type DraftMilestone } from './MilestoneDraftRow'
 import { Spinner } from '@/components/ui/spinner'
+import { track, AnalyticsEvent } from '@/lib/analytics'
 
 type Tab = 'ai' | 'template' | 'direct'
 type Scheduled = { title: string; description?: string; start_date: string; due_date: string; children?: Scheduled[] }
@@ -102,6 +103,8 @@ export default function MilestoneDraftDrawer({
       })
       toast.success(`${milestones.length}개 마일스톤을 저장했어요.`)
       onSaved(milestones)
+      const hasAiSource = rows.some(r => r.source === 'ai' || (r.children ?? []).some(c => c.source === 'ai'))
+      track(AnalyticsEvent.MILESTONE_ADDED, { method: hasAiSource ? 'ai' : 'manual', count: milestones.length })
       setRows([])
       onClose()
     } catch {

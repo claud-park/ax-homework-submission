@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useMemo } from 'react'
 import { MessageCircle, X } from 'lucide-react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
+import { track, AnalyticsEvent } from '@/lib/analytics'
 import type { HotlineMessage } from '@/lib/types'
 import { HotlineEditor } from './HotlineEditor'
 import DOMPurify from 'dompurify'
@@ -86,6 +87,7 @@ export function HotlineFAB() {
       body: JSON.stringify({ body }),
     })
     setMessages(prev => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg])
+    track(AnalyticsEvent.HOTLINE_MESSAGE_SENT)
   }
 
   const fabAriaLabel = unread > 0

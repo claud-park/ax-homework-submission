@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
+import { resetAnalytics } from '@/lib/analytics'
 import { Users, FileText, LayoutList, Upload, LogOut, Menu, X, Calendar, Video } from 'lucide-react'
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
 import type { Milestone } from '@/lib/types'
@@ -46,6 +47,8 @@ export function ChampionSidebar() {
   }, [])
 
   async function handleLogout() {
+    resetAnalytics()
+    if (typeof window !== 'undefined') sessionStorage.removeItem('champion_login_tracked')
     await supabase.auth.signOut()
     router.push('/login')
   }
