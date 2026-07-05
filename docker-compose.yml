@@ -28,3 +28,25 @@ services:
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       ADMIN_NOTIFICATION_EMAIL: ${ADMIN_NOTIFICATION_EMAIL}
       APP_BASE_URL: ${APP_BASE_URL}
+      # daily-nudge cron 엔드포인트 인증 토큰 (cron 사이드카가 동일 값으로 호출)
+      CRON_SECRET: ${CRON_SECRET}
+
+  # ── 스케줄러 사이드카 ──────────────────────────────────────────
+  # Vercel Cron 대체. 매일 05:00 UTC(=14:00 KST)에 frontend의 daily-nudge를 호출.
+  # busybox crond(UTC) + curl. 시크릿은 컨테이너 기동 시 crontab에 주입된다.
+  cron:
+    image: alpine:3.20
+    container_name: ax-homework-cron
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache curl >/dev/null 2>&1
+        touch /var/log/cron.log
+        printf '0 5 * * * curl -fsS -X GET -H "Authorization: Bearer %s" http://frontend:3000/api/cron/daily-nudge >> /var/log/cron.log 2>&1\n' "$$CRON_SECRET" > /etc/crontabs/root
+        crond -f -L /var/log/cron.log
