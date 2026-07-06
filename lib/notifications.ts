@@ -264,6 +264,47 @@ export async function nudgeChampion(params: {
   await sendEmail({ to: user.email, subject, html })
 }
 
+/**
+ * 매주 월요일, 지연/미완료(gantt 빨간 박스) 마일스톤이 있는 champion 에게
+ * 보내는 부드러운 자동 넛지. 압박 없이 진행 체크·기한 연장·도움 요청을 안내한다.
+ */
+export async function nudgeOverdueMilestones(params: {
+  user: Pick<User, 'id' | 'email' | 'name'>
+}): Promise<void> {
+  const { user } = params
+  const milestonesUrl = `${appBaseUrl()}/my-project/milestones`
+  const subject = '[AX] 이번 주 마일스톤을 함께 살펴볼까요 🌱'
+
+  const html = `
+<div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a">
+  <div style="border-bottom:2px solid #d97706;padding-bottom:12px;margin-bottom:20px">
+    <h2 style="margin:0;font-size:18px">🌱 AX Office에서 인사드려요</h2>
+  </div>
+  <p style="margin:0 0 16px 0;font-size:14px;color:#0f172a">안녕하세요, ${escapeHtml(user.name)}님.</p>
+  <p style="margin:0 0 16px 0;font-size:14px;color:#64748b;line-height:1.7">
+    바쁜 일정 속에서도 AX 과제에 함께해 주셔서 진심으로 감사드려요.<br>
+    이번 주 마일스톤을 잠깐 함께 살펴보면 좋을 것 같아 가볍게 안내드려요.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:14px;color:#0f172a;line-height:1.7">
+    <a href="${escapeHtml(milestonesUrl)}" style="color:#b45309;font-weight:600;text-decoration:underline">내 마일스톤 현황</a>에서
+    <b>[진행 시작]</b>과 <b>[완료]</b>를 그때그때 체크해 주시면, AX Office에서도 진행 상황을 함께 확인할 수 있어요.
+    <span style="color:#64748b">진행 노트를 남겨 상황을 공유해 주셔도 좋아요.</span>
+  </p>
+  <p style="margin:0 0 12px 0;font-size:14px;color:#0f172a;line-height:1.7">
+    혹시 마일스톤 진행이나 기한 산정에 어려움이 있으시면, <b>[기한 연장]</b>으로 일정을 편하게 조정해 주셔도 괜찮아요.
+  </p>
+  <p style="margin:0 0 24px 0;font-size:14px;color:#0f172a;line-height:1.7">
+    막히는 지점이 있다면 <b>[이슈 보고/도움 요청]</b>을 남겨 주세요. AX Office에서 확인하고 도움을 드릴게요.
+  </p>
+  <div>
+    <a href="${escapeHtml(milestonesUrl)}" style="display:inline-block;background:#d97706;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">내 마일스톤 현황 보기</a>
+  </div>
+</div>
+`.trim()
+
+  await sendEmail({ to: user.email, subject, html })
+}
+
 export async function notifyHotlineMessage(params: {
   champion: Pick<User, 'id' | 'name'>
   body: string

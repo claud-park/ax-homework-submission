@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type NudgeType = 'no_charter' | 'no_milestone' | 'delayed_milestone'
+export type NudgeType = 'no_charter' | 'no_milestone' | 'delayed_milestone' | 'overdue_milestones'
 export type NudgeSource = 'manual' | 'cron'
 
 /** 같은 (user, type) 넛지를 이 시간 안에 다시 보내지 않는다. */
