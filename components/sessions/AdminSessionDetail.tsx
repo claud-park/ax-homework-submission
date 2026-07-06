@@ -12,6 +12,7 @@ import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 import { useSessionActionItems } from '@/components/sessions/useSessionActionItems'
 import { useSessionNotes } from '@/components/sessions/useSessionNotes'
+import { useConfirm } from '@/components/ui/confirm'
 
 interface Props {
   sessionId: string
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDeleted }: Props) {
+  const confirm = useConfirm()
   const {
     actionItems, setActionItems,
     newItemBody, setNewItemBody, addingItem,
@@ -82,7 +84,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   }
 
   async function deleteSession() {
-    if (!confirm('이 세션을 삭제할까요?')) return
+    if (!(await confirm({ description: '이 세션을 삭제할까요?', confirmText: '삭제', destructive: true }))) return
     setDeleting(true)
     try {
       await apiFetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
@@ -116,7 +118,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   }
 
   async function deleteComment(commentId: string) {
-    if (!window.confirm('이 댓글을 삭제할까요?')) return
+    if (!(await confirm({ description: '이 댓글을 삭제할까요?', confirmText: '삭제', destructive: true }))) return
     try {
       await apiFetch(`/api/sessions/${sessionId}/comments/${commentId}`, { method: 'DELETE' })
       setComments(v => v.filter(c => c.id !== commentId))

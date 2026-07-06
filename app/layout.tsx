@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
+import { ConfirmProvider } from '@/components/ui/confirm'
 
 const pretendard = localFont({
   src: '../public/fonts/PretendardVariable.woff2',
@@ -18,7 +19,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" className={pretendard.variable}>
-      <body>{children}<Toaster position="top-right" richColors /></body>
+      <body>
+        <ConfirmProvider>{children}</ConfirmProvider>
+        <Toaster position="top-right" richColors />
+      </body>
     </html>
   )
 }

@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import type { SessionActionItem } from '@/lib/types'
+import { useConfirm } from '@/components/ui/confirm'
 
 /** 세션 액션 아이템 CRUD 상태/핸들러 — admin·champion 디테일이 공유 */
 export function useSessionActionItems(sessionId: string) {
+  const confirm = useConfirm()
   const [actionItems, setActionItems] = useState<SessionActionItem[]>([])
   const [newItemBody, setNewItemBody] = useState('')
   const [addingItem, setAddingItem] = useState(false)
@@ -35,7 +37,7 @@ export function useSessionActionItems(sessionId: string) {
   }
 
   async function deleteItem(itemId: string) {
-    if (!window.confirm('이 액션 아이템을 삭제할까요?')) return
+    if (!(await confirm({ description: '이 액션 아이템을 삭제할까요?', confirmText: '삭제', destructive: true }))) return
     try {
       await apiFetch(`/api/sessions/${sessionId}/action-items/${itemId}`, { method: 'DELETE' })
       setActionItems(v => v.filter(i => i.id !== itemId))

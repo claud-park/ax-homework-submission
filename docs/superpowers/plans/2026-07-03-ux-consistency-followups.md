@@ -24,6 +24,15 @@
 - `app/admin/champions/[userId]/page.tsx`, `components/SubmissionDetailPanel.tsx`(제출 없는 카드 → "제출 없음" 안내), `app/(champion)/champions/[userId]/page.tsx`(무음 리다이렉트)
 - 중첩 라우트 `loading.tsx`/`error.tsx` 추가(현재 루트에만 존재).
 
-## 후속 3 — 모바일 탭바 정보구조
+## 후속 3 — 모바일 탭바 정보구조 → 변경 불필요 (2026-07-06 재확인)
 
-`app/admin/AdminSidebar.tsx` `MOBILE_TABS`가 실제 모바일 지원 화면과 불일치(제출현황=Kanban은 DesktopOnly인데 탭바 노출, 챔피언 리스트는 누락). 탭바를 모바일 실사용 가능 화면 기준으로 재정렬.
+실제 코드 확인 결과 플랜의 전제가 틀림: `MOBILE_TABS`는 [지연신고, 과제정의서(mobile/charters), 리포트, 핫라인] 4개로, Kanban(DesktopOnly)은 **애초에 탭바에 없음**. DesktopOnly 화면(대시보드/Kanban/챔피언리스트)은 정확히 제외돼 있고, 4개 탭 대상은 모두 모바일 지원 화면. → 조치 불필요.
+
+---
+
+## 진행 현황 (2026-07-06)
+
+- ✅ 후속 1(일부): 네이티브 confirm 6곳 → `useConfirm`(AlertDialog) 통일.
+- ✅ 후속 2: SubmissionDetailPanel 빈 상태 안내 + admin/(champion) `loading.tsx`.
+- ✅ 후속 3: 변경 불필요(위).
+- ⬜ **남음**: `SectionEditorInner.tsx` 링크 삽입 `window.prompt` → 텍스트 입력 모달(useConfirm는 boolean만 커버, 별도 input 모달 필요). champion 상세 로드 실패 시 에러+재시도 UI, 중첩 `error.tsx`.

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
+import { useConfirm } from '@/components/ui/confirm'
 import type { CharterComment } from '@/lib/types'
 
 function relativeTime(dateStr: string): string {
@@ -22,6 +23,7 @@ function CommentThread({
   onEdit: (commentId: string, body: string) => Promise<void>
   onDelete: (commentId: string) => Promise<void>
 }) {
+  const confirm = useConfirm()
   const [replyOpen, setReplyOpen] = useState(false)
   const [replyBody, setReplyBody] = useState('')
   const [editOpen, setEditOpen] = useState(false)
@@ -35,7 +37,7 @@ function CommentThread({
   const dimmed = isTopLevel && comment.is_resolved
 
   async function handleDeleteClick() {
-    if (!window.confirm('코멘트를 삭제하시겠습니까?')) return
+    if (!(await confirm({ description: '코멘트를 삭제할까요?', confirmText: '삭제', destructive: true }))) return
     setDeleting(true)
     try { await onDelete(comment.id) } finally { setDeleting(false) }
   }
