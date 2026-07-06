@@ -9,6 +9,7 @@ import { MarkdownView } from '@/components/MarkdownView'
 import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
 import { useSessionNotes } from '@/components/sessions/useSessionNotes'
 import { useSessionActionItems } from '@/components/sessions/useSessionActionItems'
+import { useConfirm } from '@/components/ui/confirm'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
 
@@ -19,6 +20,7 @@ interface Props {
 
 export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [session, setSession] = useState<CheckUpSession | null>(null)
   const { notes, setNotes, isEditingNotes, setIsEditingNotes, saving, saveNotes } =
     useSessionNotes(sessionId, session, setSession, () => { /* champion은 새로고침 안내로 충분 */ })
@@ -77,7 +79,7 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
   }
 
   async function deleteComment(commentId: string) {
-    if (!window.confirm('이 댓글을 삭제할까요?')) return
+    if (!(await confirm({ description: '이 댓글을 삭제할까요?', confirmText: '삭제', destructive: true }))) return
     try {
       await apiFetch(`/api/sessions/${sessionId}/comments/${commentId}`, { method: 'DELETE' })
       setComments(v => v.filter(c => c.id !== commentId))

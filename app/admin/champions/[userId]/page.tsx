@@ -7,6 +7,7 @@ import { parseName } from '@/lib/utils'
 import { Download, ExternalLink, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
+import { useConfirm } from '@/components/ui/confirm'
 import { AdminSessionList } from '@/components/sessions/AdminSessionList'
 import { AdminSessionDetail } from '@/components/sessions/AdminSessionDetail'
 
@@ -167,6 +168,7 @@ type SubWithComments = Submission & { comments?: Comment[] }
 type CharterComment = { id: string; body: string; author_role: 'admin' | 'user'; author_id: string | null; created_at: string }
 
 export default function AdminChampionPage() {
+  const confirm = useConfirm()
   const { userId } = useParams<{ userId: string }>()
   const [data, setData] = useState<ChampionProject | null>(null)
   const [submissions, setSubmissions] = useState<SubWithComments[]>([])
@@ -292,7 +294,7 @@ export default function AdminChampionPage() {
   }
 
   async function deleteCharterComment(commentId: string) {
-    if (!window.confirm('코멘트를 삭제하시겠습니까?')) return
+    if (!(await confirm({ description: '코멘트를 삭제할까요?', confirmText: '삭제', destructive: true }))) return
     try {
       await apiFetch(`/api/charter/comments/${commentId}`, { method: 'DELETE' })
       setCharterComments(prev => prev.filter(c => c.id !== commentId))
