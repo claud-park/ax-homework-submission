@@ -11,6 +11,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { FullPageSpinner, Spinner } from '@/components/ui/spinner'
+import { EmptyState } from '@/components/ui/empty-state'
+import { FileText } from 'lucide-react'
 import { ResizeHandle, useResizableWidth } from '@/components/ui/resize-handle'
 import type { KanbanCard, Submission, SubmissionStatus, Comment } from '@/lib/types'
 
@@ -75,7 +77,27 @@ export function SubmissionDetailPanel({ card, open, onOpenChange, onStatusChange
     }
   }, [open, card, fetchDetail])
 
-  if (!card?.latestSubmission) return null
+  if (!card) return null
+
+  // 제출이 없는 카드도 패널을 열되 빈 상태를 안내(기존엔 return null 로 아무것도 안 열림).
+  if (!card.latestSubmission) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="overflow-y-auto !max-w-none"
+          style={{ width: `${sheetWidth}px` }}
+        >
+          <ResizeHandle side="left" onMouseDown={onResizeSheet} />
+          <SheetHeader>
+            <SheetTitle>{card.user.name}</SheetTitle>
+            <SheetDescription>제출 이력</SheetDescription>
+          </SheetHeader>
+          <EmptyState icon={FileText} title="아직 제출이 없어요" description="이 챔피언은 아직 과제를 제출하지 않았어요." />
+        </SheetContent>
+      </Sheet>
+    )
+  }
 
   const latest = submissions[0] ?? null
   const currentStatus = latest?.status ?? card.latestSubmission.status
