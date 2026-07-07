@@ -174,7 +174,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
           >
             {charters.map(c => (
               <option key={c.id} value={c.id}>
-                {c.title ?? c.project_name ?? 'Charter'}
+                {c.title?.trim() || c.project_name?.trim() || 'Charter'}
               </option>
             ))}
           </select>

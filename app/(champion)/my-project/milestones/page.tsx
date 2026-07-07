@@ -1,6 +1,7 @@
 import { createUserServerClient, createServiceClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import type { Milestone, CharterSubmission } from '@/lib/types'
+import { filterMilestonesByCharter } from '@/lib/milestone-filter'
 import { MilestonesClient } from './MilestonesClient'
 
 export default async function WorkStatusPage({
@@ -35,13 +36,12 @@ export default async function WorkStatusPage({
     : charters[0]?.id ?? null
 
   const firstCharterId = charters[0]?.id ?? null
-  const milestones = (milestonesData ?? []).filter(m => {
-    if (!charterId) return true
-    if (m.charter_submission_id === charterId) return true
-    // orphan 마일스톤(FK null)은 첫 번째 charter에 표시 (Gantt와 동일)
-    if (m.charter_submission_id === null && charterId === firstCharterId) return true
-    return false
-  }) as Milestone[]
+  // 게시된 charter가 하나도 없으면(charterId === null) 마일스톤을 노출하지 않는다.
+  const milestones = charterId
+    ? filterMilestonesByCharter((milestonesData ?? []) as Milestone[], charterId, {
+        includeOrphans: charterId === firstCharterId,
+      })
+    : []
 
   const charterApproved = charters.some(c => !!c.admin_approved_at)
 
