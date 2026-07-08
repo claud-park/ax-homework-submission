@@ -101,6 +101,7 @@ async function handleConfirm(payload: Record<string, unknown>, bookingId: string
         start: { dateTime: booking.slot_start, timeZone: 'Asia/Seoul' },
         end:   { dateTime: booking.slot_end,   timeZone: 'Asia/Seoul' },
         attendees,
+        guestsCanModify: true,
       },
     })
   } catch (err) {
