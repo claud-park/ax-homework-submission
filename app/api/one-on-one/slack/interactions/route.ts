@@ -5,6 +5,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { slack, getAdminIdBySlackUserId, getSlackUserIdByAdminId, type AdminId } from '@/lib/one-on-one/slack'
 import { getAuthenticatedClient, getAdminEmails } from '@/lib/one-on-one/google-auth'
 import { formatSlotLabel, formatSlotRange } from '@/lib/one-on-one/slot-utils'
+import { enableMeetAutoArtifacts } from '@/lib/one-on-one/meet'
+import { findFreeRoom } from '@/lib/one-on-one/meeting-rooms'
 
 function verifySlackSignature(
   secret: string,
@@ -93,17 +95,42 @@ async function handleConfirm(payload: Record<string, unknown>, bookingId: string
   try {
     const auth = await getAuthenticatedClient(confirmedAdminId)
     const calendar = google.calendar({ version: 'v3', auth })
-    await calendar.events.insert({
+
+    // 빈 회의실 조회 — 만실이면 Meet만으로 진행
+    const roomEmail = await findFreeRoom(auth, booking.slot_start, booking.slot_end)
+
+    const { data: createdEvent } = await calendar.events.insert({
       calendarId: 'primary',
       sendUpdates: 'all',
+      conferenceDataVersion: 1,
       requestBody: {
         summary: `[AX] 1-on-1: ${booking.champion_name} × ${adminLabel}`,
         start: { dateTime: booking.slot_start, timeZone: 'Asia/Seoul' },
         end:   { dateTime: booking.slot_end,   timeZone: 'Asia/Seoul' },
-        attendees,
+        attendees: roomEmail
+          ? [...attendees, { email: roomEmail, resource: true }]
+          : attendees,
         guestsCanModify: true,
+        conferenceData: {
+          createRequest: {
+            requestId: bookingId,
+            conferenceSolutionKey: { type: 'hangoutsMeet' },
+          },
+        },
       },
     })
+
+    // Gemini 회의록 + 녹취록 자동 생성 설정 — 실패해도 이벤트는 유지
+    const meetingCode = createdEvent.conferenceData?.conferenceId
+    if (meetingCode) {
+      try {
+        await enableMeetAutoArtifacts(auth, meetingCode)
+      } catch (err) {
+        console.error('Meet 자동 아티팩트 설정 실패:', err)
+      }
+    } else {
+      console.error('Meet 링크 미생성 — conferenceId 없음')
+    }
   } catch (err) {
     console.error('Calendar event creation failed:', err)
     // Calendar 실패해도 confirmed 상태는 유지 (Slack 메시지는 업데이트)
