@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterMilestonesByCharter } from '@/lib/milestone-filter'
+import { filterMilestonesByCharter, resolveFirstCharterId } from '@/lib/milestone-filter'
 
 const m = (id: string, user_id: string, charter_submission_id: string | null) =>
   ({ id, user_id, charter_submission_id }) as any
@@ -38,5 +38,19 @@ describe('filterMilestonesByCharter', () => {
   it('일치하는 milestone이 없으면 빈 배열을 반환한다', () => {
     const milestones = [m('m1', 'champion-a', 'charter-2')]
     expect(filterMilestonesByCharter(milestones, 'charter-1')).toEqual([])
+  })
+})
+
+describe('resolveFirstCharterId', () => {
+  it('가장 최근에 제출된(submitted_at desc) charter의 id를 반환한다', () => {
+    const charters = [
+      { id: 'charter-old', submitted_at: '2026-01-01T00:00:00Z' },
+      { id: 'charter-new', submitted_at: '2026-06-01T00:00:00Z' },
+    ]
+    expect(resolveFirstCharterId(charters)).toBe('charter-new')
+  })
+
+  it('charter가 없으면 null을 반환한다', () => {
+    expect(resolveFirstCharterId([])).toBeNull()
   })
 })

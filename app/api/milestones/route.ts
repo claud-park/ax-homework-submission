@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
-import type { MilestoneStatus } from '@/lib/types'
+import { filterMilestonesByCharter, resolveFirstCharterId } from '@/lib/milestone-filter'
+import type { Milestone, MilestoneStatus } from '@/lib/types'
 
 function computeStatus(milestone: {
   due_date: string | null
@@ -54,16 +55,29 @@ export async function GET(req: NextRequest) {
     .order('start_date', { ascending: true, nullsFirst: false })
 
   if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
-  if (charter_id) query = query.or(`charter_submission_id.eq.${charter_id},charter_submission_id.is.null`)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const milestones = (data ?? []).map((m: Record<string, unknown>) =>
+  let milestones = (data ?? []) as Milestone[]
+
+  if (charter_id) {
+    const { data: charters } = await supabase
+      .from('charter_submissions')
+      .select('id, submitted_at')
+      .eq('user_id', effectiveUserId)
+      .eq('publish_status', 'published')
+    const firstCharterId = resolveFirstCharterId(charters ?? [])
+    milestones = filterMilestonesByCharter(milestones, charter_id, {
+      includeOrphans: charter_id === firstCharterId,
+    })
+  }
+
+  const result = milestones.map((m: Milestone) =>
     m.publish_status === 'published'
-      ? { ...m, status: computeStatus(m as Parameters<typeof computeStatus>[0]) }
+      ? { ...m, status: computeStatus(m as unknown as Parameters<typeof computeStatus>[0]) }
       : m
   )
-  return NextResponse.json(milestones)
+  return NextResponse.json(result)
 }
 
 export async function POST(req: NextRequest) {

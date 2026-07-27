@@ -25,3 +25,18 @@ export function filterMilestonesByCharter<T extends Pick<Milestone, 'charter_sub
     return false
   })
 }
+
+/**
+ * Given a champion's charters, returns the id of the one that owns orphan
+ * (charter_submission_id === null) milestones — the most recently submitted
+ * one, matching the one-time backfill in migration 20260617100000 and the
+ * "내 마일스톤 현황" page. Callers should pass this id as `charterSubmissionId`
+ * to `filterMilestonesByCharter` with `includeOrphans: true`; any other
+ * charter must NOT receive orphans.
+ */
+export function resolveFirstCharterId(
+  charters: { id: string; submitted_at: string | null }[],
+): string | null {
+  const sorted = [...charters].sort((a, b) => (b.submitted_at ?? '').localeCompare(a.submitted_at ?? ''))
+  return sorted[0]?.id ?? null
+}
