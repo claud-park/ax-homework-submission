@@ -13,8 +13,13 @@ export async function GET(req: NextRequest) {
     .single()
   if (!pairing) return NextResponse.json({ status: 'expired' })
 
-  if (pairing.status === 'pending' && new Date(pairing.expires_at) < new Date()) {
-    await supabase.from('device_pairing_codes').update({ status: 'expired' }).eq('code', code)
+  // TTL applies regardless of status — an approved-but-never-polled code must not
+  // leave its plaintext token retrievable forever.
+  if (pairing.status !== 'expired' && new Date(pairing.expires_at) < new Date()) {
+    await supabase
+      .from('device_pairing_codes')
+      .update({ status: 'expired', issued_token: null })
+      .eq('code', code)
     return NextResponse.json({ status: 'expired' })
   }
 

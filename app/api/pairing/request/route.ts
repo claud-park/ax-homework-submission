@@ -1,10 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generatePairingCode } from '@/lib/pairing-tokens'
+import { isRateLimited } from '@/lib/rate-limit'
 
 const TTL_MS = 10 * 60 * 1000
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  if (isRateLimited(`pairing-request:${ip}`, 10, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
+
   const supabase = createServiceClient()
 
   let code = generatePairingCode()

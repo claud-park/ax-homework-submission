@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generatePersonalAccessToken, hashToken } from '@/lib/pairing-tokens'
+import { isPatBearer } from '@/lib/auth'
+import { isRateLimited } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
-  const bearer = req.headers.get('Authorization')?.replace('Bearer ', '')
-  if (bearer?.startsWith('amst_')) {
+  if (isPatBearer(req)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -15,6 +16,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const code = typeof body.code === 'string' ? body.code.toUpperCase() : ''
   if (!code) return NextResponse.json({ error: 'validation_failed' }, { status: 400 })
+
+  if (isRateLimited(`pairing-approve:${code}`, 5, 10 * 60 * 1000)) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
 
   const supabase = createServiceClient()
   const { data: pairing } = await supabase

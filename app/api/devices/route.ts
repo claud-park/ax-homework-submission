@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
+import { isPatBearer } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
+  if (isPatBearer(req)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const user = await requireUser(req)
   if (user instanceof NextResponse) return user
 
@@ -19,6 +24,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  if (isPatBearer(req)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const user = await requireUser(req)
   if (user instanceof NextResponse) return user
 
