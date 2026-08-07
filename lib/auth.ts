@@ -1,10 +1,32 @@
 import { createServiceClient } from './supabase/server'
 import { NextRequest } from 'next/server'
 import type { User } from '@supabase/supabase-js'
+import { hashToken } from './pairing-tokens'
+
+async function verifyPersonalAccessToken(token: string): Promise<User | null> {
+  const supabase = createServiceClient()
+  const { data: pat } = await supabase
+    .from('personal_access_tokens')
+    .select('id, user_id')
+    .eq('token_hash', hashToken(token))
+    .is('revoked_at', null)
+    .single()
+  if (!pat) return null
+
+  await supabase
+    .from('personal_access_tokens')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', pat.id)
+
+  // PAT는 웹 로그인 세션이 아니므로 app_metadata/user_metadata가 없다 —
+  // isAdminUser()는 app_metadata.is_admin만 신뢰하므로 PAT는 절대 관리자 권한을 얻지 않는다.
+  return { id: pat.user_id, app_metadata: {}, user_metadata: {} } as User
+}
 
 export async function verifyJWT(req: NextRequest): Promise<User | null> {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '')
   if (!token) return null
+  if (token.startsWith('amst_')) return verifyPersonalAccessToken(token)
   const supabase = createServiceClient()
   const { data: { user } } = await supabase.auth.getUser(token)
   return user ?? null
