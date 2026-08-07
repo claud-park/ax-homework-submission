@@ -4,7 +4,7 @@
 // Dependency-free Node client for the ax-homework-submission pairing + milestone-log API.
 // Requires Node 18+ (global fetch) and the AX_MILESTONE_SYNC_API_URL env var.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
@@ -34,8 +34,9 @@ function loadConfig() {
 }
 
 function saveConfig(config) {
-  mkdirSync(CONFIG_DIR, { recursive: true })
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+  mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 })
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 0o600 })
+  chmodSync(CONFIG_PATH, 0o600)
 }
 
 async function sleep(ms) {

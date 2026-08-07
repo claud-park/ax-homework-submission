@@ -59,9 +59,11 @@ it (e.g. in their shell profile) and stop; do not guess a URL.
    `--date=YYYY-MM-DD` only if the work being logged happened on a date other than today.
 
 6. **Report.** Summarize what was written, one line per milestone updated (e.g. "✅ M4 진행중으로
-   갱신, 로그 남김"). If a call fails with `charter_not_approved`, tell the champion their charter
-   isn't approved yet so progress can't be marked, but the log entry itself likely still succeeded
-   — check the script's error output to confirm which happened.
+   갱신, 로그 남김"). If a call fails with `charter_not_approved`, the note was NOT saved — the
+   server rejects the whole request before writing anything when the champion doesn't have an
+   approved charter yet. Tell the champion clearly that this update didn't go through and their
+   charter needs to be approved first; suggest they check the site or contact an admin. Don't
+   imply it might have partially succeeded.
 
 ## Notes
 
