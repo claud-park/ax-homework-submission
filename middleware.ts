@@ -34,8 +34,11 @@ export async function middleware(request: NextRequest) {
   // Protect champion routes
   const championRoutes = ['/', '/my-project', '/homework', '/charter', '/milestones', '/progress']
   const isChampionRoute = championRoutes.some(r => path === r || path.startsWith(r + '/'))
-  if (isChampionRoute && !user)
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (isChampionRoute && !user) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', path + request.nextUrl.search)
+    return NextResponse.redirect(loginUrl)
+  }
 
   // Protect admin routes
   if (path.startsWith('/admin') && !path.startsWith('/admin/login')) {
