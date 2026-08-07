@@ -29,4 +29,12 @@ describe('sanitizeRedirectPath', () => {
   it('rejects paths not starting with /', () => {
     expect(sanitizeRedirectPath('javascript:alert(1)')).toBe('/')
   })
+
+  it('rejects backslash-as-slash open-redirect bypass', () => {
+    expect(sanitizeRedirectPath('/\\evil.com')).toBe('/')
+  })
+
+  it('rejects tab-stripping open-redirect bypass', () => {
+    expect(sanitizeRedirectPath('/\t/evil.com')).toBe('/')
+  })
 })
