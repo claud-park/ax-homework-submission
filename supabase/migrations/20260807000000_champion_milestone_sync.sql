@@ -3,16 +3,19 @@
 
 CREATE TABLE device_pairing_codes (
   code text PRIMARY KEY,
-  user_id uuid REFERENCES auth.users,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'expired')),
   issued_token text,
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL
 );
 
+-- API 는 service role 로 접근(RLS 우회). 챔피언 직접 접근은 없음.
+ALTER TABLE device_pairing_codes ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE personal_access_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   token_hash text NOT NULL UNIQUE,
   label text,
   last_used_at timestamptz,
@@ -22,16 +25,22 @@ CREATE TABLE personal_access_tokens (
 
 CREATE INDEX personal_access_tokens_user_id_idx ON personal_access_tokens(user_id) WHERE revoked_at IS NULL;
 
+-- API 는 service role 로 접근(RLS 우회). 챔피언 직접 접근은 없음.
+ALTER TABLE personal_access_tokens ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE milestone_activity_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   milestone_id uuid NOT NULL REFERENCES milestones ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES auth.users,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   log_date date NOT NULL DEFAULT CURRENT_DATE,
   note text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX milestone_activity_log_milestone_id_idx ON milestone_activity_log(milestone_id);
+
+-- API 는 service role 로 접근(RLS 우회). 챔피언 직접 접근은 없음.
+ALTER TABLE milestone_activity_log ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE device_pairing_codes IS '로컬 Claude Code 스킬 페어링용 단명 코드 (TTL ~10분)';
 COMMENT ON TABLE personal_access_tokens IS '챔피언별 장기 API 토큰 (해시만 저장, 평문은 발급 시 1회만 노출)';
