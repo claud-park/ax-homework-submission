@@ -4,6 +4,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { generatePersonalAccessToken, hashToken } from '@/lib/pairing-tokens'
 
 export async function POST(req: NextRequest) {
+  const bearer = req.headers.get('Authorization')?.replace('Bearer ', '')
+  if (bearer?.startsWith('amst_')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const user = await requireUser(req)
   if (user instanceof NextResponse) return user
 

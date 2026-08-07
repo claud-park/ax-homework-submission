@@ -19,9 +19,18 @@ export async function GET(req: NextRequest) {
   }
 
   if (pairing.status !== 'approved') return NextResponse.json({ status: pairing.status })
-  if (!pairing.issued_token) return NextResponse.json({ status: 'expired' })
 
-  const token = pairing.issued_token
-  await supabase.from('device_pairing_codes').update({ issued_token: null }).eq('code', code)
-  return NextResponse.json({ status: 'approved', token })
+  // Atomic clear-and-return: a conditional UPDATE...RETURNING means concurrent polls
+  // can't both observe a non-null issued_token — only the request that wins the row
+  // lock gets a non-null `claimed.issued_token` back.
+  const { data: claimed } = await supabase
+    .from('device_pairing_codes')
+    .update({ issued_token: null })
+    .eq('code', code)
+    .not('issued_token', 'is', null)
+    .select('issued_token')
+    .single()
+  if (!claimed) return NextResponse.json({ status: 'expired' })
+
+  return NextResponse.json({ status: 'approved', token: claimed.issued_token })
 }
