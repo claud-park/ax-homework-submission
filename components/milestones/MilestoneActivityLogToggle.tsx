@@ -4,11 +4,17 @@ import { apiFetch } from '@/lib/api-client'
 import type { MilestoneActivityLog } from '@/lib/types'
 
 function relativeDate(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const days = Math.floor(diff / 86400000)
-  if (days <= 0) return '오늘'
-  if (days === 1) return '어제'
-  return `${days}일 전`
+  const today = new Date()
+  const todayLocal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  if (dateStr >= todayLocal) return '오늘'
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const [ty, tm, td] = todayLocal.split('-').map(Number)
+  // Date.UTC with the same y/m/d components on both sides cancels out timezone entirely,
+  // giving a pure calendar-day difference (avoids the UTC/KST day-shift the old instant-diff had).
+  const diffDays = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000)
+  if (diffDays <= 0) return '오늘'
+  if (diffDays === 1) return '어제'
+  return `${diffDays}일 전`
 }
 
 interface MilestoneActivityLogToggleProps {
@@ -23,6 +29,7 @@ export default function MilestoneActivityLogToggle({ milestoneId, userId }: Mile
   const [error, setError] = useState(false)
 
   async function toggle() {
+    if (loading) return
     if (!expanded && logs === null) {
       setLoading(true)
       setError(false)

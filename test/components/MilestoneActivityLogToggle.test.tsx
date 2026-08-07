@@ -73,4 +73,35 @@ describe('MilestoneActivityLogToggle', () => {
     await waitFor(() => expect(screen.getByText('재시도 성공')).toBeInTheDocument())
     expect(mockApiFetch).toHaveBeenCalledTimes(2)
   })
+
+  it('labels a log dated today as "오늘" and one from 3 days ago as "3일 전", independent of timezone', async () => {
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const threeDaysAgo = new Date(today.getTime() - 3 * 86400000)
+    const threeDaysAgoStr = `${threeDaysAgo.getFullYear()}-${String(threeDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(threeDaysAgo.getDate()).padStart(2, '0')}`
+    mockApiFetch.mockResolvedValue({
+      logs: [
+        { id: 'l1', milestone_id: 'm1', user_id: 'u1', log_date: todayStr, note: '오늘 작업', created_at: `${todayStr}T10:00:00Z` },
+        { id: 'l2', milestone_id: 'm1', user_id: 'u1', log_date: threeDaysAgoStr, note: '사흘 전 작업', created_at: `${threeDaysAgoStr}T10:00:00Z` },
+      ],
+    })
+    render(<MilestoneActivityLogToggle milestoneId="m1" />)
+    fireEvent.click(screen.getByText(/작업 로그/))
+    await waitFor(() => expect(screen.getByText('오늘 작업')).toBeInTheDocument())
+    expect(screen.getByText(`${todayStr} · 오늘`)).toBeInTheDocument()
+    expect(screen.getByText(`${threeDaysAgoStr} · 3일 전`)).toBeInTheDocument()
+  })
+
+  it('does not double-fetch on rapid expand/collapse/expand before the first fetch resolves', async () => {
+    let resolveFetch: (v: unknown) => void = () => {}
+    mockApiFetch.mockImplementationOnce(() => new Promise(resolve => { resolveFetch = resolve }))
+    render(<MilestoneActivityLogToggle milestoneId="m1" />)
+    const button = screen.getByText(/작업 로그/)
+    fireEvent.click(button) // expand — starts a pending fetch
+    fireEvent.click(button) // collapse while still loading
+    fireEvent.click(button) // expand again while still loading — must NOT start a second fetch
+    resolveFetch({ logs: [] })
+    await waitFor(() => expect(screen.getByText('기록된 작업 로그가 없습니다.')).toBeInTheDocument())
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+  })
 })
