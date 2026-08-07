@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useConfirm } from '@/components/ui/confirm'
 import { AdminSessionList } from '@/components/sessions/AdminSessionList'
 import { AdminSessionDetail } from '@/components/sessions/AdminSessionDetail'
+import MilestoneActivityLogToggle from '@/components/milestones/MilestoneActivityLogToggle'
 
 
 const MS_STATUS_LABEL: Record<MilestoneStatus, string> = {
@@ -46,7 +47,7 @@ function buildTree(milestones: Milestone[]): Milestone[] {
   return sort(roots)
 }
 
-function MilestoneRow({ m, depth = 0 }: { m: Milestone & { children?: Milestone[] }; depth?: number }) {
+function MilestoneRow({ m, userId, depth = 0 }: { m: Milestone & { children?: Milestone[] }; userId: string; depth?: number }) {
   const color = MS_STATUS_COLOR[m.status]
   const bg = MS_STATUS_BG[m.status]
   const children = (m.children ?? []) as (Milestone & { children?: Milestone[] })[]
@@ -119,6 +120,10 @@ function MilestoneRow({ m, depth = 0 }: { m: Milestone & { children?: Milestone[
         </div>
       </div>
 
+      <div style={{ marginLeft: depth > 0 ? 20 + 18 : 12 }}>
+        <MilestoneActivityLogToggle milestoneId={m.id} userId={userId} />
+      </div>
+
       {/* Children with vertical line */}
       {children.length > 0 && (
         <div style={{ position: 'relative', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -132,7 +137,7 @@ function MilestoneRow({ m, depth = 0 }: { m: Milestone & { children?: Milestone[
             background: '#cbd5e1',
           }} />
           {children.map((c) => (
-            <MilestoneRow key={c.id} m={c as Milestone & { children?: Milestone[] }} depth={depth + 1} />
+            <MilestoneRow key={c.id} m={c as Milestone & { children?: Milestone[] }} userId={userId} depth={depth + 1} />
           ))}
         </div>
       )}
@@ -746,7 +751,7 @@ export default function AdminChampionPage() {
                 {activeCharterMilestones.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {buildTree(activeCharterMilestones).map(m => (
-                      <MilestoneRow key={m.id} m={m as Milestone & { children?: Milestone[] }} depth={0} />
+                      <MilestoneRow key={m.id} m={m as Milestone & { children?: Milestone[] }} userId={userId} depth={0} />
                     ))}
                   </div>
                 ) : (

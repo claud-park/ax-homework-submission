@@ -97,6 +97,15 @@ export interface Milestone {
   children?: Milestone[]
 }
 
+export interface MilestoneActivityLog {
+  id: string
+  milestone_id: string
+  user_id: string
+  log_date: string
+  note: string
+  created_at: string
+}
+
 export interface DeadlineChangeRequest {
   id: string
   milestone_id: string
