@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { generatePairingCode } from '@/lib/pairing-tokens'
 
 const TTL_MS = 10 * 60 * 1000
 
-export async function POST(_req: NextRequest) {
+export async function POST() {
   const supabase = createServiceClient()
 
   let code = generatePairingCode()
