@@ -56,4 +56,21 @@ describe('MilestoneActivityLogToggle', () => {
     fireEvent.click(screen.getByText(/작업 로그/))
     await waitFor(() => expect(screen.getByText('기록된 작업 로그가 없습니다.')).toBeInTheDocument())
   })
+
+  it('shows a retryable error state and does not get stuck on a failed fetch', async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error('network error'))
+    render(<MilestoneActivityLogToggle milestoneId="m1" />)
+    const button = screen.getByText(/작업 로그/)
+    fireEvent.click(button)
+    await waitFor(() => expect(screen.getByText(/불러오지 못했습니다/)).toBeInTheDocument())
+
+    // Collapse and expand again — this time the fetch succeeds, proving the component can retry
+    mockApiFetch.mockResolvedValueOnce({
+      logs: [{ id: 'l1', milestone_id: 'm1', user_id: 'u1', log_date: '2026-08-07', note: '재시도 성공', created_at: '2026-08-07T10:00:00Z' }],
+    })
+    fireEvent.click(button) // collapse
+    fireEvent.click(button) // expand again — should re-attempt the fetch
+    await waitFor(() => expect(screen.getByText('재시도 성공')).toBeInTheDocument())
+    expect(mockApiFetch).toHaveBeenCalledTimes(2)
+  })
 })

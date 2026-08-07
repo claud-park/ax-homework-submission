@@ -20,16 +20,18 @@ export default function MilestoneActivityLogToggle({ milestoneId, userId }: Mile
   const [expanded, setExpanded] = useState(false)
   const [logs, setLogs] = useState<MilestoneActivityLog[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
 
   async function toggle() {
     if (!expanded && logs === null) {
       setLoading(true)
+      setError(false)
       try {
         const qs = userId ? `?user_id=${userId}` : ''
         const { logs: data } = await apiFetch<{ logs: MilestoneActivityLog[] }>(`/api/milestones/${milestoneId}/log${qs}`)
         setLogs(data)
       } catch {
-        setLogs([])
+        setError(true)
       } finally {
         setLoading(false)
       }
@@ -52,6 +54,8 @@ export default function MilestoneActivityLogToggle({ milestoneId, userId }: Mile
         <div className="mt-1.5 flex flex-col gap-1.5">
           {loading ? (
             <p className="text-xs" style={{ color: 'var(--text-disabled)' }}>불러오는 중...</p>
+          ) : error ? (
+            <p className="text-xs" style={{ color: 'var(--error)' }}>작업 로그를 불러오지 못했습니다. 다시 시도해주세요.</p>
           ) : logs && logs.length > 0 ? (
             logs.map(l => (
               <div
