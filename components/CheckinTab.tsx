@@ -4,6 +4,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
 import type { Milestone, BottleneckType } from '@/lib/types'
+import MilestoneActivityLogToggle from '@/components/milestones/MilestoneActivityLogToggle'
 
 function fmtMD(s: string): string {
   if (!s) return ''
@@ -276,6 +277,8 @@ function MilestoneCard({ m, showActions, charterApproved, onCompleteClick, onIss
           </button>
         </div>
       ) : null}
+
+      <MilestoneActivityLogToggle milestoneId={m.id} />
 
       {showActions ? (
         <div className="flex flex-wrap items-center gap-2">
