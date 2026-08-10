@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
-import { generatePairingCode, generatePersonalAccessToken, hashToken, claimPairingToken } from '@/lib/pairing-tokens'
+import {
+  generatePairingCode,
+  generatePersonalAccessToken,
+  generateAdminAccessToken,
+  hashToken,
+  canApprovePairing,
+  claimPairingToken,
+} from '@/lib/pairing-tokens'
 
 function fakeSupabase(result: { data: string | null; error: unknown }) {
   const rpc = vi.fn().mockResolvedValue(result)
@@ -35,6 +42,33 @@ describe('generatePersonalAccessToken', () => {
 
   it('generates different tokens across calls', () => {
     expect(generatePersonalAccessToken()).not.toBe(generatePersonalAccessToken())
+  })
+})
+
+describe('generateAdminAccessToken', () => {
+  it('starts with the admt_ prefix', () => {
+    expect(generateAdminAccessToken()).toMatch(/^admt_/)
+  })
+
+  it('generates a token with at least 32 characters after the prefix', () => {
+    const token = generateAdminAccessToken()
+    expect(token.slice('admt_'.length).length).toBeGreaterThanOrEqual(32)
+  })
+
+  it('generates different tokens across calls', () => {
+    expect(generateAdminAccessToken()).not.toBe(generateAdminAccessToken())
+  })
+})
+
+describe('canApprovePairing', () => {
+  it('allows a champion-scope code to be approved regardless of caller admin status', () => {
+    expect(canApprovePairing('champion', false)).toBe(true)
+    expect(canApprovePairing('champion', true)).toBe(true)
+  })
+
+  it('allows an admin-scope code to be approved only when the caller is an admin', () => {
+    expect(canApprovePairing('admin', true)).toBe(true)
+    expect(canApprovePairing('admin', false)).toBe(false)
   })
 })
 

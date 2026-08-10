@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('personal_access_tokens')
-    .select('id, label, last_used_at, created_at')
+    .select('id, label, last_used_at, created_at, scope')
     .eq('user_id', user.id)
     .is('revoked_at', null)
     .order('created_at', { ascending: false })

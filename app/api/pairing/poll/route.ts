@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: 'expired' })
   }
 
-  if (pairing.status !== 'approved') return NextResponse.json({ status: pairing.status })
+  if (pairing.status !== 'approved') return NextResponse.json({ status: pairing.status, scope: pairing.scope })
 
   const token = await claimPairingToken(supabase, code)
   if (!token) return NextResponse.json({ status: 'expired' })
