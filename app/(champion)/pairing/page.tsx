@@ -8,6 +8,7 @@ type ApproveState = 'idle' | 'approving' | 'approved' | 'error'
 function PairingPageInner() {
   const searchParams = useSearchParams()
   const code = searchParams.get('code') ?? ''
+  const scope = searchParams.get('scope') === 'admin' ? 'admin' : 'champion'
   const [state, setState] = useState<ApproveState>('idle')
   const [message, setMessage] = useState<string | null>(null)
 
@@ -52,7 +53,9 @@ function PairingPageInner() {
         {code && state !== 'approved' && (
           <>
             <p className="text-flo-body2 mb-2" style={{ color: 'var(--text-secondary)' }}>
-              내 컴퓨터의 Claude Code 스킬을 이 계정에 연결할까요?
+              {scope === 'admin'
+                ? '내 컴퓨터를 관리자 권한으로 이 계정에 연결할까요?'
+                : '내 컴퓨터의 Claude Code 스킬을 이 계정에 연결할까요?'}
             </p>
             <p
               className="text-flo-h300 font-mono font-semibold mb-6 tracking-widest"

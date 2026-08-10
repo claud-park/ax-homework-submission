@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generatePersonalAccessToken, hashToken } from '@/lib/pairing-tokens'
-import { isPatBearer } from '@/lib/auth'
+import { generatePersonalAccessToken, generateAdminAccessToken, hashToken } from '@/lib/pairing-tokens'
+import { isPatBearer, isAdminUser } from '@/lib/auth'
 import { isRateLimited } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
@@ -35,11 +35,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_or_expired_code' }, { status: 404 })
   }
 
-  const token = generatePersonalAccessToken()
+  if (pairing.scope === 'admin' && !isAdminUser(user)) {
+    return NextResponse.json({ error: 'admin_required' }, { status: 403 })
+  }
+
+  const token = pairing.scope === 'admin' ? generateAdminAccessToken() : generatePersonalAccessToken()
   const { error: insertError } = await supabase.from('personal_access_tokens').insert({
     user_id: user.id,
     token_hash: hashToken(token),
-    label: `Paired ${new Date().toISOString().slice(0, 10)}`,
+    scope: pairing.scope,
+    label: `Paired ${new Date().toISOString().slice(0, 10)}${pairing.scope === 'admin' ? ' (admin)' : ''}`,
   })
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 

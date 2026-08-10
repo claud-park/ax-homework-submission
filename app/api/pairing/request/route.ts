@@ -11,6 +11,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
   }
 
+  const body = await req.json().catch(() => ({}))
+  const scope = body?.scope === 'admin' ? 'admin' : 'champion'
+
   const supabase = createServiceClient()
 
   let code = generatePairingCode()
@@ -28,8 +31,8 @@ export async function POST(req: NextRequest) {
   const expiresAt = new Date(Date.now() + TTL_MS).toISOString()
   const { error } = await supabase
     .from('device_pairing_codes')
-    .insert({ code, status: 'pending', expires_at: expiresAt })
+    .insert({ code, status: 'pending', expires_at: expiresAt, scope })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ code, expires_at: expiresAt })
+  return NextResponse.json({ code, expires_at: expiresAt, scope })
 }
