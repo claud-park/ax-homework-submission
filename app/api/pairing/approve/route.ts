@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
-import { generatePersonalAccessToken, generateAdminAccessToken, hashToken } from '@/lib/pairing-tokens'
+import { generatePersonalAccessToken, generateAdminAccessToken, hashToken, canApprovePairing } from '@/lib/pairing-tokens'
 import { isPatBearer, isAdminUser } from '@/lib/auth'
 import { isRateLimited } from '@/lib/rate-limit'
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_or_expired_code' }, { status: 404 })
   }
 
-  if (pairing.scope === 'admin' && !isAdminUser(user)) {
+  if (!canApprovePairing(pairing.scope, isAdminUser(user))) {
     return NextResponse.json({ error: 'admin_required' }, { status: 403 })
   }
 

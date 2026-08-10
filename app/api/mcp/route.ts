@@ -70,12 +70,29 @@ const handler = createMcpHandler((server) => {
       }
 
       const supabase = createServiceClient()
-      const { data: session } = await supabase
+      const { data: sessions, error: lookupError } = await supabase
         .from('check_up_sessions')
         .select('*')
         .eq('champion_user_id', effectiveChampionId)
         .eq('session_date', date)
-        .maybeSingle()
+        .order('session_time', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
+      if (lookupError) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: lookupError.message }) }], isError: true }
+      }
+      if (sessions.length > 1) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              error: 'multiple_sessions_on_date',
+              sessions: sessions.map((s) => ({ id: s.id, session_time: s.session_time, title: s.title })),
+            }),
+          }],
+          isError: true,
+        }
+      }
+      const session = sessions[0] ?? null
       if (!session) return { content: [{ type: 'text', text: JSON.stringify(null) }] }
 
       const { data: actionItems } = await supabase
@@ -101,11 +118,15 @@ const handler = createMcpHandler((server) => {
         date: z.string().describe('Session date, YYYY-MM-DD'),
         title: z.string().optional(),
         notes: z.string().optional().describe('Markdown meeting notes'),
+        expected_updated_at: z
+          .string()
+          .optional()
+          .describe('Pass the updated_at value from a prior get_session call to detect concurrent edits — if the session changed since, the update is rejected with a conflict error instead of silently overwriting.'),
       }),
     },
     async (args, ctx) => {
       const identity = getAuthenticatedIdentity(ctx)
-      const { champion_user_id, date, title, notes } = args
+      const { champion_user_id, date, title, notes, expected_updated_at } = args
       const effectiveChampionId = identity.isAdmin ? champion_user_id : identity.userId
       if (!effectiveChampionId) {
         return {
@@ -115,12 +136,29 @@ const handler = createMcpHandler((server) => {
       }
 
       const supabase = createServiceClient()
-      const { data: existing } = await supabase
+      const { data: sessions, error: lookupError } = await supabase
         .from('check_up_sessions')
         .select('*')
         .eq('champion_user_id', effectiveChampionId)
         .eq('session_date', date)
-        .maybeSingle()
+        .order('session_time', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
+      if (lookupError) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: lookupError.message }) }], isError: true }
+      }
+      if (sessions.length > 1) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              error: 'multiple_sessions_on_date',
+              sessions: sessions.map((s) => ({ id: s.id, session_time: s.session_time, title: s.title })),
+            }),
+          }],
+          isError: true,
+        }
+      }
+      const existing = sessions[0] ?? null
 
       if (!existing) {
         if (!identity.isAdmin) {
@@ -152,16 +190,23 @@ const handler = createMcpHandler((server) => {
       if (allowed.includes('title') && title !== undefined) updates.title = title.trim()
       if (allowed.includes('notes') && notes !== undefined) updates.notes = notes
 
-      const { data: updated, error } = await supabase
-        .from('check_up_sessions')
-        .update(updates)
-        .eq('id', existing.id)
-        .select()
-        .single()
-      if (error || !updated) {
-        return { content: [{ type: 'text', text: JSON.stringify({ error: error?.message ?? 'update failed' }) }], isError: true }
+      let updateQuery = supabase.from('check_up_sessions').update(updates).eq('id', existing.id)
+      if (expected_updated_at) updateQuery = updateQuery.eq('updated_at', expected_updated_at)
+
+      const { data: updatedRows, error } = await updateQuery.select()
+      if (error) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: error.message }) }], isError: true }
       }
-      return { content: [{ type: 'text', text: JSON.stringify(updated) }] }
+      if (!updatedRows || updatedRows.length === 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: 'conflict', message: '다른 사용자가 먼저 수정했습니다. get_session으로 다시 조회 후 재시도하세요.' }),
+          }],
+          isError: true,
+        }
+      }
+      return { content: [{ type: 'text', text: JSON.stringify(updatedRows[0]) }] }
     },
   )
 
@@ -193,10 +238,11 @@ const handler = createMcpHandler((server) => {
       if (!role) return { content: [{ type: 'text', text: JSON.stringify({ error: 'forbidden' }) }], isError: true }
 
       const allowed = allowedActionItemUpdateFields(role)
-      const results: Record<string, unknown>[] = []
+      const results: Array<{ index: number; status: 'created' | 'updated' | 'not_found' | 'error'; item?: Record<string, unknown>; error?: string }> = []
       const now = new Date().toISOString()
 
-      for (const item of items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
         if (item.id) {
           const updates: Record<string, unknown> = { updated_at: now }
           if (allowed.includes('body')) updates.body = item.body.trim()
@@ -210,8 +256,10 @@ const handler = createMcpHandler((server) => {
             .eq('id', item.id)
             .eq('session_id', session_id)
             .select()
-            .single()
-          if (!error && data) results.push(data)
+            .maybeSingle()
+          if (error) results.push({ index: i, status: 'error', error: error.message })
+          else if (!data) results.push({ index: i, status: 'not_found' })
+          else results.push({ index: i, status: 'updated', item: data })
         } else {
           const { data, error } = await supabase
             .from('session_action_items')
@@ -220,15 +268,17 @@ const handler = createMcpHandler((server) => {
               body: item.body.trim(),
               is_completed: item.is_completed,
               completed_at: item.is_completed ? now : null,
-              display_order: 0,
+              display_order: i,
             })
             .select()
             .single()
-          if (!error && data) results.push(data)
+          if (error || !data) results.push({ index: i, status: 'error', error: error?.message ?? 'insert failed' })
+          else results.push({ index: i, status: 'created', item: data })
         }
       }
 
-      return { content: [{ type: 'text', text: JSON.stringify(results) }] }
+      const hasFailure = results.some((r) => r.status === 'error' || r.status === 'not_found')
+      return { content: [{ type: 'text', text: JSON.stringify(results) }], isError: hasFailure }
     },
   )
 })

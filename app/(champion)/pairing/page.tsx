@@ -1,16 +1,31 @@
 'use client'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 
 type ApproveState = 'idle' | 'approving' | 'approved' | 'error'
+type PairingScope = 'champion' | 'admin'
 
 function PairingPageInner() {
   const searchParams = useSearchParams()
   const code = searchParams.get('code') ?? ''
-  const scope = searchParams.get('scope') === 'admin' ? 'admin' : 'champion'
+  const [scope, setScope] = useState<PairingScope | null>(null)
+  const [scopeError, setScopeError] = useState(false)
   const [state, setState] = useState<ApproveState>('idle')
   const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!code) return
+    apiFetch<{ status: string; scope?: PairingScope }>(`/api/pairing/poll?code=${encodeURIComponent(code)}`)
+      .then((body) => {
+        if (body.status === 'expired' || !body.scope) {
+          setScopeError(true)
+          return
+        }
+        setScope(body.scope)
+      })
+      .catch(() => setScopeError(true))
+  }, [code])
 
   async function handleApprove() {
     setState('approving')
@@ -50,7 +65,19 @@ function PairingPageInner() {
           </p>
         )}
 
-        {code && state !== 'approved' && (
+        {code && scopeError && (
+          <p className="text-flo-body2 mt-4" style={{ color: 'var(--text-secondary)' }}>
+            코드가 만료되었거나 올바르지 않습니다. 스킬에서 다시 시도해주세요.
+          </p>
+        )}
+
+        {code && !scope && !scopeError && (
+          <p className="text-flo-body2 mt-4" style={{ color: 'var(--text-secondary)' }}>
+            확인 중...
+          </p>
+        )}
+
+        {code && scope && state !== 'approved' && (
           <>
             <p className="text-flo-body2 mb-2" style={{ color: 'var(--text-secondary)' }}>
               {scope === 'admin'

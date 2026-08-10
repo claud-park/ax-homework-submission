@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: 'expired' })
   }
 
-  if (pairing.status !== 'approved') return NextResponse.json({ status: pairing.status })
+  if (pairing.status !== 'approved') return NextResponse.json({ status: pairing.status, scope: pairing.scope })
 
   // Atomic clear-and-return: a conditional UPDATE...RETURNING means concurrent polls
   // can't both observe a non-null issued_token — only the request that wins the row

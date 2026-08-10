@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generatePairingCode, generatePersonalAccessToken, hashToken } from '@/lib/pairing-tokens'
+import { generatePairingCode, generatePersonalAccessToken, generateAdminAccessToken, hashToken, canApprovePairing } from '@/lib/pairing-tokens'
 
 describe('generatePairingCode', () => {
   it('returns a 6-character uppercase code from the unambiguous alphabet', () => {
@@ -30,6 +30,33 @@ describe('generatePersonalAccessToken', () => {
 
   it('generates different tokens across calls', () => {
     expect(generatePersonalAccessToken()).not.toBe(generatePersonalAccessToken())
+  })
+})
+
+describe('generateAdminAccessToken', () => {
+  it('starts with the admt_ prefix', () => {
+    expect(generateAdminAccessToken()).toMatch(/^admt_/)
+  })
+
+  it('generates a token with at least 32 characters after the prefix', () => {
+    const token = generateAdminAccessToken()
+    expect(token.slice('admt_'.length).length).toBeGreaterThanOrEqual(32)
+  })
+
+  it('generates different tokens across calls', () => {
+    expect(generateAdminAccessToken()).not.toBe(generateAdminAccessToken())
+  })
+})
+
+describe('canApprovePairing', () => {
+  it('allows a champion-scope code to be approved regardless of caller admin status', () => {
+    expect(canApprovePairing('champion', false)).toBe(true)
+    expect(canApprovePairing('champion', true)).toBe(true)
+  })
+
+  it('allows an admin-scope code to be approved only when the caller is an admin', () => {
+    expect(canApprovePairing('admin', true)).toBe(true)
+    expect(canApprovePairing('admin', false)).toBe(false)
   })
 })
 
