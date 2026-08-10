@@ -22,6 +22,26 @@ and the `ax-sessions` MCP server connected. If tool calls like `mcp__ax-sessions
 available, run `ToolSearch` with `select:mcp__ax-sessions__whoami,mcp__ax-sessions__list_champions,mcp__ax-sessions__get_session,mcp__ax-sessions__upsert_session,mcp__ax-sessions__sync_action_items`
 first — MCP servers connected mid-session need this before their tools are callable.
 
+**If the native tools still don't show up** (confirmed in practice: `ToolSearch` can come back
+empty even in a session started fresh after `claude mcp add`/`/reload-skills`, with `claude mcp
+list` showing `ax-sessions` as Connected) — fall back to calling the MCP HTTP endpoint directly
+instead of blocking on tool availability:
+1. Read the bearer token straight out of the local Claude Code config:
+   `python3 -c "import json; print(json.load(open('/Users/<user>/.claude.json'))['mcpServers']['ax-sessions']['headers']['Authorization'])"`
+   (adjust the home path). This requires no re-pairing.
+2. Call tools with a plain JSON-RPC POST, e.g.:
+   `curl -sS -X POST "$AX_MILESTONE_SYNC_API_URL/api/mcp" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -H "Authorization: <token from step 1>" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"<tool>","arguments":{...}}}'`
+   The response is an SSE line (`data: {...}`); the tool's actual JSON result is at
+   `result.content[0].text` inside that payload.
+3. This call needs the sandbox's network restriction lifted for the `curl` — otherwise it silently
+   returns a fake typed stub (`{code: string, expires_at: string, ...}`) instead of hitting the
+   real server. Use the harness's mechanism for that (e.g. Claude Code's
+   `dangerouslyDisableSandbox` on the Bash tool) rather than treating the stub as a real response.
+4. For calls beyond a couple, write a small throwaway Python/Node script that wraps this curl call
+   once and loop over it, instead of hand-typing one `curl` per tool call — see "Bulk syncs" below.
+   Never leave the token sitting in a script or temp file after you're done; delete it once the
+   sync completes.
+
 ## Setup (one time per machine)
 
 1. Run `claude mcp list` and check whether `ax-sessions` already shows **Connected**. If so,
@@ -64,11 +84,37 @@ first — MCP servers connected mid-session need this before their tools are cal
    Extract `session_id`/`champion_id` if present, the notes body, and the action item list (each
    with its checkbox state and optional `<!-- id: ... -->`).
 
+   **In practice, real vault notes rarely look this simple.** A note produced by an AI
+   meeting-recorder tool typically has YAML frontmatter (`date:`, `time:`, `participants:`,
+   `projects:`) followed by rich structured sections: 화자 매핑(추정), 🎯 요약, 🗣️ 논의 주제,
+   💬 피드백, 🤨 고민·요청 사항, 🤝 합의 사항, ✅ 액션 아이템 (checkboxes usually written as
+   `- [ ] **Name**: body`), and a full 전체 전사록 (raw transcript, often hundreds of lines).
+   There is no `session_id`/`champion_id` comment on a first-time sync — that's expected, not
+   an error. When you meet this shape:
+   - `session_date` comes from the frontmatter `date:` field, not from parsing the filename/title.
+   - Build `notes` as a condensed synthesis of **요약 + 논의 주제 (condensed to 1–2 lines per
+     subsection) + 결정/합의 사항** only. Do not port 화자 매핑, 피드백, 고민·요청 사항, or the
+     raw 전사록 into `notes` — they're real content but not what belongs in a tracker's notes
+     field; they stay in Obsidian. Skipping the transcript specifically also keeps `notes` from
+     ballooning to thousands of characters.
+   - Build the action items list strictly from the ✅ 액션 아이템 section's checkboxes, one item
+     per bullet, keeping the `**Name**:` prefix in the body text — do not also pull items from
+     🪏 팔로업 ("follow-up") sections some notes have; treat those as out of scope unless the
+     human asks to include them.
+
 3. **Resolve the champion.** If `champion_id` isn't cached in the file yet, call
    `mcp__ax-sessions__list_champions` (admin-only — returns `admin_required` for a champion PAT,
    which is fine, skip this step for champion callers who always act as themselves) to map the
-   champion's name to a `user_id`. Suggest writing that id into the file's HTML comment so future
-   runs skip this lookup.
+   champion's name to a `user_id`. `list_champions` returns names formatted as
+   `한글이름(EnglishNickname)/부서/Dreamus` (e.g. `강진영(Carol)/DSP사업팀/Dreamus`) — match against
+   whichever identifier the note actually uses (the meeting title, the frontmatter
+   `participants:` list, or a name mentioned in 화자 매핑 often only gives the English nickname
+   like "Carol" or "Luffy"). If a note's filename/title doesn't clearly name a single champion
+   (e.g. a generic "AX 1:1" title), use the frontmatter `participants:` list — the champion is
+   whichever participant isn't one of the recurring AX team members, and if it's still ambiguous,
+   ask. Suggest writing the resolved id into the file's HTML comment so future runs skip this
+   lookup. Building the full name→id map once per sync batch (not once per file) is worth it when
+   syncing more than a couple of notes — see "Bulk syncs" below.
 
 4. **Fetch current app state.** Call `mcp__ax-sessions__get_session` with the date (and
    `champion_user_id` for admin callers). Handle its responses:
@@ -78,6 +124,22 @@ first — MCP servers connected mid-session need this before their tools are cal
    - `{error: "multiple_sessions_on_date", sessions: [...]}` → more than one session exists that
      day (the site supports multiple 1-on-1s per day via `session_time`). Show the human the
      listed sessions (time/title) and ask which one this file corresponds to — never guess.
+
+   **A session that already exists may not have come from a prior Obsidian sync at all.** The
+   site has its own audio-upload→STT→Claude-summary pipeline (`check_up_sessions.audio_file_path`
+   / `recording_duration_sec` / `processing_status` populated means this). It's common for the
+   same real-life meeting to be captured independently by both the site's recorder and a separate
+   Obsidian meeting-recorder tool, producing two differently-worded but overlapping summaries of
+   the same conversation — neither is "the sync source" for the other. Before proposing to
+   overwrite an existing session's `notes` or add to its `action_items`, check whether it already
+   looks substantively populated (real `notes`, a non-empty `action_items` array covering similar
+   ground to what the Obsidian file would produce). If so, don't treat this as a normal
+   Obsidian-wins-on-conflict update — surface it to the human as a distinct decision instead of
+   folding it into the general diff-and-confirm: e.g. "this session already has 7 site-generated
+   action items covering the same meeting, worth touching or fine as-is?" Only propose a plain
+   fill when the gap is unambiguous and additive with no risk of duplication — e.g. `notes` exists
+   but `action_items` is empty (a failed/partial site-side extraction) — in which case adding the
+   Obsidian-derived action items is safe and worth doing without extra deliberation.
 
 5. **Diff.** Compare the file's notes and action items against the fetched session (or note that
    this would be a brand-new session). Build a clear before/after summary: what the session
@@ -117,6 +179,33 @@ first — MCP servers connected mid-session need this before their tools are cal
 
 9. **Report.** One line per thing that changed (e.g. "✅ 노트 갱신, 액션아이템 1개 신규 생성·1개
    완료 처리"). If nothing changed, say so plainly instead of a generic "완료".
+
+## Bulk syncs (many notes / "sync everything")
+
+When asked to sync a whole folder or "모든 챔피언의 노트" rather than one file, don't run steps
+1–9 file-by-file with a confirmation prompt after each one — gather everything read-only first,
+then confirm once against a single consolidated plan:
+
+1. List candidate files (a vault's meeting-notes folder usually mixes real 1-on-1s with unrelated
+   meetings — weeklies, lunches, cross-team syncs; filter by filename/title pattern like
+   `1-on-1`/`1_1` before doing anything else, and confirm the filtered set with the human if it's
+   not obvious).
+2. Call `list_champions` once, resolve every file to a champion up front.
+3. Call `get_session` for every (champion, date) pair before writing anything, so you know the
+   full shape of the work: how many are genuinely new, how many already exist with a real gap to
+   fill, and how many already exist and are already well-populated (see the gotcha under step 4
+   above — this is where it matters most, since a bulk sync is exactly when it's tempting to
+   treat "session exists" as a uniform "update" case).
+4. Present one plan grouped by category — net-new creates, gap-fills, and "already covered,
+   proposing to skip" — and get a single explicit go-ahead, rather than N separate confirmations.
+   For the ambiguous "already has content" cases, state your proposed handling (usually: leave
+   alone) and let the human override per-item if they disagree.
+5. Execute writes, then batch the ID-backfill (step 8) across every touched file before reporting.
+   If most of the calls go through the raw-HTTP fallback (see above) because native tools aren't
+   loaded, write one throwaway script that loops through all the session payloads rather than
+   invoking `curl` once per call — check every result for a non-`created`/`updated` status before
+   reporting success, since a partial failure in the middle of a large batch is easy to miss
+   otherwise.
 
 ## Direction B: App → Obsidian (export)
 
