@@ -16,7 +16,7 @@ function PairingPageInner() {
 
   useEffect(() => {
     if (!code) return
-    apiFetch<{ status: string; scope?: PairingScope }>(`/api/pairing/poll?code=${encodeURIComponent(code)}`)
+    apiFetch<{ status: string; scope?: PairingScope }>(`/api/pairing/info?code=${encodeURIComponent(code)}`)
       .then((body) => {
         if (body.status === 'expired' || !body.scope) {
           setScopeError(true)
