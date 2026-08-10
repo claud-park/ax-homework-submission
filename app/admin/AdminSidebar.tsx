@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
-import { LayoutDashboard, Layers, AlertTriangle, FileText, BarChart2, LogOut, Menu, X, Users, UserCog, MessageCircle } from 'lucide-react'
+import { LayoutDashboard, Layers, AlertTriangle, FileText, BarChart2, LogOut, Menu, X, Users, UserCog, MessageCircle, Smartphone } from 'lucide-react'
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
 import type { HotlineThread } from '@/lib/types'
 
@@ -16,6 +16,7 @@ const NAV = [
   { icon: FileText,        label: '주간 리포트',   href: '/admin/reports' },
   { icon: MessageCircle,   label: '핫라인',        href: '/admin/hotline' },
   { icon: UserCog,         label: '유저 권한 관리', href: '/admin/users' },
+  { icon: Smartphone,      label: '연결된 기기',   href: '/admin/devices' },
 ]
 
 interface Props {
