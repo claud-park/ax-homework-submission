@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { claimPairingToken } from '@/lib/pairing-tokens'
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get('code')?.toUpperCase()
@@ -25,17 +26,8 @@ export async function GET(req: NextRequest) {
 
   if (pairing.status !== 'approved') return NextResponse.json({ status: pairing.status, scope: pairing.scope })
 
-  // Atomic clear-and-return: a conditional UPDATE...RETURNING means concurrent polls
-  // can't both observe a non-null issued_token — only the request that wins the row
-  // lock gets a non-null `claimed.issued_token` back.
-  const { data: claimed } = await supabase
-    .from('device_pairing_codes')
-    .update({ issued_token: null })
-    .eq('code', code)
-    .not('issued_token', 'is', null)
-    .select('issued_token')
-    .single()
-  if (!claimed) return NextResponse.json({ status: 'expired' })
+  const token = await claimPairingToken(supabase, code)
+  if (!token) return NextResponse.json({ status: 'expired' })
 
-  return NextResponse.json({ status: 'approved', token: claimed.issued_token })
+  return NextResponse.json({ status: 'approved', token })
 }
