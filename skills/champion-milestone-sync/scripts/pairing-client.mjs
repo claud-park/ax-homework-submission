@@ -127,6 +127,28 @@ async function logMilestone(id, note, opts) {
   console.log(JSON.stringify(result))
 }
 
+async function listMilestoneLog(id) {
+  const result = await authedFetch(`/api/milestones/${id}/log`)
+  console.log(JSON.stringify(result))
+}
+
+async function createMilestone(title, opts) {
+  const result = await authedFetch('/api/milestones', {
+    method: 'POST',
+    body: JSON.stringify({
+      title,
+      description: opts.description,
+      publish_status: 'published',
+    }),
+  })
+  console.log(JSON.stringify(result))
+}
+
+async function deleteMilestone(id) {
+  const result = await authedFetch(`/api/milestones/${id}`, { method: 'DELETE' })
+  console.log(JSON.stringify(result))
+}
+
 function parseLogArgs(argv) {
   const [id, note, ...rest] = argv
   if (!id || !note) {
@@ -142,6 +164,19 @@ function parseLogArgs(argv) {
   return { id, note, opts }
 }
 
+function parseCreateMilestoneArgs(argv) {
+  const [title, ...rest] = argv
+  if (!title) {
+    console.error('usage: create-milestone <title> [--description="..."]')
+    process.exit(1)
+  }
+  const opts = { description: undefined }
+  for (const arg of rest) {
+    if (arg.startsWith('--description=')) opts.description = arg.slice('--description='.length)
+  }
+  return { title, opts }
+}
+
 async function main() {
   const [, , command, ...rest] = process.argv
   try {
@@ -150,8 +185,27 @@ async function main() {
     else if (command === 'log-milestone') {
       const { id, note, opts } = parseLogArgs(rest)
       await logMilestone(id, note, opts)
+    } else if (command === 'milestone-log') {
+      const [id] = rest
+      if (!id) {
+        console.error('usage: milestone-log <milestone_id>')
+        process.exit(1)
+      }
+      await listMilestoneLog(id)
+    } else if (command === 'create-milestone') {
+      const { title, opts } = parseCreateMilestoneArgs(rest)
+      await createMilestone(title, opts)
+    } else if (command === 'delete-milestone') {
+      const [id] = rest
+      if (!id) {
+        console.error('usage: delete-milestone <milestone_id>')
+        process.exit(1)
+      }
+      await deleteMilestone(id)
     } else {
-      console.error('usage: pairing-client.mjs <ensure-paired|list-milestones|log-milestone>')
+      console.error(
+        'usage: pairing-client.mjs <ensure-paired|list-milestones|log-milestone|milestone-log|create-milestone|delete-milestone>',
+      )
       process.exit(1)
     }
   } catch (err) {
