@@ -125,7 +125,7 @@ the champion's charter itself needs revising, that still happens on the site, no
   not-started/delayed to in-progress or completed.
 - If any call fails with "token no longer valid", the script has already cleared the local config;
   just re-run step 1 to re-pair.
-- Pivot handling (below) never touches a charter (`charter_submissions`) — only milestones. If the
+- Pivot handling (above) never touches a charter (`charter_submissions`) — only milestones. If the
   champion's actual charter direction changed, tell them that's still a site edit, not something
   this skill does.
 - Deleting a milestone is irreversible and takes its entire activity log with it — always show the
