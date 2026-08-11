@@ -129,7 +129,8 @@ async function logMilestone(id, note, opts) {
 
 async function listMilestoneLog(id) {
   const result = await authedFetch(`/api/milestones/${id}/log`)
-  console.log(JSON.stringify(result))
+  const logs = result.logs ?? []
+  console.log(JSON.stringify({ count: logs.length, logs }))
 }
 
 async function createMilestone(title, opts) {
@@ -139,6 +140,7 @@ async function createMilestone(title, opts) {
       title,
       description: opts.description,
       publish_status: 'published',
+      charter_submission_id: opts.charterSubmissionId,
     }),
   })
   console.log(JSON.stringify(result))
@@ -166,15 +168,25 @@ function parseLogArgs(argv) {
 
 function parseCreateMilestoneArgs(argv) {
   const [title, ...rest] = argv
-  if (!title) {
-    console.error('usage: create-milestone <title> [--description="..."]')
+  if (!title || title.startsWith('--')) {
+    console.error('usage: create-milestone <title> [--description="..."] [--charter-submission-id=<id>]')
     process.exit(1)
   }
-  const opts = { description: undefined }
+  const opts = { description: undefined, charterSubmissionId: undefined }
   for (const arg of rest) {
     if (arg.startsWith('--description=')) opts.description = arg.slice('--description='.length)
+    else if (arg.startsWith('--charter-submission-id=')) opts.charterSubmissionId = arg.slice('--charter-submission-id='.length)
   }
   return { title, opts }
+}
+
+function requireId(rest, usage) {
+  const [id] = rest
+  if (!id) {
+    console.error(`usage: ${usage}`)
+    process.exit(1)
+  }
+  return id
 }
 
 async function main() {
@@ -186,21 +198,13 @@ async function main() {
       const { id, note, opts } = parseLogArgs(rest)
       await logMilestone(id, note, opts)
     } else if (command === 'milestone-log') {
-      const [id] = rest
-      if (!id) {
-        console.error('usage: milestone-log <milestone_id>')
-        process.exit(1)
-      }
+      const id = requireId(rest, 'milestone-log <milestone_id>')
       await listMilestoneLog(id)
     } else if (command === 'create-milestone') {
       const { title, opts } = parseCreateMilestoneArgs(rest)
       await createMilestone(title, opts)
     } else if (command === 'delete-milestone') {
-      const [id] = rest
-      if (!id) {
-        console.error('usage: delete-milestone <milestone_id>')
-        process.exit(1)
-      }
+      const id = requireId(rest, 'delete-milestone <milestone_id>')
       await deleteMilestone(id)
     } else {
       console.error(

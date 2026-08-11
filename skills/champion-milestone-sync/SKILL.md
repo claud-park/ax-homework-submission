@@ -79,14 +79,21 @@ the champion's charter itself needs revising, that still happens on the site, no
    skip straight to step 3 below (a new milestone is still proposed).
 
 2. **Confirm each deletion separately.** For every milestone the champion pointed to:
-   - Run `node <skill_dir>/scripts/pairing-client.mjs milestone-log <milestone_id>` and count the
-     entries in the returned `logs` array.
+   - Run `node <skill_dir>/scripts/pairing-client.mjs milestone-log <milestone_id>` and read the
+     `count` field from the result. If `milestone-log` fails for any reason (including a 405 if
+     the site's log-read endpoint isn't deployed yet), do not delete that milestone — report the
+     failure to the champion and move on to the next one.
    - Check the milestone list already fetched in step 2 of the main flow for any entry whose
-     `parent_milestone_id` equals this milestone's `id` (its sub-milestones, if any).
+     `parent_milestone_id` equals this milestone's `id` (its sub-milestones, if any) (this list
+     only contains published milestones — if the champion has draft sub-milestones under the one
+     being deleted, this check won't see them, so mention that limitation if it seems relevant).
    - Ask, as its own explicit question: "[제목] 마일스톤을 삭제할까요? 활동 로그 N건이 함께
      사라집니다." — append ", 하위 마일스톤 M개는 삭제되지 않고 최상위로 이동합니다." if any
      sub-milestones were found. Deleting is permanent (`ON DELETE CASCADE` on the activity log) —
-     the champion must see the count before answering; never guess it or skip the check.
+     the champion must see the count before answering; never guess it or skip the check. A blanket
+     approval like '다 지워줘' does not count as confirming any individual deletion — each
+     milestone still needs its own question, asked after its own log count has been shown, and its
+     own explicit answer.
    - Only on an explicit yes, run:
      ```
      node <skill_dir>/scripts/pairing-client.mjs delete-milestone <milestone_id>
@@ -98,28 +105,39 @@ the champion's charter itself needs revising, that still happens on the site, no
    deleted nothing, declined every deletion, or wasn't asked because they pointed to nothing —
    draft a title and a one-to-two sentence description from what the session actually did, and
    confirm it as its own question: "새 마일스톤 '[제목]'을(를) 만들까요? — [설명]". This
-   confirmation is independent of step 2's — a "no" there never skips this.
+   confirmation is independent of step 2's — a "no" there never skips this. On no, skip to step 6
+   and report that nothing new was created.
 
-4. **Create it.** On yes:
+4. **Create it.** First determine which charter this belongs to: look at `charter_submission_id` on
+   the milestones already fetched in step 2 of the main flow (every milestone object includes it —
+   you always have at least one existing milestone to read this from, since the pivot flow is only
+   reached after step 2 confirmed the list is non-empty). If they all share the same value, use it.
+   If they disagree, ask the champion which one this new milestone belongs to before proceeding —
+   never guess. On yes:
    ```
-   node <skill_dir>/scripts/pairing-client.mjs create-milestone "<title>" --description="<description>"
+   node <skill_dir>/scripts/pairing-client.mjs create-milestone "<title>" --description="<description>" --charter-submission-id="<id>"
    ```
    Read the new milestone's id from the result's `milestone.id` field — you need it for step 5.
 
 5. **Offer to log today's work on it immediately.** Ask: "오늘 작업도 여기에 기록할까요?" On yes,
    run step 5 ("Write") of the main flow above against the newly created milestone's id, exactly
    as you would for a matched milestone — including the separate completion question if
-   applicable, and the same `charter_not_approved` handling from step 6 if marking progress fails
-   (report that the milestone itself was created successfully even if marking it in-progress
-   wasn't — don't let one failure make the whole pivot sound like it failed).
+   applicable, and the same `charter_not_approved` handling from step 6 of the main flow if marking
+   progress fails (report that the milestone itself was created successfully even if marking it
+   in-progress wasn't — don't let one failure make the whole pivot sound like it failed). On no,
+   skip to step 6 without logging.
 
 6. **Report.** One line per action actually taken — each deletion, the new milestone (or that it
    was declined), and whether today's work got logged to it. If the champion declined everything,
-   say that plainly rather than a generic "완료".
+   say that plainly rather than a generic "완료". Only ever use milestone ids exactly as they
+   appeared in the fetched list — report deletions based on what the champion confirmed, not
+   merely on the command exiting without error (a delete call against an id that doesn't match
+   anything also exits without error).
 
 ## Notes
 
-- Never write anything without the explicit confirmation from step 4.
+- Never write anything without the explicit confirmation from step 4 of the main flow (in a pivot,
+  the corresponding confirmation in that section).
 - Never un-complete a milestone or edit `milestones.note` (the website's own manual note field) —
   this skill only ever adds activity-log entries and optionally moves a milestone from
   not-started/delayed to in-progress or completed.
