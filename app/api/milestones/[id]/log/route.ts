@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
+import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyMilestoneCompleted } from '@/lib/notifications'
 import type { MilestoneStatus, User } from '@/lib/types'
@@ -15,6 +16,27 @@ function computeStatus(milestone: {
   if (milestone.is_manual_progress) return 'in_progress'
   if (milestone.due_date && new Date(milestone.due_date) < new Date()) return 'delayed'
   return 'not_started'
+}
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await requireUser(req)
+  if (user instanceof NextResponse) return user
+
+  const isAdmin = isAdminUser(user)
+  const targetUserId = req.nextUrl.searchParams.get('user_id')
+  const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
+
+  const supabase = createServiceClient()
+  const { data, error } = await supabase
+    .from('milestone_activity_log')
+    .select('*')
+    .eq('milestone_id', params.id)
+    .eq('user_id', effectiveUserId)
+    .order('log_date', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ logs: data })
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
