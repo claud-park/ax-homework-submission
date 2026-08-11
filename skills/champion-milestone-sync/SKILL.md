@@ -111,9 +111,12 @@ the champion's charter itself needs revising, that still happens on the site, no
 4. **Create it.** First determine which charter this belongs to: look at `charter_submission_id` on
    the milestones already fetched in step 2 of the main flow (every milestone object includes it —
    you always have at least one existing milestone to read this from, since the pivot flow is only
-   reached after step 2 confirmed the list is non-empty). If they all share the same value, use it.
-   If they disagree, ask the champion which one this new milestone belongs to before proceeding —
-   never guess. On yes:
+   reached after step 2 confirmed the list is non-empty). If they all share the same non-null value,
+   use it. If they disagree, or if every existing milestone has a null `charter_submission_id`
+   (this happens — some milestones are legacy orphans not linked to any charter), ask the champion
+   which charter this new milestone belongs to before proceeding. Never create it with a null
+   charter link just because that's what the existing ones have — that reproduces the exact
+   "invisible on the dashboard" problem this whole flow exists to avoid. On yes:
    ```
    node <skill_dir>/scripts/pairing-client.mjs create-milestone "<title>" --description="<description>" --charter-submission-id="<id>"
    ```
