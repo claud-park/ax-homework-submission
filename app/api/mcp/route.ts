@@ -340,9 +340,13 @@ const handler = createMcpHandler((server) => {
     {
       title: 'Upsert Weekly Session',
       description:
-        'Creates an AX Champion Weekly meeting for a date if none exists, or updates title/notes on an existing one — admin-only.',
+        'Creates an AX Champion Weekly meeting for a date if none exists, or updates title/notes on an existing one — admin-only. Pass weekly_session_id to target a specific session directly (e.g. to disambiguate a multiple_sessions_on_date result from get_weekly_session) — when given, date-based lookup is skipped entirely and date is not used to find the row.',
       inputSchema: z.object({
         date: z.string().describe('Meeting date, YYYY-MM-DD'),
+        weekly_session_id: z
+          .string()
+          .optional()
+          .describe('Target this specific session id directly, bypassing date-based lookup — use this when get_weekly_session returned multiple_sessions_on_date and the human picked one. If no session exists with this id, an error is returned (no new session is created).'),
         title: z.string().optional(),
         notes: z.string().optional().describe('Markdown meeting notes (condensed summary)'),
         expected_updated_at: z
@@ -356,30 +360,50 @@ const handler = createMcpHandler((server) => {
       if (!identity.isAdmin) {
         return { content: [{ type: 'text', text: JSON.stringify({ error: 'admin_required' }) }], isError: true }
       }
-      const { date, title, notes, expected_updated_at } = args
+      const { date, weekly_session_id, title, notes, expected_updated_at } = args
       const supabase = createServiceClient()
-      const { data: sessions, error: lookupError } = await supabase
-        .from('champion_weekly_sessions')
-        .select('*')
-        .eq('session_date', date)
-        .order('session_time', { ascending: true, nullsFirst: false })
-        .order('created_at', { ascending: true })
-      if (lookupError) {
-        return { content: [{ type: 'text', text: JSON.stringify({ error: lookupError.message }) }], isError: true }
-      }
-      if (sessions.length > 1) {
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              error: 'multiple_sessions_on_date',
-              sessions: sessions.map((s) => ({ id: s.id, session_time: s.session_time, title: s.title })),
-            }),
-          }],
-          isError: true,
+
+      let existing
+      if (weekly_session_id) {
+        const { data: byId, error: byIdError } = await supabase
+          .from('champion_weekly_sessions')
+          .select('*')
+          .eq('id', weekly_session_id)
+          .maybeSingle()
+        if (byIdError) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: byIdError.message }) }], isError: true }
         }
+        if (!byId) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'weekly_session_not_found' }) }],
+            isError: true,
+          }
+        }
+        existing = byId
+      } else {
+        const { data: sessions, error: lookupError } = await supabase
+          .from('champion_weekly_sessions')
+          .select('*')
+          .eq('session_date', date)
+          .order('session_time', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true })
+        if (lookupError) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: lookupError.message }) }], isError: true }
+        }
+        if (sessions.length > 1) {
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                error: 'multiple_sessions_on_date',
+                sessions: sessions.map((s) => ({ id: s.id, session_time: s.session_time, title: s.title })),
+              }),
+            }],
+            isError: true,
+          }
+        }
+        existing = sessions[0] ?? null
       }
-      const existing = sessions[0] ?? null
 
       if (!existing) {
         const { data: created, error } = await supabase
@@ -433,7 +457,7 @@ const handler = createMcpHandler((server) => {
         items: z.array(
           z.object({
             id: z.string().optional(),
-            champion_user_id: z.string().describe('Required for new items; ignored (kept as-is) when updating an existing item'),
+            champion_user_id: z.string().optional().describe('Required for new items; ignored (kept as-is) when updating an existing item'),
             project_label: z.string().optional(),
             summary: z.string(),
           }),

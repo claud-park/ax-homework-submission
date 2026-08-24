@@ -14,8 +14,9 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('weekly_champion_updates')
-    .select('*, weekly_session:champion_weekly_sessions(session_date, title)')
+    .select('*, weekly_session:champion_weekly_sessions!inner(session_date, title)')
     .eq('champion_user_id', championUserId)
+    .order('session_date', { referencedTable: 'weekly_session', ascending: false })
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
