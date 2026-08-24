@@ -252,7 +252,10 @@ Less common (per design, ~10% of usage) — no dedicated export tool exists; you
    - `upsert_weekly_session(date, title, notes[, expected_updated_at])`으로 미팅 레코드 생성/갱신.
    - `sync_champion_updates(weekly_session_id, items)`로 챔피언별 업데이트 배치 생성/갱신.
      `id`가 있는 항목은 갱신, 없는 항목은 생성되고 새 id가 응답으로 돌아온다. **삭제되지 않는다** —
-     노트에서 빠진 기존 항목이 있어도 그대로 둔다.
+     노트에서 빠진 기존 항목이 있어도 그대로 둔다. **`id`가 없는 신규 항목에는 반드시
+     `champion_user_id`를 채운다** — 2단계에서 `list_champions`로 이미 매칭해둔 그 챔피언의
+     `user_id`를 그대로 넣으면 된다. 빠뜨리면 `champion_user_id required for new items` 에러가
+     항목별로 돌아온다.
 
 6. **ID를 파일에 백필한다.** 성공 후 미팅 H1 아래 `<!-- weekly_session_id: ... -->`, 각
    `### 이름 — 프로젝트명` 서브섹션 아래 `<!-- weekly_update_id: ... -->`를 적어 넣는다.
