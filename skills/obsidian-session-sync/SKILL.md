@@ -1,25 +1,29 @@
 ---
 name: obsidian-session-sync
-description: Use when an admin (usually) or champion wants to sync 1-on-1 check-up session notes and action items between a local Obsidian vault and ax-homework-submission, in either direction. Triggers on "옵시디언 동기화", "세션 노트 동기화", "1on1 노트 싱크", "obsidian sync", "sync session notes".
+description: Use when an admin (usually) or champion wants to sync 1-on-1 check-up session notes and action items between a local Obsidian vault and ax-homework-submission, in either direction. Triggers on "옵시디언 동기화", "세션 노트 동기화", "1on1 노트 싱크", "obsidian sync", "sync session notes", "Weekly 진척도 동기화", "weekly sync".
 ---
 
 # Obsidian Session Sync
 
-Syncs 1-on-1 meeting notes and action items between a local Obsidian vault and
-ax-homework-submission's `check_up_sessions`/`session_action_items` tables, via the
+Syncs 1-on-1 meeting notes and action items, and AX Champion Weekly meeting notes, between a
+local Obsidian vault and ax-homework-submission's `check_up_sessions`/`session_action_items`
+tables (1-on-1s) and `champion_weekly_sessions`/`weekly_champion_updates` tables (Weekly), via the
 `ax-sessions` MCP server (`app/api/mcp/route.ts`). Usually run by an **admin** syncing several
-champions' session notes; a champion can also run it for their own sessions, but creating a
-brand-new session in the app requires an admin (matches the site's own rule).
+champions' session notes; a champion can also run it for their own 1-on-1 sessions, but creating a
+brand-new session in the app requires an admin (matches the site's own rule) — Weekly sync is
+admin-only end to end (see Direction C).
 
 This skill has two parts: the `ax-sessions` MCP server, which does the actual DB reads/writes
-through five tools (`whoami`, `list_champions`, `get_session`, `upsert_session`,
-`sync_action_items`), and you, the agent, who does everything that requires judgment: reading
-and parsing the local Obsidian file, matching it to the right champion/date, diffing it against
-the app's current state, and confirming with the human before writing anything on either side.
+through eight tools (`whoami`, `list_champions`, `get_session`, `upsert_session`,
+`sync_action_items` for 1-on-1s, plus `get_weekly_session`, `upsert_weekly_session`,
+`sync_champion_updates` for Weekly), and you, the agent, who does everything that requires
+judgment: reading and parsing the local Obsidian file, matching it to the right champion/date,
+diffing it against the app's current state, and confirming with the human before writing
+anything on either side.
 
 **Requires `AX_MILESTONE_SYNC_API_URL`** in the environment (shared with champion-milestone-sync)
 and the `ax-sessions` MCP server connected. If tool calls like `mcp__ax-sessions__whoami` aren't
-available, run `ToolSearch` with `select:mcp__ax-sessions__whoami,mcp__ax-sessions__list_champions,mcp__ax-sessions__get_session,mcp__ax-sessions__upsert_session,mcp__ax-sessions__sync_action_items`
+available, run `ToolSearch` with `select:mcp__ax-sessions__whoami,mcp__ax-sessions__list_champions,mcp__ax-sessions__get_session,mcp__ax-sessions__upsert_session,mcp__ax-sessions__sync_action_items,mcp__ax-sessions__get_weekly_session,mcp__ax-sessions__upsert_weekly_session,mcp__ax-sessions__sync_champion_updates`
 first — MCP servers connected mid-session need this before their tools are callable.
 
 **If the native tools still don't show up** (confirmed in practice: `ToolSearch` can come back
@@ -220,6 +224,54 @@ Less common (per design, ~10% of usage) — no dedicated export tool exists; you
 4. If no local file exists, propose the target path (following the vault's existing note
    convention) and confirm before creating it, using the same HTML-comment ID format from
    Direction A step 2 so future syncs match correctly.
+
+## Direction C: Weekly 미팅 동기화 (Obsidian → App, 관리자 전용)
+
+**목적은 순수 관리자용 기록·검색이다.** 1:1과 달리 챔피언 본인이 보는 화면은 없다 — 관리자만
+`get_weekly_session`/`upsert_weekly_session`/`sync_champion_updates` 세 도구를 호출할 수 있고,
+챔피언 PAT로 호출하면 `admin_required` 에러가 돌아온다.
+
+1. **노트를 식별한다.** 파일명/제목에 "Weekly"가 들어간 노트(예: `[11층 하와이] AX Champion
+   Weekly.md`)를 대상으로 한다. 1:1과 마찬가지로 첫 동기화 시엔 HTML 주석 ID가 없는 게 정상이다.
+
+2. **`## 🤖 챔피언별 활동 공유` 섹션을 파싱한다.** 이 섹션 아래 `### 이름 — 프로젝트명`
+   형태의 서브섹션이 챔피언 한 명당 하나씩 있다. 각 서브섹션에서:
+   - "이름"을 `list_champions` 결과와 매칭한다(1:1 스킬과 동일한 매칭 규칙 — 닉네임 우선).
+   - **매칭 실패 시(예: `### 화자6 (미상) — 정산서 자동화`) 해당 서브섹션은 건너뛰고
+     목록으로 사람에게 보고한다 — 추측으로 아무 챔피언에게나 매핑하지 않는다.**
+   - `—` 뒤 텍스트를 `project_label`로, 그 아래 불릿 전체를 `summary`로 삼는다.
+   - `🏆 우수 사례·인사이트`, `🤨 질문·건의 사항`, `✅ 액션 아이템`, 전체 전사록은
+     이 동기화 대상이 아니다 — 저장하지 않는다.
+
+3. **미팅 자체를 조회한다.** `get_weekly_session`을 노트 날짜로 호출한다.
+   - `null`이면 신규 생성 대상.
+   - 세션 객체가 오면 갱신 대상 — `champion_updates` 배열을 노트의 파싱 결과와 비교한다.
+   - `{error: "multiple_sessions_on_date", sessions: [...]}`이면 같은 날짜에 여러 Weekly가
+     있다는 뜻(예: 층별 별도 회의) — 사람에게 어느 것인지 확인받는다. 사람이 하나를 고르면, 그
+     세션의 `id`를 이후 `upsert_weekly_session` 호출 시 `weekly_session_id`로 넘겨 날짜 기반 조회를
+     건너뛰고 그 세션을 정확히 지정한다.
+
+4. **diff를 보여주고 확인받는다.** 미팅 노트(`notes` — 요약/논의 조건화, 1:1과 동일 스타일)와
+   챔피언별 업데이트 각각에 대해 신규/갱신 여부를 명확히 보여준 뒤, 명시적 yes 없이는 쓰지 않는다.
+
+5. **쓴다.**
+   - `upsert_weekly_session(date, title, notes[, expected_updated_at])`으로 미팅 레코드 생성/갱신.
+     같은 날짜에 여러 Weekly가 있어 3단계에서 특정 세션을 골랐다면, `date` 대신(또는 함께)
+     `weekly_session_id`를 넘겨 그 세션을 정확히 지정한다 — 이 값이 있으면 날짜 기반 조회는
+     건너뛰고 해당 id의 세션에만 적용된다.
+   - `sync_champion_updates(weekly_session_id, items)`로 챔피언별 업데이트 배치 생성/갱신.
+     `id`가 있는 항목은 갱신, 없는 항목은 생성되고 새 id가 응답으로 돌아온다. **삭제되지 않는다** —
+     노트에서 빠진 기존 항목이 있어도 그대로 둔다. **`id`가 없는 신규 항목에는 반드시
+     `champion_user_id`를 채운다** — 2단계에서 `list_champions`로 이미 매칭해둔 그 챔피언의
+     `user_id`를 그대로 넣으면 된다. `id`가 없는(신규) 항목에서만 빠뜨리면 `champion_user_id
+     required for new items` 에러가 그 항목에 한해 돌아온다 — `id`가 있는 갱신 전용 항목은
+     `champion_user_id`를 생략해도(기존 값 유지) 이 에러와 무관하다.
+
+6. **ID를 파일에 백필한다.** 성공 후 미팅 H1 아래 `<!-- weekly_session_id: ... -->`, 각
+   `### 이름 — 프로젝트명` 서브섹션 아래 `<!-- weekly_update_id: ... -->`를 적어 넣는다.
+
+7. **보고한다.** "✅ 노트 갱신, 챔피언 3명 업데이트(신규 1·갱신 2), 매칭 실패 1명(화자6)
+   건너뜀" 같은 한 줄 요약. 매칭 실패가 있었다면 반드시 언급한다.
 
 ## Notes
 

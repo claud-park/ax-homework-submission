@@ -10,6 +10,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { useConfirm } from '@/components/ui/confirm'
 import { AdminSessionList } from '@/components/sessions/AdminSessionList'
 import { AdminSessionDetail } from '@/components/sessions/AdminSessionDetail'
+import { AdminWeeklyProgressList } from '@/components/weekly/AdminWeeklyProgressList'
+import type { WeeklyChampionUpdateWithSession } from '@/lib/types'
 import MilestoneActivityLogToggle from '@/components/milestones/MilestoneActivityLogToggle'
 
 
@@ -206,7 +208,8 @@ export default function AdminChampionPage() {
   const [sessionTab, setSessionTab] = useState<'list' | 'detail'>('list')
   const [sessions, setSessions] = useState<import('@/lib/types').CheckUpSession[]>([])
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions'>('charter')
+  const [activeMainTab, setActiveMainTab] = useState<'submissions' | 'charter' | 'milestones' | 'sessions' | 'weekly'>('charter')
+  const [weeklyUpdates, setWeeklyUpdates] = useState<WeeklyChampionUpdateWithSession[]>([])
   const [scrolled, setScrolled] = useState(false)
   const headerSentinelRef = useRef<HTMLDivElement>(null)
 
@@ -459,6 +462,7 @@ export default function AdminChampionPage() {
         {([
           { key: 'charter', label: '과제정의서' },
           { key: 'sessions', label: '1-on-1 세션' },
+          { key: 'weekly', label: 'Weekly 진척도' },
           { key: 'submissions', label: '제출물' },
         ] as const).map(tab => (
           <button
@@ -469,6 +473,11 @@ export default function AdminChampionPage() {
                 setSessionTab('list')
                 apiFetch<import('@/lib/types').CheckUpSession[]>(`/api/sessions?championId=${userId}`)
                   .then(setSessions)
+                  .catch(() => {})
+              }
+              if (tab.key === 'weekly') {
+                apiFetch<WeeklyChampionUpdateWithSession[]>(`/api/weekly-updates?championUserId=${userId}`)
+                  .then(setWeeklyUpdates)
                   .catch(() => {})
               }
             }}
@@ -922,6 +931,12 @@ export default function AdminChampionPage() {
               }}
             />
           ) : null}
+        </section>
+      )}
+
+      {activeMainTab === 'weekly' && (
+        <section className="mb-8">
+          <AdminWeeklyProgressList updates={weeklyUpdates} />
         </section>
       )}
     </div>

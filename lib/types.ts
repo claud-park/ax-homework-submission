@@ -295,3 +295,29 @@ export interface OneOnOneBooking {
   created_at: string
   updated_at: string
 }
+
+export interface ChampionWeeklySession {
+  id: string
+  session_date: string
+  session_time: string | null
+  title: string
+  notes: string | null
+  admin_user_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WeeklyChampionUpdate {
+  id: string
+  weekly_session_id: string
+  champion_user_id: string
+  project_label: string | null
+  summary: string
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface WeeklyChampionUpdateWithSession extends WeeklyChampionUpdate {
+  weekly_session: { session_date: string; title: string }
+}

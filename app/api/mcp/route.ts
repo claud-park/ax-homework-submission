@@ -281,6 +281,237 @@ const handler = createMcpHandler((server) => {
       return { content: [{ type: 'text', text: JSON.stringify(results) }], isError: hasFailure }
     },
   )
+
+  server.registerTool(
+    'get_weekly_session',
+    {
+      title: 'Get Weekly Session',
+      description:
+        'Looks up an AX Champion Weekly meeting by date — admin-only. Returns null if none exists, or an error listing candidates if multiple sessions share the date.',
+      inputSchema: z.object({
+        date: z.string().describe('Meeting date, YYYY-MM-DD'),
+      }),
+    },
+    async (args, ctx) => {
+      const identity = getAuthenticatedIdentity(ctx)
+      if (!identity.isAdmin) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: 'admin_required' }) }], isError: true }
+      }
+      const { date } = args
+      const supabase = createServiceClient()
+      const { data: sessions, error: lookupError } = await supabase
+        .from('champion_weekly_sessions')
+        .select('*')
+        .eq('session_date', date)
+        .order('session_time', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
+      if (lookupError) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: lookupError.message }) }], isError: true }
+      }
+      if (sessions.length > 1) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              error: 'multiple_sessions_on_date',
+              sessions: sessions.map((s) => ({ id: s.id, session_time: s.session_time, title: s.title })),
+            }),
+          }],
+          isError: true,
+        }
+      }
+      const session = sessions[0] ?? null
+      if (!session) return { content: [{ type: 'text', text: JSON.stringify(null) }] }
+
+      const { data: updates } = await supabase
+        .from('weekly_champion_updates')
+        .select('*')
+        .eq('weekly_session_id', session.id)
+        .order('display_order', { ascending: true })
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ ...session, champion_updates: updates ?? [] }) }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'upsert_weekly_session',
+    {
+      title: 'Upsert Weekly Session',
+      description:
+        'Creates an AX Champion Weekly meeting for a date if none exists, or updates title/notes on an existing one — admin-only. Pass weekly_session_id to target a specific session directly (e.g. to disambiguate a multiple_sessions_on_date result from get_weekly_session) — when given, date-based lookup is skipped entirely and date is not used to find the row.',
+      inputSchema: z.object({
+        date: z.string().describe('Meeting date, YYYY-MM-DD'),
+        weekly_session_id: z
+          .string()
+          .optional()
+          .describe('Target this specific session id directly, bypassing date-based lookup — use this when get_weekly_session returned multiple_sessions_on_date and the human picked one. If no session exists with this id, an error is returned (no new session is created).'),
+        title: z.string().optional(),
+        notes: z.string().optional().describe('Markdown meeting notes (condensed summary)'),
+        expected_updated_at: z
+          .string()
+          .optional()
+          .describe('Pass the updated_at value from a prior get_weekly_session call to detect concurrent edits.'),
+      }),
+    },
+    async (args, ctx) => {
+      const identity = getAuthenticatedIdentity(ctx)
+      if (!identity.isAdmin) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: 'admin_required' }) }], isError: true }
+      }
+      const { date, weekly_session_id, title, notes, expected_updated_at } = args
+      const supabase = createServiceClient()
+
+      let existing
+      if (weekly_session_id) {
+        const { data: byId, error: byIdError } = await supabase
+          .from('champion_weekly_sessions')
+          .select('*')
+          .eq('id', weekly_session_id)
+          .maybeSingle()
+        if (byIdError) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: byIdError.message }) }], isError: true }
+        }
+        if (!byId) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ error: 'weekly_session_not_found' }) }],
+            isError: true,
+          }
+        }
+        existing = byId
+      } else {
+        const { data: sessions, error: lookupError } = await supabase
+          .from('champion_weekly_sessions')
+          .select('*')
+          .eq('session_date', date)
+          .order('session_time', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true })
+        if (lookupError) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: lookupError.message }) }], isError: true }
+        }
+        if (sessions.length > 1) {
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                error: 'multiple_sessions_on_date',
+                sessions: sessions.map((s) => ({ id: s.id, session_time: s.session_time, title: s.title })),
+              }),
+            }],
+            isError: true,
+          }
+        }
+        existing = sessions[0] ?? null
+      }
+
+      if (!existing) {
+        const { data: created, error } = await supabase
+          .from('champion_weekly_sessions')
+          .insert({
+            admin_user_id: identity.userId,
+            session_date: date,
+            title: title?.trim() || `${date} AX Champion Weekly`,
+            notes: notes ?? null,
+          })
+          .select()
+          .single()
+        if (error || !created) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: error?.message ?? 'create failed' }) }], isError: true }
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(created) }] }
+      }
+
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if (title !== undefined) updates.title = title.trim()
+      if (notes !== undefined) updates.notes = notes
+
+      let updateQuery = supabase.from('champion_weekly_sessions').update(updates).eq('id', existing.id)
+      if (expected_updated_at) updateQuery = updateQuery.eq('updated_at', expected_updated_at)
+
+      const { data: updatedRows, error } = await updateQuery.select()
+      if (error) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: error.message }) }], isError: true }
+      }
+      if (!updatedRows || updatedRows.length === 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ error: 'conflict', message: '다른 사용자가 먼저 수정했습니다. get_weekly_session으로 다시 조회 후 재시도하세요.' }),
+          }],
+          isError: true,
+        }
+      }
+      return { content: [{ type: 'text', text: JSON.stringify(updatedRows[0]) }] }
+    },
+  )
+
+  server.registerTool(
+    'sync_champion_updates',
+    {
+      title: 'Sync Champion Weekly Updates',
+      description:
+        'Batch create/update per-champion progress updates for a Weekly meeting — admin-only. Items with an id are updated (project_label, summary); items without an id are created and their new id is returned so the caller can write it back into the Obsidian file. Never deletes.',
+      inputSchema: z.object({
+        weekly_session_id: z.string(),
+        items: z.array(
+          z.object({
+            id: z.string().optional(),
+            champion_user_id: z.string().optional().describe('Required for new items; ignored (kept as-is) when updating an existing item'),
+            project_label: z.string().optional(),
+            summary: z.string(),
+          }),
+        ),
+      }),
+    },
+    async (args, ctx) => {
+      const identity = getAuthenticatedIdentity(ctx)
+      if (!identity.isAdmin) {
+        return { content: [{ type: 'text', text: JSON.stringify({ error: 'admin_required' }) }], isError: true }
+      }
+      const { weekly_session_id, items } = args
+      const supabase = createServiceClient()
+      const results: Array<{ index: number; status: 'created' | 'updated' | 'not_found' | 'error'; item?: Record<string, unknown>; error?: string }> = []
+      const now = new Date().toISOString()
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.id) {
+          const updates: Record<string, unknown> = { updated_at: now, summary: item.summary.trim() }
+          if (item.project_label !== undefined) updates.project_label = item.project_label
+          const { data, error } = await supabase
+            .from('weekly_champion_updates')
+            .update(updates)
+            .eq('id', item.id)
+            .eq('weekly_session_id', weekly_session_id)
+            .select()
+            .maybeSingle()
+          if (error) results.push({ index: i, status: 'error', error: error.message })
+          else if (!data) results.push({ index: i, status: 'not_found' })
+          else results.push({ index: i, status: 'updated', item: data })
+        } else if (!item.champion_user_id) {
+          results.push({ index: i, status: 'error', error: 'champion_user_id required for new items' })
+        } else {
+          const { data, error } = await supabase
+            .from('weekly_champion_updates')
+            .insert({
+              weekly_session_id,
+              champion_user_id: item.champion_user_id,
+              project_label: item.project_label ?? null,
+              summary: item.summary.trim(),
+              display_order: i,
+            })
+            .select()
+            .single()
+          if (error || !data) results.push({ index: i, status: 'error', error: error?.message ?? 'insert failed' })
+          else results.push({ index: i, status: 'created', item: data })
+        }
+      }
+
+      const hasFailure = results.some((r) => r.status === 'error' || r.status === 'not_found')
+      return { content: [{ type: 'text', text: JSON.stringify(results) }], isError: hasFailure }
+    },
+  )
 })
 
 const authHandler = withMcpAuth(handler, verifyMcpToken, { required: true })
