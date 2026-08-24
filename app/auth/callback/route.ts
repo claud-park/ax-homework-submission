@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeRedirectPath } from '@/lib/safe-redirect'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -8,9 +9,10 @@ export async function GET(request: NextRequest) {
   const proto = request.headers.get('x-forwarded-proto') ?? 'http'
   const origin = `${proto}://${host}`
   const code = searchParams.get('code')
+  const next = sanitizeRedirectPath(searchParams.get('next'))
   if (!code) return NextResponse.redirect(`${origin}/login?error=no_code`)
 
-  const response = NextResponse.redirect(`${origin}/`)
+  const response = NextResponse.redirect(`${origin}${next}`)
 
   // Use @supabase/ssr client so exchangeCodeForSession writes session cookies into the response
   const supabase = createServerClient(

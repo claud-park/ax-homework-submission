@@ -1,13 +1,17 @@
 'use client'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
-export default function LoginPage() {
+function LoginPageInner() {
   const supabase = createSupabaseBrowserClient()
+  const searchParams = useSearchParams()
 
   async function handleGoogleLogin() {
+    const next = searchParams.get('next') ?? '/'
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${location.origin}/auth/callback` },
+      options: { redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
     })
   }
 
@@ -61,5 +65,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   )
 }

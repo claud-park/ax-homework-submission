@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { Milestone, MilestoneStatus } from '@/lib/types'
+import MilestoneActivityLogToggle from '@/components/milestones/MilestoneActivityLogToggle'
 
 const STATUS_COLOR: Record<MilestoneStatus, string> = {
   in_progress: '#3b82f6',
@@ -189,6 +190,8 @@ export function MobileMilestoneCard({
             </button>
           </div>
         ) : null}
+
+        <MilestoneActivityLogToggle milestoneId={m.id} />
 
         {/* 액션 버튼 */}
         {m.status !== 'completed' && charterApproved && (
