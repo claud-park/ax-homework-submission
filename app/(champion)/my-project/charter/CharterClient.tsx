@@ -3,6 +3,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import dynamic from 'next/dynamic'
 import { apiFetch } from '@/lib/api-client'
+import { formatCharterValidationMessage } from '@/lib/charter-validation-message'
 
 const SectionEditorInner = dynamic(() => import('./SectionEditorInner'), {
   ssr: false,
@@ -659,7 +660,7 @@ function CharterPanel({ mode, submission, charterId, onCreated, onUpdated, onAut
       try {
         const parsed = JSON.parse(msg)
         if (parsed.error === 'validation_failed') {
-          toast.error('게시 실패: 필수 항목을 확인해주세요')
+          toast.error(formatCharterValidationMessage(parsed.fields ?? []))
           return false
         }
       } catch { /* not JSON */ }
