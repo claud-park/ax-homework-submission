@@ -1,3 +1,5 @@
+// 과제 제출 페이지 비활성화로 컴포넌트 전체 comment out (복구 시 아래 블록 주석 해제)
+/*
 'use client'
 import { useRef, useState } from 'react'
 import { apiFetch, apiUpload } from '@/lib/api-client'
@@ -117,7 +119,6 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
     <div>
       <DesktopOnlyNotice />
       <div className="hidden md:block">
-      {/* 제출 섹션 */}
       <div
         className="rounded-xl border p-4 mb-6"
         style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
@@ -128,7 +129,6 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
           </p>
         )}
 
-        {/* 파일 업로드 */}
         <div className="flex items-center gap-3 mb-3">
           <label
             className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm cursor-pointer"
@@ -153,14 +153,12 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
           </button>
         </div>
 
-        {/* 구분선 */}
         <div className="flex items-center gap-2 my-3">
           <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
           <span className="text-xs" style={{ color: 'var(--text-disabled)' }}>또는</span>
           <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
         </div>
 
-        {/* 링크 제출 */}
         <div className="flex items-center gap-3">
           <div
             className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg border"
@@ -209,7 +207,6 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
               className="flex flex-col p-4 rounded-xl border gap-3"
               style={{ background: 'var(--background)', borderColor: 'var(--border)' }}
             >
-              {/* 파일/링크 + 상태배지 row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
                   {sub.link_url
@@ -254,7 +251,6 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
                 </span>
               </div>
 
-              {/* 관리자 피드백 블록 (feedback 있을 때만) */}
               {sub.feedback && (
                 <div
                   style={{
@@ -280,7 +276,6 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
                 </div>
               )}
 
-              {/* 코멘트 */}
               {(() => {
                 const comments = (sub.comments ?? []).slice().sort(
                   (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -347,3 +342,4 @@ export function SubmissionClient({ initialSubmissions }: { initialSubmissions: S
     </div>
   )
 }
+*/

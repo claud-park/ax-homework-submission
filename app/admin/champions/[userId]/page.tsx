@@ -2,9 +2,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
-import type { ChampionProject, Submission, MilestoneStatus, CharterSubmission, Milestone, Comment, SubmissionStatus } from '@/lib/types'
+// Submission, SubmissionStatus, Comment: 과제 제출 탭 비활성화로 미사용 (types.ts 자체는 유지)
+import type { ChampionProject, MilestoneStatus, CharterSubmission, Milestone } from '@/lib/types'
 import { parseName } from '@/lib/utils'
-import { Download, ExternalLink, Send } from 'lucide-react'
+// Download, ExternalLink: 과제 제출 탭 비활성화로 미사용
+import { Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
 import { useConfirm } from '@/components/ui/confirm'
@@ -146,12 +148,13 @@ function MilestoneRow({ m, userId, depth = 0 }: { m: Milestone & { children?: Mi
     </div>
   )
 }
-const SUB_STATUS_LABEL: Record<string, string> = {
-  pending: '검토 중', accepted: '합격', declined: '불합격',
-}
-const SUB_STATUS_COLOR: Record<string, string> = {
-  pending: 'var(--amber)', accepted: 'var(--success)', declined: 'var(--error)',
-}
+// 과제 제출 탭 비활성화로 미사용
+// const SUB_STATUS_LABEL: Record<string, string> = {
+//   pending: '검토 중', accepted: '합격', declined: '불합격',
+// }
+// const SUB_STATUS_COLOR: Record<string, string> = {
+//   pending: 'var(--amber)', accepted: 'var(--success)', declined: 'var(--error)',
+// }
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -171,14 +174,16 @@ const CHARTER_SECTIONS = [
   { key: 'build', label: '05. Build · 어떻게 만들 것인가' },
 ]
 
-type SubWithComments = Submission & { comments?: Comment[] }
+// 과제 제출 탭 비활성화로 미사용
+// type SubWithComments = Submission & { comments?: Comment[] }
 type CharterComment = { id: string; body: string; author_role: 'admin' | 'user'; author_id: string | null; created_at: string }
 
 export default function AdminChampionPage() {
   const confirm = useConfirm()
   const { userId } = useParams<{ userId: string }>()
   const [data, setData] = useState<ChampionProject | null>(null)
-  const [submissions, setSubmissions] = useState<SubWithComments[]>([])
+  // 과제 제출 탭 비활성화로 미사용
+  // const [submissions, setSubmissions] = useState<SubWithComments[]>([])
   const [loading, setLoading] = useState(true)
   const [approving, setApproving] = useState(false)
 
@@ -193,16 +198,16 @@ export default function AdminChampionPage() {
   const [editingBody, setEditingBody] = useState('')
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null)
 
-  // feedback confirm flow
-  const [confirmingSubId, setConfirmingSubId] = useState<string | null>(null)
-  const [confirmingStatus, setConfirmingStatus] = useState<SubmissionStatus | null>(null)
-  const [feedbackText, setFeedbackText] = useState('')
-  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
+  // feedback confirm flow (과제 제출 탭 비활성화로 미사용)
+  // const [confirmingSubId, setConfirmingSubId] = useState<string | null>(null)
+  // const [confirmingStatus, setConfirmingStatus] = useState<SubmissionStatus | null>(null)
+  // const [feedbackText, setFeedbackText] = useState('')
+  // const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
 
-  // comment flow
-  const [newComment, setNewComment] = useState<Record<string, string>>({})
-  const [posting, setPosting] = useState<string | null>(null)
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  // comment flow (과제 제출 탭 비활성화로 미사용)
+  // const [newComment, setNewComment] = useState<Record<string, string>>({})
+  // const [posting, setPosting] = useState<string | null>(null)
+  // const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   // session tab
   const [sessionTab, setSessionTab] = useState<'list' | 'detail'>('list')
@@ -229,9 +234,10 @@ export default function AdminChampionPage() {
     return () => io.disconnect()
   }, [data])
 
-  function loadSubs() {
-    return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
-  }
+  // 과제 제출 탭 비활성화로 미사용
+  // function loadSubs() {
+  //   return apiFetch<SubWithComments[]>(`/api/admin/users/${userId}/submissions`).then(setSubmissions)
+  // }
 
   function loadCharterComments(charterId: string) {
     return apiFetch<CharterComment[]>(`/api/charter/submissions/${charterId}/comments`).then(setCharterComments).catch(() => {})
@@ -250,7 +256,7 @@ export default function AdminChampionPage() {
         setActiveCharterId(firstId)
         if (firstId) loadCharterComments(firstId)
       }),
-      loadSubs(),
+      // loadSubs(), // 과제 제출 탭 비활성화로 미사용
     ])
       .catch(() => toast.error('데이터 로드 실패'))
       .finally(() => setLoading(false))
@@ -332,66 +338,67 @@ export default function AdminChampionPage() {
     }
   }
 
-  function openConfirm(subId: string, status: SubmissionStatus, currentFeedback: string | null) {
-    setConfirmingSubId(subId)
-    setConfirmingStatus(status)
-    setFeedbackText(currentFeedback ?? '')
-  }
-
-  function cancelConfirm() {
-    setConfirmingSubId(null)
-    setConfirmingStatus(null)
-    setFeedbackText('')
-  }
-
-  async function confirmStatusChange() {
-    if (!confirmingSubId || !confirmingStatus) return
-    setUpdatingStatus(confirmingSubId)
-    try {
-      await apiFetch(`/api/admin/submissions/${confirmingSubId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: confirmingStatus, feedback: feedbackText }),
-      })
-      toast.success('상태가 변경되었습니다.')
-      cancelConfirm()
-      await loadSubs()
-    } catch {
-      toast.error('상태 변경 실패')
-    } finally {
-      setUpdatingStatus(null)
-    }
-  }
-
-  async function postComment(subId: string) {
-    const trimmed = (newComment[subId] ?? '').trim()
-    if (!trimmed) return
-    setPosting(subId)
-    try {
-      await apiFetch(`/api/admin/submissions/${subId}/comments`, {
-        method: 'POST',
-        body: JSON.stringify({ body: trimmed }),
-      })
-      toast.success('코멘트가 작성되었습니다.')
-      setNewComment(prev => ({ ...prev, [subId]: '' }))
-      await loadSubs()
-    } catch {
-      toast.error('코멘트 작성 실패')
-    } finally {
-      setPosting(null)
-    }
-  }
-
-  async function downloadFile(subId: string) {
-    setDownloadingId(subId)
-    try {
-      const { url } = await apiFetch<{ url: string }>(`/api/admin/storage/${subId}/download`)
-      window.open(url, '_blank')
-    } catch (e) {
-      toast.error('다운로드 URL 생성 실패: ' + (e as Error).message)
-    } finally {
-      setDownloadingId(null)
-    }
-  }
+  // 과제 제출 탭 비활성화로 아래 함수들 미사용
+  // function openConfirm(subId: string, status: SubmissionStatus, currentFeedback: string | null) {
+  //   setConfirmingSubId(subId)
+  //   setConfirmingStatus(status)
+  //   setFeedbackText(currentFeedback ?? '')
+  // }
+  //
+  // function cancelConfirm() {
+  //   setConfirmingSubId(null)
+  //   setConfirmingStatus(null)
+  //   setFeedbackText('')
+  // }
+  //
+  // async function confirmStatusChange() {
+  //   if (!confirmingSubId || !confirmingStatus) return
+  //   setUpdatingStatus(confirmingSubId)
+  //   try {
+  //     await apiFetch(`/api/admin/submissions/${confirmingSubId}`, {
+  //       method: 'PATCH',
+  //       body: JSON.stringify({ status: confirmingStatus, feedback: feedbackText }),
+  //     })
+  //     toast.success('상태가 변경되었습니다.')
+  //     cancelConfirm()
+  //     await loadSubs()
+  //   } catch {
+  //     toast.error('상태 변경 실패')
+  //   } finally {
+  //     setUpdatingStatus(null)
+  //   }
+  // }
+  //
+  // async function postComment(subId: string) {
+  //   const trimmed = (newComment[subId] ?? '').trim()
+  //   if (!trimmed) return
+  //   setPosting(subId)
+  //   try {
+  //     await apiFetch(`/api/admin/submissions/${subId}/comments`, {
+  //       method: 'POST',
+  //       body: JSON.stringify({ body: trimmed }),
+  //     })
+  //     toast.success('코멘트가 작성되었습니다.')
+  //     setNewComment(prev => ({ ...prev, [subId]: '' }))
+  //     await loadSubs()
+  //   } catch {
+  //     toast.error('코멘트 작성 실패')
+  //   } finally {
+  //     setPosting(null)
+  //   }
+  // }
+  //
+  // async function downloadFile(subId: string) {
+  //   setDownloadingId(subId)
+  //   try {
+  //     const { url } = await apiFetch<{ url: string }>(`/api/admin/storage/${subId}/download`)
+  //     window.open(url, '_blank')
+  //   } catch (e) {
+  //     toast.error('다운로드 URL 생성 실패: ' + (e as Error).message)
+  //   } finally {
+  //     setDownloadingId(null)
+  //   }
+  // }
 
 
 
@@ -463,7 +470,7 @@ export default function AdminChampionPage() {
           { key: 'charter', label: '과제정의서' },
           { key: 'sessions', label: '1-on-1 세션' },
           { key: 'weekly', label: 'Weekly 진척도' },
-          { key: 'submissions', label: '제출물' },
+          // { key: 'submissions', label: '제출물' }, // 과제 제출 탭 비활성화
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -493,6 +500,7 @@ export default function AdminChampionPage() {
         ))}
       </div>
 
+      {/* 과제 제출 탭 비활성화 (comment out)
       {activeMainTab === 'submissions' && (
       <section className="mb-8">
         <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>과제 제출 이력</h2>
@@ -512,7 +520,6 @@ export default function AdminChampionPage() {
                   className="rounded-xl border"
                   style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
                 >
-                  {/* 헤더: 파일/링크 + 상태 */}
                   <div className="flex items-start justify-between gap-3 p-3">
                     <div className="min-w-0 flex-1">
                       {sub.link_url ? (
@@ -574,7 +581,6 @@ export default function AdminChampionPage() {
                     </div>
                   </div>
 
-                  {/* 기존 피드백 표시 */}
                   {sub.feedback && !isConfirming && (
                     <div className="px-3 pb-3">
                       <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>피드백</p>
@@ -582,7 +588,6 @@ export default function AdminChampionPage() {
                     </div>
                   )}
 
-                  {/* 상태 변경 확인 + 피드백 입력 */}
                   {isConfirming && (
                     <div
                       className="mx-3 mb-3 rounded-lg border p-3 flex flex-col gap-2"
@@ -618,7 +623,6 @@ export default function AdminChampionPage() {
                     </div>
                   )}
 
-                  {/* 코멘트 */}
                   <div
                     className="px-3 pb-3 pt-2 flex flex-col gap-2"
                     style={{ borderTop: '1px solid var(--border-faint)' }}
@@ -680,6 +684,7 @@ export default function AdminChampionPage() {
         )}
       </section>
       )}
+      */}
 
       {activeMainTab === 'charter' && data.charters.length > 0 && (
         <section id="charter" className="mb-8">

@@ -4,7 +4,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { apiFetch } from '@/lib/api-client'
-import { Users, FileText, LayoutList, Upload, LogOut, Menu, X, Calendar, Video, Smartphone } from 'lucide-react'
+import { Users, FileText, LayoutList, LogOut, Menu, X, Calendar, Video, Smartphone } from 'lucide-react'
+// Upload: 과제 제출 탭 비활성화로 미사용
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
 import type { Milestone } from '@/lib/types'
 
@@ -14,7 +15,8 @@ const NAV = [
   { icon: LayoutList, label: '내 마일스톤 현황',  href: '/my-project/milestones', match: (p: string) => p.startsWith('/my-project/milestones') },
   { icon: Calendar,   label: '1-on-1 세션',       href: '/my-project/sessions',   match: (p: string) => p.startsWith('/my-project/sessions') },
   { icon: Video,      label: '1-on-1 신청하기',   href: '/my-project/one-on-one', match: (p: string) => p.startsWith('/my-project/one-on-one') },
-  { icon: Upload,     label: '과제 제출',        href: '/my-project/submission', match: (p: string) => p.startsWith('/my-project/submission') },
+  // 과제 제출 탭 비활성화
+  // { icon: Upload,     label: '과제 제출',        href: '/my-project/submission', match: (p: string) => p.startsWith('/my-project/submission') },
   { icon: Smartphone, label: '연결된 기기',      href: '/my-project/devices',    match: (p: string) => p.startsWith('/my-project/devices') },
 ]
 
