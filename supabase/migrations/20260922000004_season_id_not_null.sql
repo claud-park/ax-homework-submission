@@ -7,14 +7,12 @@
 BEGIN;
 
 ALTER TABLE charter_submissions ALTER COLUMN season_id SET NOT NULL;
-ALTER TABLE project_charters ALTER COLUMN season_id SET NOT NULL;
 ALTER TABLE milestones ALTER COLUMN season_id SET NOT NULL;
 ALTER TABLE check_up_sessions ALTER COLUMN season_id SET NOT NULL;
 ALTER TABLE champion_weekly_sessions ALTER COLUMN season_id SET NOT NULL;
 ALTER TABLE session_action_items ALTER COLUMN season_id SET NOT NULL;
 
 CREATE INDEX charter_submissions_season_user_idx ON charter_submissions(season_id, user_id);
-CREATE INDEX project_charters_season_user_idx ON project_charters(season_id, user_id);
 CREATE INDEX milestones_season_user_idx ON milestones(season_id, user_id);
 CREATE INDEX check_up_sessions_season_champion_idx ON check_up_sessions(season_id, champion_user_id);
 CREATE INDEX champion_weekly_sessions_season_idx ON champion_weekly_sessions(season_id);

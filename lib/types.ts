@@ -44,6 +44,7 @@ export interface CharterSubmission {
   id: string
   user_id: string
   season_id: string
+  previous_charter_id: string | null
   title: string | null
   project_name: string | null
   content: {
@@ -62,12 +63,13 @@ export interface CharterSubmission {
   admin_approved_at: string | null
 }
 
+// project_charters 테이블은 실제 운영 DB에 존재하지 않는다 (죽은 테이블 —
+// app/api/charter/route.ts만 참조하고 프론트엔드는 호출하지 않음). season_id는
+// 실제로 쓰이는 CharterSubmission에만 부여한다.
 export interface ProjectCharter {
   id: string
   user_id: string
-  season_id: string
   charter_submission_id: string | null
-  previous_charter_id: string | null
   project_name: string | null
   content: CharterSubmission['content']
   updated_at: string

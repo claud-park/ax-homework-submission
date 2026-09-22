@@ -164,13 +164,13 @@ AX 프로그램이 매 기수(시즌)마다 새로운 챔피언 코호트를 받
 |---|---|---|
 | Champion 판별 | `users.user_group = 'champion'` (정적, 시즌 무관) | `season_enrollments`에 **현재 시즌**(`seasons.is_current = true`) 기준 `role_in_season = 'champion'` 행이 존재하는지로 판별 |
 | 시즌 종료 후 이력 | 표현 불가 (user_group을 수동으로 바꾸는 것 외 방법 없음) | `season_enrollments.status`(`active`\|`completed`\|`dropped`)로 보존, 신규 시즌 재참여 시 새 enrollment 행 추가 |
-| 데이터 스코프 | 전역 (시즌 개념 없음) | `charter_submissions`·`project_charters`·`milestones`·`check_up_sessions`·`champion_weekly_sessions`·`session_action_items`에 `season_id` 컬럼 추가, 모든 조회가 시즌 스코프로 한정 |
+| 데이터 스코프 | 전역 (시즌 개념 없음) | `charter_submissions`·`milestones`·`check_up_sessions`·`champion_weekly_sessions`·`session_action_items`에 `season_id` 컬럼 추가, 모든 조회가 시즌 스코프로 한정 |
 
 - `seasons`: 시즌 메타데이터(`name`, `status`: `recruiting`\|`active`\|`closed`\|`archived`, `is_current`). 동시에 하나의 시즌만 `is_current = true`일 수 있음 (부분 유니크 인덱스).
 - `season_enrollments`: 사람×시즌×역할, `(season_id, user_id)` 유니크. `continued_from_enrollment_id`로 이전 시즌 enrollment와 연결해 연속 참여를 추적.
-- `project_charters.previous_charter_id`: 시즌을 이어가는 챔피언이 새 시즌에 새 차터를 작성할 때, 직전 시즌 차터를 참조용으로 연결.
+- `charter_submissions.previous_charter_id`: 시즌을 이어가는 챔피언이 새 시즌에 새 차터를 작성할 때, 직전 시즌 차터를 참조용으로 연결. (`project_charters`는 실제 운영 DB에 존재하지 않는 죽은 테이블로 2026-09-22 확인되어 시즌 모델 범위에서 제외됨 — 별도 정리 필요)
 - 애플리케이션 코드는 `lib/data/season.ts` 헬퍼로 "현재 시즌의 champion/partner user id 목록"을 조회하며, 쓰기 API는 `requireCurrentEnrollment` 가드로 현재 시즌 미등록 사용자의 쓰기를 차단한다.
-- **admin은 이 모델 밖**: 시즌과 무관한 전역 권한이므로 `user_metadata.is_admin` 판별을 그대로 유지한다 (§2.4).
+- **admin은 이 모델 밖**: 시즌과 무관한 전역 권한이므로 `app_metadata.is_admin` 판별을 그대로 유지한다 (§2.4).
 - **마이그레이션**: 1기(그동안의 데이터)는 `status='closed', is_current=true`로 백필하여 기존 화면 동작을 그대로 보존한다. 상세는 `docs/ERD.md` "Season Tables" 참고.
 - **범위 밖 (후속 플랜)**: 시즌 관리 Admin UI(`/admin/seasons`), 참여자 배정 화면, 챔피언 시즌 아카이브 모드, Admin 화면 시즌 선택 드롭다운은 이 플랜이 만든 기반 위에서 별도 플랜으로 진행한다.
 
@@ -914,7 +914,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | v2.1 | 2026-06-08 | partner 제외, 핫라인 Tiptap, Charter 서식 툴바 |
 | v2.2 | 2026-06-16 | 스마트 마일스톤 입력(AI 생성·템플릿·직접 입력) 설계 완료 |
 | v2.3 | 2026-06-24 | 1-on-1 세션(체크업 세션) 신규 기능 전체; 어드민 공유→개별 3계정 전환; Storage `check-up-sessions` 버킷; 신규 테이블 3개(`check_up_sessions`, `session_action_items`, `session_comments`); API +11 (세션·업로드·처리·액션 아이템·댓글); 신규 의존성 (openai/Whisper, tiptap-markdown, react-markdown) |
-| v2.4 | 2026-09-22 | 시즌(기수) 모델 신설(§2.5): `seasons`·`season_enrollments` 테이블 추가, champion/partner 판별 기준을 `users.user_group`에서 현재 시즌 enrollment로 전환; 시즌 스코프 테이블 6개(`charter_submissions`·`project_charters`·`milestones`·`check_up_sessions`·`champion_weekly_sessions`·`session_action_items`)에 `season_id` 추가, `project_charters.previous_charter_id` 추가; 1기 데이터 백필 |
+| v2.4 | 2026-09-22 | 시즌(기수) 모델 신설(§2.5): `seasons`·`season_enrollments` 테이블 추가, champion/partner 판별 기준을 `users.user_group`에서 현재 시즌 enrollment로 전환; 시즌 스코프 테이블 5개(`charter_submissions`·`milestones`·`check_up_sessions`·`champion_weekly_sessions`·`session_action_items`)에 `season_id` 추가, `charter_submissions.previous_charter_id` 추가(`project_charters`는 실제 DB에 없는 죽은 테이블로 확인되어 제외); 1기 데이터 백필 |
 
 ---
 

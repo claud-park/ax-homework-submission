@@ -63,10 +63,10 @@ One per champion. Auto-save scratch pad (legacy — UI now uses `charter_submiss
 | 🔗 user_id | uuid FK | → users.id (UNIQUE constraint dropped in `20260617100002_project_charters_charter_fk.sql` to allow multiple charters per user; uniqueness is intended to be per-season, i.e. one charter per user per season — not currently DB-enforced, follow-up) |
 | project_name | text | |
 | content | jsonb | structured sections: problem, goal, scope, outcomes, risks |
-| 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
-| 🔗 previous_charter_id | uuid FK nullable | → project_charters.id (v8) — 시즌을 이어가는 챔피언의 새 차터가 직전 시즌 차터를 참조용으로 연결 |
 | updated_at | timestamptz | |
 | created_at | timestamptz | |
+
+> **v8 주의**: 이 테이블은 실제 운영 DB에 존재하지 않는 것으로 확인됐다(2026-09-22) — `app/api/charter/route.ts`만 참조하는 죽은 라우트이며 프론트엔드에서 호출하는 곳이 없다. 위 스키마는 `001_initial_schema.sql`에 기록된 대로만 문서화한 것이며, `season_id`/`previous_charter_id`는 이 테이블이 아니라 실제로 쓰이는 `charter_submissions`에 추가됐다 (아래 참고). 이 테이블/라우트를 완전히 제거할지, 복구할지는 별도 결정 필요.
 
 ### `charter_submissions`
 Each champion's submitted/saved 과제정의서 versions. Mutable — champion can edit and resubmit any entry.
@@ -79,6 +79,7 @@ Each champion's submitted/saved 과제정의서 versions. Mutable — champion c
 | project_name | text | |
 | content | jsonb | same shape as project_charters.content |
 | 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
+| 🔗 previous_charter_id | uuid FK nullable | → charter_submissions.id (v8) — 시즌을 이어가는 챔피언의 새 차터가 직전 시즌 차터를 참조용으로 연결 |
 | submitted_at | timestamptz | original submission time |
 | updated_at | timestamptz | last resubmit time |
 | publish_status | enum | `draft` \| `published` — default `published` |
@@ -406,8 +407,7 @@ seasons           1 ──< N  season_enrollments
 users             1 ──< N  season_enrollments
 season_enrollments 1 ──< N  season_enrollments (via continued_from_enrollment_id, self-referential, nullable)
 seasons           1 ──< N  charter_submissions
-seasons           1 ──< N  project_charters
-project_charters  1 ──< 1  project_charters (via previous_charter_id, self-referential, nullable)
+charter_submissions 1 ──< 1  charter_submissions (via previous_charter_id, self-referential, nullable)
 seasons           1 ──< N  milestones
 seasons           1 ──< N  check_up_sessions
 seasons           1 ──< N  champion_weekly_sessions

@@ -23,7 +23,6 @@ BEGIN
   WHERE user_group IN ('champion', 'partner');
 
   UPDATE charter_submissions SET season_id = v_season_id WHERE season_id IS NULL;
-  UPDATE project_charters SET season_id = v_season_id WHERE season_id IS NULL;
   UPDATE milestones SET season_id = v_season_id WHERE season_id IS NULL;
   UPDATE check_up_sessions SET season_id = v_season_id WHERE season_id IS NULL;
   UPDATE champion_weekly_sessions SET season_id = v_season_id WHERE season_id IS NULL;
