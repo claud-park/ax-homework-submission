@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { nudgeChampion } from '@/lib/notifications'
 import { findRecentNudge, recordNudge } from '@/lib/nudge/cooldown'
+import { getCurrentSeasonUserIds } from '@/lib/data/season'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -24,11 +25,12 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // user_group = 'champion' 인 유저만 조회
+  // 현재 시즌에 champion으로 참여 중인 유저만 조회
+  const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
   const { data: champions, error: usersErr } = await supabase
     .from('users')
     .select('id, email, name')
-    .eq('user_group', 'champion')
+    .in('id', championIds)
 
   if (usersErr || !champions) {
     console.error('[cron/daily-nudge] users fetch error:', usersErr)

@@ -4,6 +4,7 @@ import { verifyMcpToken, getAuthenticatedIdentity } from '@/lib/mcp/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveSessionRole } from '@/lib/sessions/access'
 import { allowedSessionUpdateFields, allowedActionItemUpdateFields } from '@/lib/sessions/permissions'
+import { getCurrentSeasonUserIds, requireCurrentSeasonIdForWrite, getSeasonIdForCheckUpSession } from '@/lib/data/season'
 
 const handler = createMcpHandler((server) => {
   server.registerTool(
@@ -34,10 +35,11 @@ const handler = createMcpHandler((server) => {
         return { content: [{ type: 'text', text: JSON.stringify({ error: 'admin_required' }) }], isError: true }
       }
       const supabase = createServiceClient()
+      const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
       const { data, error } = await supabase
         .from('users')
         .select('id, name')
-        .eq('user_group', 'champion')
+        .in('id', championIds)
         .order('name', { ascending: true })
       if (error) return { content: [{ type: 'text', text: JSON.stringify({ error: error.message }) }], isError: true }
       return { content: [{ type: 'text', text: JSON.stringify(data) }] }
@@ -167,11 +169,18 @@ const handler = createMcpHandler((server) => {
             isError: true,
           }
         }
+        let seasonId: string
+        try {
+          seasonId = await requireCurrentSeasonIdForWrite(supabase)
+        } catch (err) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: (err as Error).message }) }], isError: true }
+        }
         const { data: created, error } = await supabase
           .from('check_up_sessions')
           .insert({
             champion_user_id: effectiveChampionId,
             admin_user_id: identity.userId,
+            season_id: seasonId,
             session_date: date,
             title: title?.trim() || `${date} 1-on-1`,
             notes: notes ?? null,
@@ -237,6 +246,8 @@ const handler = createMcpHandler((server) => {
       })
       if (!role) return { content: [{ type: 'text', text: JSON.stringify({ error: 'forbidden' }) }], isError: true }
 
+      const actionItemSeasonId = await getSeasonIdForCheckUpSession(supabase, session_id)
+
       const allowed = allowedActionItemUpdateFields(role)
       const results: Array<{ index: number; status: 'created' | 'updated' | 'not_found' | 'error'; item?: Record<string, unknown>; error?: string }> = []
       const now = new Date().toISOString()
@@ -265,6 +276,7 @@ const handler = createMcpHandler((server) => {
             .from('session_action_items')
             .insert({
               session_id,
+              season_id: actionItemSeasonId,
               body: item.body.trim(),
               is_completed: item.is_completed,
               completed_at: item.is_completed ? now : null,
@@ -406,10 +418,17 @@ const handler = createMcpHandler((server) => {
       }
 
       if (!existing) {
+        let seasonId: string
+        try {
+          seasonId = await requireCurrentSeasonIdForWrite(supabase)
+        } catch (err) {
+          return { content: [{ type: 'text', text: JSON.stringify({ error: (err as Error).message }) }], isError: true }
+        }
         const { data: created, error } = await supabase
           .from('champion_weekly_sessions')
           .insert({
             admin_user_id: identity.userId,
+            season_id: seasonId,
             session_date: date,
             title: title?.trim() || `${date} AX Champion Weekly`,
             notes: notes ?? null,

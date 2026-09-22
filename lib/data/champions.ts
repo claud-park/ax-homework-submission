@@ -2,15 +2,17 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { GanttChampion, GanttMilestone } from '@/app/api/champions/gantt/route'
 import type { ChampionSummary, MilestoneStatus } from '@/lib/types'
+import { getCurrentSeasonUserIds } from '@/lib/data/season'
 
 export async function fetchGanttData(): Promise<GanttChampion[]> {
   const supabase = createServiceClient()
+  const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
   const [
     { data: users },
     { data: charters },
     { data: milestones },
   ] = await Promise.all([
-    supabase.from('users').select('id, name').eq('user_group', 'champion'),
+    supabase.from('users').select('id, name').in('id', championIds),
     supabase.from('charter_submissions').select('user_id, id, project_name, title').eq('publish_status', 'published'),
     supabase.from('milestones')
       .select('id, user_id, charter_submission_id, title, start_date, due_date, status, week_number, parent_milestone_id, display_order')
@@ -61,8 +63,9 @@ export async function fetchGanttData(): Promise<GanttChampion[]> {
 
 export async function fetchSummaryData(): Promise<ChampionSummary[]> {
   const supabase = createServiceClient()
+  const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
   const [{ data: users }, { data: charters }, { data: milestones }] = await Promise.all([
-    supabase.from('users').select('id, name').eq('user_group', 'champion'),
+    supabase.from('users').select('id, name').in('id', championIds),
     supabase.from('charter_submissions').select('user_id, id, project_name, publish_status'),
     supabase.from('milestones').select('user_id, week_number, status').eq('publish_status', 'published'),
   ])

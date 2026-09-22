@@ -11,7 +11,7 @@ const SectionEditorInner = dynamic(() => import('./SectionEditorInner'), {
     <div className="p-3 min-h-24 animate-pulse" style={{ background: 'var(--surface-secondary)', borderRadius: 4 }} />
   ),
 })
-import type { ProjectCharter, CharterSubmission, Milestone } from '@/lib/types'
+import type { CharterSubmission, Milestone } from '@/lib/types'
 import DateRangePicker from '@/components/DateRangePicker'
 import MilestoneDraftDrawer from '@/components/milestones/MilestoneDraftDrawer'
 import { CharterCommentPanel } from '@/components/CharterCommentPanel'
@@ -24,7 +24,7 @@ import { SaveOrPublishButtons } from '@/components/SaveOrPublishButtons'
 
 type SectionKey = 'summary' | 'problem' | 'user' | 'goal' | 'solution' | 'build' | 'closing'
 
-type CharterContent = ProjectCharter['content']
+type CharterContent = CharterSubmission['content']
 type SidePanel = null | 'new' | CharterSubmission
 
 const SECTIONS: { key: SectionKey; label: string; required?: boolean; tooltip?: string; placeholder?: string; groupHeader?: string }[] = [

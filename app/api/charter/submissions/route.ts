@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
 function stripHtml(s: string | undefined | null) {
   return (s ?? '').replace(/<[^>]*>/g, '').trim()
@@ -61,10 +62,17 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+  let seasonId: string
+  try {
+    seasonId = await requireCurrentSeasonIdForWrite(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
   const { data, error } = await supabase
     .from('charter_submissions')
     .insert({
       user_id: user.id,
+      season_id: seasonId,
       title: title ?? null,
       project_name: project_name ?? null,
       content: content ?? {},

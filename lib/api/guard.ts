@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { User } from '@supabase/supabase-js'
 import { verifyJWT, verifyAdmin } from '@/lib/auth'
+import { createServiceClient } from '@/lib/supabase/server'
+import { isEnrolledInCurrentSeason } from '@/lib/data/season'
 
 /**
  * API 라우트 인증 가드.
@@ -21,8 +23,8 @@ export function unauthorized(): NextResponse {
 }
 
 /** 403 응답 (권한 없음). */
-export function forbidden(): NextResponse {
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+export function forbidden(message = 'Forbidden'): NextResponse {
+  return NextResponse.json({ error: message }, { status: 403 })
 }
 
 /** 인증된 사용자를 반환하거나, 미인증 시 401 NextResponse 를 반환한다. */
@@ -35,4 +37,22 @@ export async function requireUser(req: NextRequest): Promise<User | NextResponse
 export async function requireAdmin(req: NextRequest): Promise<User | NextResponse> {
   const admin = await verifyAdmin(req)
   return admin ?? forbidden()
+}
+
+/**
+ * 현재 시즌에 지정된 role로 활성 enrollment가 있는 사용자를 반환하거나,
+ * 미인증 시 401, enrollment 없음 시 403 NextResponse를 반환한다.
+ */
+export async function requireCurrentEnrollment(
+  req: NextRequest,
+  role: 'champion' | 'partner',
+): Promise<User | NextResponse> {
+  const user = await verifyJWT(req)
+  if (!user) return unauthorized()
+
+  const supabase = createServiceClient()
+  const enrolled = await isEnrolledInCurrentSeason(supabase, user.id, role)
+  if (!enrolled) return forbidden('현재 시즌에 참여 중이 아닙니다')
+
+  return user
 }

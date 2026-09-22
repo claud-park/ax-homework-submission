@@ -1,8 +1,8 @@
 # 디시인사이드 과제 관리 플랫폼 — 제품 요구사항 명세서 (PRD)
 
-> **문서 버전** 2.3 · **최종 업데이트** 2026-06-24 · **작성자** yr.park@dreamus.io
+> **문서 버전** 2.5 · **최종 업데이트** 2026-09-22 · **작성자** yr.park@dreamus.io
 > **상태** 사내 검토 중 · **저장소** `AX/ax-homework-submission`
-> **이전 버전** v2.2 (2026-06-16) · v2.1 (2026-06-08) · v2.0 (2026-06-02) · v1.2 (2026-05-27)
+> **이전 버전** v2.4 (2026-09-22) · v2.3 (2026-06-24) · v2.2 (2026-06-16) · v2.1 (2026-06-08) · v2.0 (2026-06-02)
 
 ---
 
@@ -11,8 +11,8 @@
 | 항목 | 내용 |
 |---|---|
 | 프로젝트명 | 디시인사이드 과제 관리 플랫폼 (ax-homework-submission) |
-| 버전 | v2.3 |
-| 작성일 | 2026-06-24 |
+| 버전 | v2.5 |
+| 작성일 | 2026-09-22 |
 | 작성자 | yr.park@dreamus.io |
 | 검토자 | Strategy Lead · Engineering Lead |
 
@@ -139,7 +139,7 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 
 - 모든 API는 JWT 검증 (`verifyJWT`) + 어드민 전용 API는 추가 검증 (`verifyAdmin`)
 - 클라이언트의 직접 DB 접근 금지 (Supabase RLS **DENY ALL**)
-- 챔피언 리스트·Gantt API는 `user_group = 'champion'` 필터 적용 — 파트너는 과제 추적 제외
+- 챔피언 리스트·Gantt 등 시즌 스코프 API는 **현재 시즌(`seasons.is_current = true`)의 `season_enrollments`** 기준으로 champion/partner를 판별한다 (v2.4, §2.5 참고) — `users.user_group`은 더 이상 이 판별에 쓰이지 않는다
 
 #### 2.4.1 어드민 계정 모델 (v2.3 변경)
 
@@ -155,6 +155,26 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 - **동시 작업 충돌 방지**: 낙관적 동시성(`expectedUpdatedAt`)과 결합하여 동시 편집 충돌 감지
 
 **프로비저닝**: `scripts/create-admins.ts` (멱등 실행, `.env`로 이메일·비밀번호 주입, `SUPABASE_SERVICE_KEY` 사용)
+
+### 2.5 시즌(기수) 모델 (v2.4 추가)
+
+AX 프로그램이 매 기수(시즌)마다 새로운 챔피언 코호트를 받는 구조로 확장됨에 따라, "이 사람이 지금 이 시즌에 champion/partner로 참여 중인가"를 `users`에서 분리해 별도 테이블(`season_enrollments`)로 관리한다.
+
+| 개념 | 이전 (v2.3 이하) | 이후 (v2.4~) |
+|---|---|---|
+| Champion 판별 | `users.user_group = 'champion'` (정적, 시즌 무관) | `season_enrollments`에 **현재 시즌**(`seasons.is_current = true`) 기준 `role_in_season = 'champion'` 행이 존재하는지로 판별 |
+| 시즌 종료 후 이력 | 표현 불가 (user_group을 수동으로 바꾸는 것 외 방법 없음) | `season_enrollments.status`(`active`\|`completed`\|`dropped`)로 보존, 신규 시즌 재참여 시 새 enrollment 행 추가 |
+| 데이터 스코프 | 전역 (시즌 개념 없음) | `charter_submissions`·`milestones`·`check_up_sessions`·`champion_weekly_sessions`·`session_action_items`에 `season_id` 컬럼 추가, 모든 조회가 시즌 스코프로 한정 |
+
+- `seasons`: 시즌 메타데이터(`name`, `status`: `recruiting`\|`active`\|`closed`\|`archived`, `is_current`). 동시에 하나의 시즌만 `is_current = true`일 수 있음 (부분 유니크 인덱스).
+- `season_enrollments`: 사람×시즌×역할, `(season_id, user_id)` 유니크. `continued_from_enrollment_id`로 이전 시즌 enrollment와 연결해 연속 참여를 추적.
+- `charter_submissions.previous_charter_id`: 시즌을 이어가는 챔피언이 새 시즌에 새 차터를 작성할 때, 직전 시즌 차터를 참조용으로 연결. (`project_charters`는 실제 운영 DB에 존재하지 않는 죽은 테이블로 2026-09-22 확인되어 시즌 모델 범위에서 제외됨 — 별도 정리 필요)
+- 애플리케이션 코드는 `lib/data/season.ts` 헬퍼로 "현재 시즌의 champion/partner user id 목록"을 조회하며, 쓰기 API는 `requireCurrentEnrollment` 가드로 현재 시즌 미등록 사용자의 쓰기를 차단한다.
+- **admin은 이 모델 밖**: 시즌과 무관한 전역 권한이므로 `app_metadata.is_admin` 판별을 그대로 유지한다 (§2.4).
+- **마이그레이션**: 1기(그동안의 데이터)는 `status='closed', is_current=true`로 백필하여 기존 화면 동작을 그대로 보존한다. 상세는 `docs/ERD.md` "Season Tables" 참고.
+- **시즌 관리 Admin UI (v2.5 추가)**: 관리자는 `/admin/seasons`에서 시즌 생성·참여자 배정(이어하기/신규/종료)·전환 확정을 수행한다. 전환 확정은 `activate_season` RPC(상세는 `docs/ERD.md` "Season Tables" 참고)로 원자적으로 처리된다.
+  - 알려진 제약: 이어하기로 배정 후 저장했다가 다시 열어 종료로 바꿔 재저장해도, 배정 API는 upsert만 수행하고 기존 enrollment를 삭제/하향하지 않아 실제로는 반영되지 않는다 — 후속 정리 필요.
+- **범위 밖 (후속 플랜)**: Admin 화면(`/admin/champions`, `/admin`, `/admin/reports`, `/admin/kanban`) 시즌 선택 드롭다운, 챔피언 화면 읽기전용 아카이브(`requireCurrentEnrollment` 연동), "이전 시즌 차터 보기" 링크(`previous_charter_id` 활용)는 이 플랜이 만든 기반 위에서 별도 플랜으로 진행한다.
 
 ---
 
@@ -896,6 +916,8 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | v2.1 | 2026-06-08 | partner 제외, 핫라인 Tiptap, Charter 서식 툴바 |
 | v2.2 | 2026-06-16 | 스마트 마일스톤 입력(AI 생성·템플릿·직접 입력) 설계 완료 |
 | v2.3 | 2026-06-24 | 1-on-1 세션(체크업 세션) 신규 기능 전체; 어드민 공유→개별 3계정 전환; Storage `check-up-sessions` 버킷; 신규 테이블 3개(`check_up_sessions`, `session_action_items`, `session_comments`); API +11 (세션·업로드·처리·액션 아이템·댓글); 신규 의존성 (openai/Whisper, tiptap-markdown, react-markdown) |
+| v2.4 | 2026-09-22 | 시즌(기수) 모델 신설(§2.5): `seasons`·`season_enrollments` 테이블 추가, champion/partner 판별 기준을 `users.user_group`에서 현재 시즌 enrollment로 전환; 시즌 스코프 테이블 5개(`charter_submissions`·`milestones`·`check_up_sessions`·`champion_weekly_sessions`·`session_action_items`)에 `season_id` 추가, `charter_submissions.previous_charter_id` 추가(`project_charters`는 실제 DB에 없는 죽은 테이블로 확인되어 제외); 1기 데이터 백필 |
+| v2.5 | 2026-09-22 | 시즌 관리 Admin UI(§2.5): `/admin/seasons`에서 시즌 생성, 참여자 배정(이어하기/신규/종료), 전환 확정 지원; `activate_season(p_new_season_id UUID) RETURNS VOID` RPC로 현재 시즌 플래그를 원자적으로 전환 |
 
 ---
 

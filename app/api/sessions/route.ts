@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireUser, requireAdmin } from '@/lib/api/guard'
+import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
@@ -42,11 +43,18 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+  let seasonId: string
+  try {
+    seasonId = await requireCurrentSeasonIdForWrite(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
   const { data, error } = await supabase
     .from('check_up_sessions')
     .insert({
       champion_user_id,
       admin_user_id: admin.id,
+      season_id: seasonId,
       session_date,
       title: title.trim(),
       ...(session_time ? { session_time } : {}),

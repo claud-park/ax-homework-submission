@@ -4,6 +4,7 @@ import { nudgeOverdueMilestones } from '@/lib/notifications'
 import { findRecentNudge, recordNudge } from '@/lib/nudge/cooldown'
 import { hasOverdueMilestone, kstTodayStr, type OverdueCandidate } from '@/lib/nudge/overdue'
 import type { MilestoneStatus } from '@/lib/types'
+import { getCurrentSeasonUserIds } from '@/lib/data/season'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -21,10 +22,11 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const todayStr = kstTodayStr()
 
+  const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
   const { data: champions, error: usersErr } = await supabase
     .from('users')
     .select('id, email, name')
-    .eq('user_group', 'champion')
+    .in('id', championIds)
 
   if (usersErr || !champions) {
     console.error('[cron/weekly-overdue-nudge] users fetch error:', usersErr)
