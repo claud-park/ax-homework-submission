@@ -40,13 +40,14 @@ ALTER TABLE users ALTER COLUMN user_group SET DEFAULT 'viewer';
 
 - 기존 champion/partner 사용자 데이터는 그대로 유지된다. `DEFAULT` 변경은 이 마이그레이션 이후 신규 가입자에게만 적용된다.
 
-### `project_charters`에 공개 플래그 추가
+### `charter_submissions`에 공개 플래그 추가
 
 ```sql
-ALTER TABLE project_charters ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE charter_submissions ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT false;
 ```
 
 - 기본값 `false` — 관리자가 차터 리뷰 화면에서 명시적으로 켜야 viewer에게 노출된다.
+- **정정 (2026-09-22)**: 이 스펙 최초 작성 시 `project_charters`에 걸 계획이었으나, 시즌 모델 배포 중 `project_charters`가 실제 운영 DB에 존재하지 않는 죽은 테이블임이 확인되어(해당 라우트 `app/api/charter/route.ts`와 함께 제거됨 — `docs/superpowers/specs/2026-09-22-season-model-design.md` 참고) 실제로 쓰이는 `charter_submissions`로 대상을 변경했다.
 
 ---
 
@@ -91,7 +92,7 @@ if (!user.email?.endsWith('@dreamus.io')) {
   statusBadge: 'in_progress' | 'completed' | ...  // 기존 status 값 재사용
 }[]
 ```
-- 정확한 소스 필드명(프로젝트명/한 줄 소개에 해당하는 기존 charter 컬럼)은 구현 단계에서 `project_charters` 스키마를 다시 확인해 매핑한다.
+- 소스 필드 매핑: `championName`은 `users.name`(파싱 필요), `projectTitle`은 `charter_submissions.project_name`, `oneLiner`는 `charter_submissions.title` 또는 `content.summary` 중 구현 단계에서 더 짧고 사용자에게 노출하기 적합한 쪽을 선택, `statusBadge`는 `charter_submissions.publish_status`/`admin_approved_at` 조합으로 유도한다(정확한 배지 값 매핑은 구현 단계에서 결정).
 
 ### admin 차터 리뷰 화면 변경
 
@@ -137,7 +138,7 @@ if (!user.email?.endsWith('@dreamus.io')) {
 ## 구현 범위 요약
 
 1. Supabase migration: `users.user_group` CHECK에 `viewer` 추가 + `DEFAULT` 변경
-2. Supabase migration: `project_charters.is_public` 컬럼 추가
+2. Supabase migration: `charter_submissions.is_public` 컬럼 추가
 3. `app/login/page.tsx`: OAuth 요청에 `hd=dreamus.io` 힌트 추가
 4. `app/auth/callback/route.ts`: 이메일 도메인 서버사이드 검증 + 실패 시 로그아웃/리다이렉트
 5. `middleware.ts`: viewer의 `(champion)` 라우트 접근 시 `/gallery` 리다이렉트 추가
