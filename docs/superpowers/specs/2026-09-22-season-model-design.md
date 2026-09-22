@@ -75,20 +75,21 @@ CREATE INDEX season_enrollments_season_role_idx
 
 다음 테이블에 `season_id UUID NOT NULL REFERENCES seasons(id)` 추가 (백필 후 NOT NULL 적용):
 
-- `charter_submissions`, `project_charters`
+- `charter_submissions`
 - `milestones`
 - `check_up_sessions` / `champion_weekly_sessions`
 - `session_action_items`
-- 과제 제출 관련 테이블
 
-`project_charters`에는 참조용 필드 추가:
+`charter_submissions`에는 참조용 필드 추가:
 
 ```sql
-ALTER TABLE project_charters
-  ADD COLUMN previous_charter_id UUID REFERENCES project_charters(id);
+ALTER TABLE charter_submissions
+  ADD COLUMN previous_charter_id UUID REFERENCES charter_submissions(id);
 ```
 
 - 시즌을 이어가는 챔피언은 시즌마다 **새 차터를 생성**하고 `previous_charter_id`로 직전 시즌 차터를 참조용으로 연결한다. 차터를 시즌 구분 없이 계속 수정하는 방식은 채택하지 않는다 — 시즌별 진도/리포트가 섞이는 것을 방지하기 위함.
+
+> **정정 (2026-09-22, 구현 중 발견)**: 최초 설계 시 `project_charters`에 붙일 계획이었으나, 실제 운영 DB에는 `project_charters` 테이블이 존재하지 않는 것으로 확인됐다(`app/api/charter/route.ts`만 참조하던 죽은 코드 — 프론트엔드 호출 없음, 라우트와 타입 모두 제거됨). "과제 제출 관련 테이블"이라 뭉뚱그렸던 레거시 `submissions`/`homeworks` 테이블도 코드 조사 결과 이번 시즌 모델 범위에서 제외하기로 확정했다(사용자 결정, 매주 제출 포맷 표준화 로드맵과 함께 별도 처리). 실제 시즌 스코프 테이블은 5개(`charter_submissions`, `milestones`, `check_up_sessions`, `champion_weekly_sessions`, `session_action_items`)이며 전부 배포 완료됨.
 
 ---
 
@@ -131,7 +132,7 @@ Admin 화면에서 시즌 생성부터 참여자 배정, 전환 확정까지 전
 
 - 항상 로그인 사용자의 **현재 시즌 enrollment** 기준으로 데이터를 노출한다.
 - 현재 시즌에 enrollment가 없는 사용자(직전 시즌에서 이어하지 않은 경우)는 새 제출/수정이 불가능하며, 가장 최근 시즌 기록을 **읽기전용 아카이브**로 본다. 세부 권한 경계는 후속 "일반 사원 뷰어 권한" 스펙에서 다룬다.
-- 이어하기 챔피언의 차터 화면에는 "이전 시즌 차터 보기" 참조 링크 노출.
+- 이어하기 챔피언의 차터 화면에는 "이전 시즌 차터 보기" 참조 링크 노출 (`charter_submissions.previous_charter_id` 기준).
 
 **Admin 화면**
 
@@ -158,8 +159,8 @@ Admin 화면에서 시즌 생성부터 참여자 배정, 전환 확정까지 전
 ## 구현 범위 요약
 
 1. Supabase migration: `seasons`, `season_enrollments` 테이블 생성
-2. Supabase migration: 시즌 스코프 테이블(charter, milestone, session, action item 등)에 `season_id` 추가 + 1기 백필
-3. Supabase migration: `project_charters.previous_charter_id` 추가
+2. Supabase migration: 시즌 스코프 테이블(charter_submissions, milestone, session, action item 등)에 `season_id` 추가 + 1기 백필
+3. Supabase migration: `charter_submissions.previous_charter_id` 추가
 4. `.eq('user_group', 'champion')` 7곳을 현재 시즌 enrollment 기준으로 교체
 5. `lib/api/guard.ts`: `requireCurrentEnrollment` 헬퍼 추가
 6. Admin: 시즌 관리 화면 신규 (`/admin/seasons` 등) — 생성/참여자 배정/전환 확정
