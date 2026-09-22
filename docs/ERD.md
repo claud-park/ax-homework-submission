@@ -369,6 +369,19 @@ Unique constraint: `(season_id, user_id)`. INDEX: `(season_id, role_in_season)`.
 ### Backfill (1기)
 `20260922000003_backfill_season_one.sql` inserts a single "시즌 1" row (`status='closed'`, `is_current=true`, `start_date` = earliest `users.created_at`), enrolls every existing `user_group IN ('champion','partner')` user as `status='completed'`, backfills `season_id` on all six season-scoped tables above, then sets `season_id NOT NULL` and adds composite indexes on each.
 
+### RPC: `activate_season`
+
+```sql
+activate_season(p_new_season_id UUID) RETURNS VOID
+```
+
+`20260922000005_activate_season_rpc.sql` — 시즌 전환(현재 시즌 플래그 이동)을 원자적으로 수행. 기존 `claim_pairing_token`/`claim_session_for_processing`과 같은 "여러 UPDATE를 하나의 원자적 동작으로 위임" 패턴을 따른다.
+
+1. 현재 `is_current = true`인 시즌을(대상 시즌 자신은 제외) `is_current = false, status = 'archived'`로 내림
+2. `p_new_season_id` 시즌을 `is_current = true, status = 'active'`로 올림
+
+순서가 중요하다 — 먼저 기존 시즌을 내려야 `seasons_single_current_idx`(부분 유니크 인덱스, `(is_current) WHERE is_current = true`)를 위반하지 않는다. `lib/data/seasons-admin.ts`의 `activateSeason()`에서 `supabase.rpc('activate_season', { p_new_season_id })`로 호출.
+
 ---
 
 ## Relationships
