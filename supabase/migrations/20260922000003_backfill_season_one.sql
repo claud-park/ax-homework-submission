@@ -2,6 +2,12 @@
 -- 1기는 이미 마무리된 상태이므로 status='closed'로 백필한다.
 -- 시즌2가 아직 없으므로 is_current=true로 남겨 기존 화면 동작을 보존한다.
 -- 이탈/중도포기를 나타내는 기존 필드가 없으므로 전원 completed로 간주한다.
+--
+-- season_id를 NOT NULL로 확정하는 작업은 20260922000004로 분리했다 —
+-- 애플리케이션 코드가 신규 INSERT에서 season_id를 채우게 된 뒤에만 적용해야
+-- 기존 쓰기 경로가 깨지지 않는다.
+
+BEGIN;
 
 DO $$
 DECLARE
@@ -24,16 +30,4 @@ BEGIN
   UPDATE session_action_items SET season_id = v_season_id WHERE season_id IS NULL;
 END $$;
 
-ALTER TABLE charter_submissions ALTER COLUMN season_id SET NOT NULL;
-ALTER TABLE project_charters ALTER COLUMN season_id SET NOT NULL;
-ALTER TABLE milestones ALTER COLUMN season_id SET NOT NULL;
-ALTER TABLE check_up_sessions ALTER COLUMN season_id SET NOT NULL;
-ALTER TABLE champion_weekly_sessions ALTER COLUMN season_id SET NOT NULL;
-ALTER TABLE session_action_items ALTER COLUMN season_id SET NOT NULL;
-
-CREATE INDEX charter_submissions_season_user_idx ON charter_submissions(season_id, user_id);
-CREATE INDEX project_charters_season_user_idx ON project_charters(season_id, user_id);
-CREATE INDEX milestones_season_user_idx ON milestones(season_id, user_id);
-CREATE INDEX check_up_sessions_season_champion_idx ON check_up_sessions(season_id, champion_user_id);
-CREATE INDEX champion_weekly_sessions_season_idx ON champion_weekly_sessions(season_id);
-CREATE INDEX session_action_items_season_idx ON session_action_items(season_id);
+COMMIT;
