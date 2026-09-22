@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { MilestoneStatus } from '@/lib/types'
 import { requireAdmin } from '@/lib/api/guard'
+import { getCurrentSeasonUserIds } from '@/lib/data/season'
 
 export interface ReportMilestoneSummary {
   id: string
@@ -27,13 +28,14 @@ export async function GET(req: NextRequest) {
   if (admin instanceof NextResponse) return admin
 
   const supabase = createServiceClient()
+  const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
 
   const [
     { data: users, error: usersErr },
     { data: charters, error: chartersErr },
     { data: milestones, error: msErr },
   ] = await Promise.all([
-    supabase.from('users').select('id, name').eq('user_group', 'champion'),
+    supabase.from('users').select('id, name').in('id', championIds),
     supabase.from('charter_submissions').select('user_id, project_name'),
     supabase
       .from('milestones')
