@@ -101,6 +101,14 @@ describe('getUnassignedUsers', () => {
     })
     expect(await getUnassignedUsers(supabase, 's2')).toEqual([{ userId: 'u2', name: 'B' }])
   })
+
+  it('also excludes ids passed via excludeUserIds, even if not in season_enrollments', async () => {
+    const supabase = createSupabaseMock({
+      users: { data: [{ id: 'u1', name: 'A' }, { id: 'u2', name: 'B' }, { id: 'u3', name: 'C' }], error: null },
+      season_enrollments: { data: [{ user_id: 'u1' }], error: null },
+    })
+    expect(await getUnassignedUsers(supabase, 's2', ['u2'])).toEqual([{ userId: 'u3', name: 'C' }])
+  })
 })
 
 describe('assignEnrollments', () => {
@@ -136,6 +144,35 @@ describe('assignEnrollments', () => {
     await expect(
       assignEnrollments(supabase, 's2', [{ userId: 'u1', roleInSeason: 'champion' }]),
     ).rejects.toThrow('upsert failed')
+  })
+
+  it('upserts multiple rows in one call, each mapped independently', async () => {
+    const builder = createQueryBuilder({ data: [{ id: 'e1' }, { id: 'e2' }], error: null })
+    const supabase = {
+      from: vi.fn(() => builder),
+      rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    } as unknown as SupabaseClient
+    await assignEnrollments(supabase, 's2', [
+      { userId: 'u1', roleInSeason: 'champion', continueFromEnrollmentId: 'e0' },
+      { userId: 'u2', roleInSeason: 'partner' },
+    ])
+    expect(builder.upsert).toHaveBeenCalledWith(
+      [
+        { season_id: 's2', user_id: 'u1', role_in_season: 'champion', status: 'active', continued_from_enrollment_id: 'e0' },
+        { season_id: 's2', user_id: 'u2', role_in_season: 'partner', status: 'active', continued_from_enrollment_id: null },
+      ],
+      { onConflict: 'season_id,user_id' },
+    )
+  })
+
+  it('does not throw when given an empty assignments array', async () => {
+    const builder = createQueryBuilder({ data: [], error: null })
+    const supabase = {
+      from: vi.fn(() => builder),
+      rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    } as unknown as SupabaseClient
+    await expect(assignEnrollments(supabase, 's2', [])).resolves.toBeUndefined()
+    expect(builder.upsert).toHaveBeenCalledWith([], { onConflict: 'season_id,user_id' })
   })
 })
 
