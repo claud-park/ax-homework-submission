@@ -4,6 +4,7 @@ import { verifyMcpToken, getAuthenticatedIdentity } from '@/lib/mcp/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveSessionRole } from '@/lib/sessions/access'
 import { allowedSessionUpdateFields, allowedActionItemUpdateFields } from '@/lib/sessions/permissions'
+import { getCurrentSeasonUserIds } from '@/lib/data/season'
 
 const handler = createMcpHandler((server) => {
   server.registerTool(
@@ -34,10 +35,11 @@ const handler = createMcpHandler((server) => {
         return { content: [{ type: 'text', text: JSON.stringify({ error: 'admin_required' }) }], isError: true }
       }
       const supabase = createServiceClient()
+      const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
       const { data, error } = await supabase
         .from('users')
         .select('id, name')
-        .eq('user_group', 'champion')
+        .in('id', championIds)
         .order('name', { ascending: true })
       if (error) return { content: [{ type: 'text', text: JSON.stringify({ error: error.message }) }], isError: true }
       return { content: [{ type: 'text', text: JSON.stringify(data) }] }
