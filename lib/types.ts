@@ -43,6 +43,7 @@ export interface Comment {
 export interface CharterSubmission {
   id: string
   user_id: string
+  season_id: string
   title: string | null
   project_name: string | null
   content: {
@@ -64,7 +65,9 @@ export interface CharterSubmission {
 export interface ProjectCharter {
   id: string
   user_id: string
+  season_id: string
   charter_submission_id: string | null
+  previous_charter_id: string | null
   project_name: string | null
   content: CharterSubmission['content']
   updated_at: string
@@ -74,6 +77,7 @@ export interface ProjectCharter {
 export interface Milestone {
   id: string
   user_id: string
+  season_id: string
   charter_submission_id: string | null
   week_number: number | null
   title: string
@@ -215,6 +219,32 @@ export interface HotlineThread {
   unread_count: number
 }
 
+// ─── Season ──────────────────────────────────────────────────────────────
+
+export type SeasonStatus = 'recruiting' | 'active' | 'closed' | 'archived'
+export type SeasonRole = 'champion' | 'partner'
+export type EnrollmentStatus = 'active' | 'completed' | 'dropped'
+
+export interface Season {
+  id: string
+  name: string
+  status: SeasonStatus
+  is_current: boolean
+  start_date: string | null
+  end_date: string | null
+  created_at: string
+}
+
+export interface SeasonEnrollment {
+  id: string
+  season_id: string
+  user_id: string
+  role_in_season: SeasonRole
+  status: EnrollmentStatus
+  continued_from_enrollment_id: string | null
+  created_at: string
+}
+
 // ─── User Group ──────────────────────────────────────────────────────────────
 
 export type UserGroup = 'champion' | 'partner' | 'admin'
@@ -236,6 +266,7 @@ export type SessionProcessingStatus = 'idle' | 'uploading' | 'transcribing' | 's
 export interface CheckUpSession {
   id: string
   champion_user_id: string
+  season_id: string
   admin_user_id: string | null
   session_date: string
   session_time: string | null
@@ -259,6 +290,7 @@ export interface CheckUpSession {
 export interface SessionActionItem {
   id: string
   session_id: string
+  season_id: string
   body: string
   is_completed: boolean
   completed_at: string | null
@@ -299,6 +331,7 @@ export interface OneOnOneBooking {
 export interface ChampionWeeklySession {
   id: string
   session_date: string
+  season_id: string
   session_time: string | null
   title: string
   notes: string | null
