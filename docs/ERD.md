@@ -1,6 +1,6 @@
-# Entity Relationship Diagram — v7
+# Entity Relationship Diagram — v8
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-06-24
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-09-22
 
 ---
 
@@ -63,6 +63,8 @@ One per champion. Auto-save scratch pad (legacy — UI now uses `charter_submiss
 | 🔗 user_id | uuid FK UNIQUE | → users.id (one charter per user) |
 | project_name | text | |
 | content | jsonb | structured sections: problem, goal, scope, outcomes, risks |
+| 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
+| 🔗 previous_charter_id | uuid FK nullable | → project_charters.id (v8) — 시즌을 이어가는 챔피언의 새 차터가 직전 시즌 차터를 참조용으로 연결 |
 | updated_at | timestamptz | |
 | created_at | timestamptz | |
 
@@ -76,6 +78,7 @@ Each champion's submitted/saved 과제정의서 versions. Mutable — champion c
 | 🔗 homework_id | int FK | → homeworks.id (nullable; one per user+homework) |
 | project_name | text | |
 | content | jsonb | same shape as project_charters.content |
+| 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
 | submitted_at | timestamptz | original submission time |
 | updated_at | timestamptz | last resubmit time |
 | publish_status | enum | `draft` \| `published` — default `published` |
@@ -134,6 +137,7 @@ Champion-created weekly WBS items (self-serve).
 | bottleneck_reviewed_at | timestamptz nullable | 관리자가 지연 신고를 확인한 시각 |
 | display_order | int | ordering within same week |
 | source | text | `manual` \| `ai` \| `template` — 생성 출처. default `manual` (migration 023). "smart" 입력 채택률 분석용 |
+| 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 | publish_status | enum | `draft` \| `published` — default `published` |
@@ -237,6 +241,7 @@ Audio-recorded 1-on-1 check-up sessions between an admin and a champion. Notes a
 | recording_duration_sec | int | |
 | processing_status | text NOT NULL | default `idle`; CHECK in (`idle`, `uploading`, `transcribing`, `summarizing`, `done`, `error`) |
 | raw_transcript | text | Whisper STT output |
+| 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
 | created_at | timestamptz | |
 | updated_at | timestamptz | updated on every PATCH; used for optimistic concurrency (`expectedUpdatedAt`) |
 
@@ -253,6 +258,7 @@ Action items generated (or manually added) per session. Champions can toggle com
 | is_completed | boolean | default `false` |
 | completed_at | timestamptz | set when `is_completed` toggled to true |
 | display_order | int | default `0`; ordering within session |
+| 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
@@ -284,6 +290,86 @@ bucket: check-up-sessions   (private)
 
 ---
 
+## Champion Weekly Sync Tables
+
+> Added 2026-08-24 (`20260824000000_champion_weekly_sync.sql`); not previously documented here — added now alongside the v8 `season_id` column below.
+
+### `champion_weekly_sessions`
+Admin-only weekly sync meeting record (distinct from `check_up_sessions`, which is 1-on-1). One row per weekly meeting.
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | `gen_random_uuid()` |
+| session_date | date NOT NULL | |
+| session_time | time | nullable |
+| title | text NOT NULL | |
+| notes | text | markdown, overall meeting summary |
+| 🔗 admin_user_id | uuid FK | → auth.users(id) ON DELETE SET NULL |
+| 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+INDEX: `(session_date DESC)`. RLS: admin ALL only (no champion access).
+
+### `weekly_champion_updates`
+Per-champion update entry attached to a weekly sync session.
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 weekly_session_id | uuid FK NOT NULL | → champion_weekly_sessions.id ON DELETE CASCADE |
+| 🔗 champion_user_id | uuid FK NOT NULL | → users.id ON DELETE CASCADE |
+| project_label | text | |
+| summary | text NOT NULL | |
+| display_order | int | default `0` |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+INDEX: `(weekly_session_id, display_order)`, `(champion_user_id, created_at DESC)`. RLS: admin ALL only. No `season_id` — scoped indirectly via its parent `champion_weekly_sessions.season_id`.
+
+---
+
+## Season Tables
+
+> Added v8 (2026-09-22). Introduces the "기수(cohort)" concept: which champions/partners are active in which season, decoupled from the static `users.user_group`.
+
+### `seasons`
+Season (기수) metadata. `status` tracks the season's own lifecycle; `is_current` marks "the season the app shows by default" — the two are independent (e.g. season 1 can be `closed` while still `is_current = true` if season 2 doesn't exist yet).
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | `gen_random_uuid()` |
+| name | text NOT NULL | e.g. "시즌 1" |
+| status | text NOT NULL | default `recruiting` — CHECK IN (`recruiting`, `active`, `closed`, `archived`) |
+| is_current | boolean NOT NULL | default `false` |
+| start_date | date | nullable |
+| end_date | date | nullable |
+| created_at | timestamptz | |
+
+Partial unique index `seasons_single_current_idx` on `(is_current)` WHERE `is_current = true` — only one season can be current at a time.
+
+### `season_enrollments`
+Person × season × role. `users` owns "who this person is"; this table owns "is this person a champion/partner in this season" — a fact that changes over time.
+
+| Column | Type | Notes |
+|---|---|---|
+| 🔑 id | uuid PK | |
+| 🔗 season_id | uuid FK NOT NULL | → seasons.id |
+| 🔗 user_id | uuid FK NOT NULL | → users.id |
+| role_in_season | text NOT NULL | CHECK IN (`champion`, `partner`) |
+| status | text NOT NULL | default `active` — CHECK IN (`active`, `completed`, `dropped`) |
+| 🔗 continued_from_enrollment_id | uuid FK nullable | → season_enrollments.id — links to the person's enrollment in a prior season when they continue across seasons |
+| created_at | timestamptz | |
+
+Unique constraint: `(season_id, user_id)`. INDEX: `(season_id, role_in_season)`.
+
+`admin` is out of scope for this table — admin is a season-independent global permission derived from `auth.users.user_metadata.is_admin` (unchanged).
+
+### Backfill (1기)
+`20260922000003_backfill_season_one.sql` inserts a single "시즌 1" row (`status='closed'`, `is_current=true`, `start_date` = earliest `users.created_at`), enrolls every existing `user_group IN ('champion','partner')` user as `status='completed'`, backfills `season_id` on all six season-scoped tables above, then sets `season_id NOT NULL` and adds composite indexes on each.
+
+---
+
 ## Relationships
 
 ```
@@ -311,6 +397,21 @@ auth.users        1 ──< N  check_up_sessions (via admin_user_id; individual 
 check_up_sessions 1 ──< N  session_action_items
 check_up_sessions 1 ──< N  session_comments
 auth.users        1 ──< N  session_comments (via author_id; admin OR champion)
+
+auth.users        1 ──< N  champion_weekly_sessions (via admin_user_id)
+champion_weekly_sessions 1 ──< N  weekly_champion_updates
+users             1 ──< N  weekly_champion_updates (via champion_user_id)
+
+seasons           1 ──< N  season_enrollments
+users             1 ──< N  season_enrollments
+season_enrollments 1 ──< N  season_enrollments (via continued_from_enrollment_id, self-referential, nullable)
+seasons           1 ──< N  charter_submissions
+seasons           1 ──< N  project_charters
+project_charters  1 ──< 1  project_charters (via previous_charter_id, self-referential, nullable)
+seasons           1 ──< N  milestones
+seasons           1 ──< N  check_up_sessions
+seasons           1 ──< N  champion_weekly_sessions
+seasons           1 ──< N  session_action_items
 ```
 
 ---
