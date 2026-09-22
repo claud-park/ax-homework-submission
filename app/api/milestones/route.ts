@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { filterMilestonesByCharter, resolveFirstCharterId } from '@/lib/milestone-filter'
 import type { Milestone, MilestoneStatus } from '@/lib/types'
+import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
 function computeStatus(milestone: {
   due_date: string | null
@@ -95,10 +96,17 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+  let seasonId: string
+  try {
+    seasonId = await requireCurrentSeasonIdForWrite(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
   const { data, error } = await supabase
     .from('milestones')
     .insert({
       user_id: user.id,
+      season_id: seasonId,
       charter_submission_id: charter_submission_id ?? null,
       title: title ?? '',
       start_date: start_date ?? null,

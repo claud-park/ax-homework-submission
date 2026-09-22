@@ -8,6 +8,7 @@ import { combineSessionNotes } from '@/lib/audio-pipeline/notes'
 import type { ProcessUsage } from '@/lib/audio-pipeline/types'
 import type { SessionActionItem } from '@/lib/types'
 import { assessTranscript } from '@/lib/audio/quality'
+import { getSeasonIdForCheckUpSession } from '@/lib/data/season'
 
 const BUCKET = 'check-up-sessions'
 
@@ -49,6 +50,9 @@ async function persistPipelineResult(
   // (기존엔 status flip이 insert보다 앞서 있어, 폴링 모드에서 빈 action_items를 읽는 레이스가 있었음)
   await supabase.from('session_action_items').delete().eq('session_id', sessionId)
 
+  const seasonId = await getSeasonIdForCheckUpSession(supabase, sessionId)
+  if (!seasonId) throw new Error(`세션의 season_id를 찾을 수 없습니다: ${sessionId}`)
+
   let inserted: SessionActionItem[] = []
   if (actionItems.length > 0) {
     const { data } = await supabase
@@ -56,6 +60,7 @@ async function persistPipelineResult(
       .insert(
         actionItems.map((item, idx) => ({
           session_id: sessionId,
+          season_id: seasonId,
           body: item.body,
           display_order: idx,
         }))

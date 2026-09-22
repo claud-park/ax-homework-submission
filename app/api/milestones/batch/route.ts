@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizeBatch, type BatchInput } from '@/lib/milestone-batch'
+import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
 export async function POST(req: NextRequest) {
   const user = await requireUser(req)
@@ -15,6 +16,12 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+  let seasonId: string
+  try {
+    seasonId = await requireCurrentSeasonIdForWrite(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
   const createdIds: string[] = []
 
   try {
@@ -24,6 +31,7 @@ export async function POST(req: NextRequest) {
         .from('milestones')
         .insert({
           user_id: user.id,
+          season_id: seasonId,
           charter_submission_id,
           title: parent.title,
           description: parent.description ?? null,
@@ -44,6 +52,7 @@ export async function POST(req: NextRequest) {
           .from('milestones')
           .insert({
             user_id: user.id,
+            season_id: seasonId,
             charter_submission_id,
             title: child.title,
             description: child.description ?? null,

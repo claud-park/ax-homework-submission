@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
 export async function GET(req: NextRequest) {
   const user = await requireUser(req)
@@ -22,11 +23,23 @@ export async function PUT(req: NextRequest) {
   if (user instanceof NextResponse) return user
   const body = await req.json()
   const supabase = createServiceClient()
+  let seasonId: string
+  try {
+    seasonId = await requireCurrentSeasonIdForWrite(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
 
   const { data, error } = await supabase
     .from('project_charters')
     .upsert(
-      { user_id: user.id, project_name: body.project_name, content: body.content, updated_at: new Date().toISOString() },
+      {
+        user_id: user.id,
+        season_id: seasonId,
+        project_name: body.project_name,
+        content: body.content,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: 'user_id' }
     )
     .select()

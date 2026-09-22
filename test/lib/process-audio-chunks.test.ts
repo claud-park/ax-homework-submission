@@ -19,7 +19,12 @@ function fakeSupabase() {
     update: (vals: any) => { updates.push({ table, vals }); return { eq: () => ({ select: async () => ({ data: [{ id: 'x' }] }) }) } },
     delete: () => ({ eq: async () => ({}) }),
     insert: () => ({ select: async () => ({ data: [] }) }),
-    select: () => ({ eq: () => ({ single: async () => ({ data: { notes: '' } }) }) }),
+    select: () => ({
+      eq: () => ({
+        single: async () => ({ data: { notes: '' } }),
+        maybeSingle: async () => ({ data: { season_id: 'season-test' }, error: null }),
+      }),
+    }),
   })
   return { client: { from, storage } as any, updates }
 }
