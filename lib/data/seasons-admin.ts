@@ -117,3 +117,32 @@ export async function getUnassignedUsers(
     .filter((u: { id: string }) => !enrolledIds.has(u.id))
     .map((u: { id: string; name: string }) => ({ userId: u.id, name: u.name }))
 }
+
+export interface EnrollmentAssignment {
+  userId: string
+  roleInSeason: SeasonRole
+  continueFromEnrollmentId?: string
+}
+
+export async function assignEnrollments(
+  supabase: SupabaseClient,
+  seasonId: string,
+  assignments: EnrollmentAssignment[],
+): Promise<void> {
+  const rows = assignments.map((a) => ({
+    season_id: seasonId,
+    user_id: a.userId,
+    role_in_season: a.roleInSeason,
+    status: 'active' as const,
+    continued_from_enrollment_id: a.continueFromEnrollmentId ?? null,
+  }))
+  const { error } = await supabase
+    .from('season_enrollments')
+    .upsert(rows, { onConflict: 'season_id,user_id' })
+  if (error) throw new Error(error.message)
+}
+
+export async function activateSeason(supabase: SupabaseClient, newSeasonId: string): Promise<void> {
+  const { error } = await supabase.rpc('activate_season', { p_new_season_id: newSeasonId })
+  if (error) throw new Error(error.message)
+}

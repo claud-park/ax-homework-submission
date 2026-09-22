@@ -6,6 +6,8 @@ import {
   getPreviousSeasonRoster,
   getSeasonEnrollments,
   getUnassignedUsers,
+  assignEnrollments,
+  activateSeason,
 } from '@/lib/data/seasons-admin'
 
 function createQueryBuilder(result: { data: unknown; error: unknown }) {
@@ -98,5 +100,41 @@ describe('getUnassignedUsers', () => {
       season_enrollments: { data: [{ user_id: 'u1' }], error: null },
     })
     expect(await getUnassignedUsers(supabase, 's2')).toEqual([{ userId: 'u2', name: 'B' }])
+  })
+})
+
+describe('assignEnrollments', () => {
+  it('upserts one row per assignment', async () => {
+    const supabase = createSupabaseMock({
+      season_enrollments: { data: [{ id: 'e1' }], error: null },
+    })
+    await expect(
+      assignEnrollments(supabase, 's2', [{ userId: 'u1', roleInSeason: 'champion', continueFromEnrollmentId: 'e0' }]),
+    ).resolves.toBeUndefined()
+  })
+
+  it('throws when the upsert fails', async () => {
+    const supabase = createSupabaseMock({
+      season_enrollments: { data: null, error: { message: 'upsert failed' } },
+    })
+    await expect(
+      assignEnrollments(supabase, 's2', [{ userId: 'u1', roleInSeason: 'champion' }]),
+    ).rejects.toThrow('upsert failed')
+  })
+})
+
+describe('activateSeason', () => {
+  it('calls the activate_season RPC with the new season id', async () => {
+    const supabase = createSupabaseMock({})
+    await activateSeason(supabase, 's2')
+    expect(supabase.rpc).toHaveBeenCalledWith('activate_season', { p_new_season_id: 's2' })
+  })
+
+  it('throws when the RPC fails', async () => {
+    const supabase = {
+      from: vi.fn(),
+      rpc: vi.fn(() => Promise.resolve({ data: null, error: { message: 'rpc failed' } })),
+    } as unknown as SupabaseClient
+    await expect(activateSeason(supabase, 's2')).rejects.toThrow('rpc failed')
   })
 })
