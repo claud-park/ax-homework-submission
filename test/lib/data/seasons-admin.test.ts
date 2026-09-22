@@ -105,12 +105,28 @@ describe('getUnassignedUsers', () => {
 
 describe('assignEnrollments', () => {
   it('upserts one row per assignment', async () => {
-    const supabase = createSupabaseMock({
-      season_enrollments: { data: [{ id: 'e1' }], error: null },
-    })
+    const builder = createQueryBuilder({ data: [{ id: 'e1' }], error: null })
+    const supabase = {
+      from: vi.fn(() => builder),
+      rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    } as unknown as SupabaseClient
+
     await expect(
       assignEnrollments(supabase, 's2', [{ userId: 'u1', roleInSeason: 'champion', continueFromEnrollmentId: 'e0' }]),
     ).resolves.toBeUndefined()
+
+    expect(builder.upsert).toHaveBeenCalledWith(
+      [
+        {
+          season_id: 's2',
+          user_id: 'u1',
+          role_in_season: 'champion',
+          status: 'active',
+          continued_from_enrollment_id: 'e0',
+        },
+      ],
+      { onConflict: 'season_id,user_id' },
+    )
   })
 
   it('throws when the upsert fails', async () => {
