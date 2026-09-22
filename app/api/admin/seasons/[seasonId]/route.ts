@@ -18,13 +18,17 @@ export async function GET(req: NextRequest, { params }: { params: { seasonId: st
   if (!season) return NextResponse.json({ error: 'Season not found' }, { status: 404 })
 
   const currentSeasonId = await getCurrentSeasonId(supabase)
-  const [previousRoster, currentEnrollments, unassignedUsers] = await Promise.all([
+  const [previousRoster, currentEnrollments] = await Promise.all([
     currentSeasonId && currentSeasonId !== params.seasonId
       ? getPreviousSeasonRoster(supabase, currentSeasonId)
       : Promise.resolve([]),
     getSeasonEnrollments(supabase, params.seasonId),
-    getUnassignedUsers(supabase, params.seasonId),
   ])
+  const unassignedUsers = await getUnassignedUsers(
+    supabase,
+    params.seasonId,
+    previousRoster.map((entry) => entry.userId),
+  )
 
   return NextResponse.json({ season, previousRoster, currentEnrollments, unassignedUsers })
 }

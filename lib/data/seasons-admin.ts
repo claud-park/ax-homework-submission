@@ -105,6 +105,7 @@ export async function getSeasonEnrollments(
 export async function getUnassignedUsers(
   supabase: SupabaseClient,
   seasonId: string,
+  excludeUserIds: string[] = [],
 ): Promise<{ userId: string; name: string }[]> {
   const [{ data: allUsers, error: usersErr }, { data: enrolled, error: enrollErr }] = await Promise.all([
     supabase.from('users').select('id, name'),
@@ -112,9 +113,12 @@ export async function getUnassignedUsers(
   ])
   if (usersErr) console.error('[seasons-admin] getUnassignedUsers users failed:', usersErr.message)
   if (enrollErr) console.error('[seasons-admin] getUnassignedUsers enrollments failed:', enrollErr.message)
-  const enrolledIds = new Set((enrolled ?? []).map((e: { user_id: string }) => e.user_id))
+  const excludedIds = new Set([
+    ...(enrolled ?? []).map((e: { user_id: string }) => e.user_id),
+    ...excludeUserIds,
+  ])
   return (allUsers ?? [])
-    .filter((u: { id: string }) => !enrolledIds.has(u.id))
+    .filter((u: { id: string }) => !excludedIds.has(u.id))
     .map((u: { id: string; name: string }) => ({ userId: u.id, name: u.name }))
 }
 
