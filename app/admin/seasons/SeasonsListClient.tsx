@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
+import { toast } from 'sonner'
 import type { Season, SeasonStatus } from '@/lib/types'
 
 const STATUS_LABEL: Record<SeasonStatus, string> = {
@@ -41,7 +42,10 @@ export function SeasonsListClient() {
   useEffect(() => {
     apiFetch<Season[]>('/api/admin/seasons')
       .then(setSeasons)
-      .catch(console.error)
+      .catch((e) => {
+        console.error(e)
+        toast.error('시즌 목록을 불러오지 못했습니다.')
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -58,6 +62,7 @@ export function SeasonsListClient() {
       setNewStartDate('')
     } catch (e) {
       console.error(e)
+      toast.error(e instanceof Error ? e.message : '시즌 생성 실패')
     } finally {
       setCreating(false)
     }

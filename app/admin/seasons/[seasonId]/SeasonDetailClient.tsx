@@ -95,7 +95,7 @@ export function SeasonDetailClient({ seasonId }: { seasonId: string }) {
   }
 
   async function handleActivate() {
-    if (!confirm('이 시즌을 현재 시즌으로 전환하시겠습니까? 되돌릴 수 없습니다.')) return
+    if (!confirm('이 시즌을 현재 시즌으로 전환하시겠습니까? 직전 시즌은 보관 처리됩니다.')) return
     setActivating(true)
     try {
       await apiFetch(`/api/admin/seasons/${seasonId}/activate`, { method: 'POST' })
