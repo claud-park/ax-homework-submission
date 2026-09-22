@@ -23,8 +23,8 @@ export function unauthorized(): NextResponse {
 }
 
 /** 403 응답 (권한 없음). */
-export function forbidden(): NextResponse {
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+export function forbidden(message = 'Forbidden'): NextResponse {
+  return NextResponse.json({ error: message }, { status: 403 })
 }
 
 /** 인증된 사용자를 반환하거나, 미인증 시 401 NextResponse 를 반환한다. */
@@ -52,7 +52,7 @@ export async function requireCurrentEnrollment(
 
   const supabase = createServiceClient()
   const enrolled = await isEnrolledInCurrentSeason(supabase, user.id, role)
-  if (!enrolled) return forbidden()
+  if (!enrolled) return forbidden('현재 시즌에 참여 중이 아닙니다')
 
   return user
 }
