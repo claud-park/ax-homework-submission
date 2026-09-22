@@ -14,7 +14,7 @@
 | name | text | from Google OAuth |
 | avatar_url | text | from Google OAuth |
 | created_at | timestamptz | |
-| user_group | text | `champion`(default) \| `partner` — CHECK constraint. `admin` 여부는 `auth.users.user_metadata.is_admin`에서 런타임 파생 |
+| user_group | text | `champion`(default) \| `partner` — CHECK constraint. `admin` 여부는 `auth.users.app_metadata.is_admin`에서 런타임 파생 |
 
 ### `homeworks`
 | Column | Type | Notes |
@@ -60,7 +60,7 @@ One per champion. Auto-save scratch pad (legacy — UI now uses `charter_submiss
 | Column | Type | Notes |
 |---|---|---|
 | 🔑 id | uuid PK | |
-| 🔗 user_id | uuid FK UNIQUE | → users.id (one charter per user) |
+| 🔗 user_id | uuid FK | → users.id (UNIQUE constraint dropped in `20260617100002_project_charters_charter_fk.sql` to allow multiple charters per user; uniqueness is intended to be per-season, i.e. one charter per user per season — not currently DB-enforced, follow-up) |
 | project_name | text | |
 | content | jsonb | structured sections: problem, goal, scope, outcomes, risks |
 | 🔗 season_id | uuid FK NOT NULL | → seasons.id (v8, backfilled) |
@@ -223,7 +223,7 @@ File attachments linked to a hotline message.
 
 ## 1-on-1 Session Tables
 
-> Added v7 (2026-06-24). Admin identity note: `admin_user_id` and `author_id` columns now reference individual admin accounts (`admin_alex@`, `admin_claud@`, `admin_jennifer@dreamus.io`) stored in `auth.users` with `user_metadata.is_admin = true`. The former shared `admin@dreamus.io` account has been deactivated (banned, not deleted — FK integrity preserved).
+> Added v7 (2026-06-24). Admin identity note: `admin_user_id` and `author_id` columns now reference individual admin accounts (`admin_alex@`, `admin_claud@`, `admin_jennifer@dreamus.io`) stored in `auth.users` with `app_metadata.is_admin = true`. The former shared `admin@dreamus.io` account has been deactivated (banned, not deleted — FK integrity preserved).
 
 ### `check_up_sessions`
 Audio-recorded 1-on-1 check-up sessions between an admin and a champion. Notes are stored as markdown (manual notes + AI summary separated by a `---` divider).
@@ -363,7 +363,7 @@ Person × season × role. `users` owns "who this person is"; this table owns "is
 
 Unique constraint: `(season_id, user_id)`. INDEX: `(season_id, role_in_season)`.
 
-`admin` is out of scope for this table — admin is a season-independent global permission derived from `auth.users.user_metadata.is_admin` (unchanged).
+`admin` is out of scope for this table — admin is a season-independent global permission derived from `auth.users.app_metadata.is_admin` (unchanged).
 
 ### Backfill (1기)
 `20260922000003_backfill_season_one.sql` inserts a single "시즌 1" row (`status='closed'`, `is_current=true`, `start_date` = earliest `users.created_at`), enrolls every existing `user_group IN ('champion','partner')` user as `status='completed'`, backfills `season_id` on all six season-scoped tables above, then sets `season_id NOT NULL` and adds composite indexes on each.
