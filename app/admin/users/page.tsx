@@ -6,12 +6,14 @@ import type { UserGroup, UserManagementEntry } from '@/lib/types'
 const GROUP_LABEL: Record<UserGroup, string> = {
   champion: 'CHAMPION',
   partner: 'PARTNER',
+  viewer: 'VIEWER',
   admin: 'ADMIN',
 }
 
 const GROUP_COLOR: Record<UserGroup, { bg: string; color: string }> = {
   champion: { bg: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' },
   partner:  { bg: 'rgba(148,163,184,0.15)', color: 'var(--text-secondary)' },
+  viewer:   { bg: 'rgba(100,116,139,0.08)', color: 'var(--text-disabled)' },
   admin:    { bg: 'rgba(124,58,237,0.1)', color: '#7c3aed' },
 }
 
