@@ -6,12 +6,14 @@ import type { UserGroup, UserManagementEntry } from '@/lib/types'
 const GROUP_LABEL: Record<UserGroup, string> = {
   champion: 'CHAMPION',
   partner: 'PARTNER',
+  viewer: 'VIEWER',
   admin: 'ADMIN',
 }
 
 const GROUP_COLOR: Record<UserGroup, { bg: string; color: string }> = {
   champion: { bg: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)' },
   partner:  { bg: 'rgba(148,163,184,0.15)', color: 'var(--text-secondary)' },
+  viewer:   { bg: 'rgba(100,116,139,0.08)', color: 'var(--text-disabled)' },
   admin:    { bg: 'rgba(124,58,237,0.1)', color: '#7c3aed' },
 }
 
@@ -39,7 +41,7 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  async function handleGroupChange(userId: string, newGroup: 'champion' | 'partner') {
+  async function handleGroupChange(userId: string, newGroup: 'champion' | 'partner' | 'viewer') {
     setChanging(userId)
     try {
       await apiFetch(`/api/admin/users/${userId}`, {
@@ -119,7 +121,7 @@ export default function AdminUsersPage() {
                         <select
                           value={u.userGroup}
                           disabled={isChanging}
-                          onChange={e => handleGroupChange(u.id, e.target.value as 'champion' | 'partner')}
+                          onChange={e => handleGroupChange(u.id, e.target.value as 'champion' | 'partner' | 'viewer')}
                           style={{
                             fontSize: 12, padding: '3px 6px', borderRadius: 4,
                             border: '1px solid var(--border)', background: 'var(--surface-primary)',
@@ -129,6 +131,7 @@ export default function AdminUsersPage() {
                         >
                           <option value="champion">champion</option>
                           <option value="partner">partner</option>
+                          <option value="viewer">viewer</option>
                         </select>
                       )}
                     </td>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUser } from '@/lib/api/guard'
+import { requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { MilestoneStatus } from '@/lib/types'
@@ -32,7 +32,7 @@ export interface GanttChampion {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUser } from '@/lib/api/guard'
+import { requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { normalizeBatch, type BatchInput } from '@/lib/milestone-batch'
 import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
 
   const body = await req.json().catch(() => ({}))

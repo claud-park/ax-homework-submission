@@ -338,6 +338,27 @@ export default function AdminChampionPage() {
     }
   }
 
+  async function toggleCharterVisibility(charterId: string, nextIsPublic: boolean) {
+    try {
+      const updated = await apiFetch<CharterSubmission>(`/api/admin/charters/${charterId}/visibility`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isPublic: nextIsPublic }),
+      })
+      setData(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          charters: prev.charters.map(c =>
+            c.id === charterId ? { ...c, is_public: updated.is_public } : c
+          ),
+        }
+      })
+      toast.success(nextIsPublic ? '일반사원에게 공개했습니다.' : '공개를 해제했습니다.')
+    } catch {
+      toast.error('공개 설정 변경에 실패했습니다.')
+    }
+  }
+
   // 과제 제출 탭 비활성화로 아래 함수들 미사용
   // function openConfirm(subId: string, status: SubmissionStatus, currentFeedback: string | null) {
   //   setConfirmingSubId(subId)
@@ -719,25 +740,42 @@ export default function AdminChampionPage() {
               <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>과제정의서</h2>
             )}
 
-            {/* 오른쪽: 승인 배지 또는 승인 버튼 */}
-            <div>
-              {activeCharter?.admin_approved_at ? (
-                <span
-                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                  style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}
-                >
-                  ✓ 승인됨 · {new Date(activeCharter.admin_approved_at).toLocaleDateString('ko-KR')}
-                </span>
-              ) : activeCharter ? (
+            <div className="flex items-center gap-2">
+              {activeCharter && (
                 <button
-                  onClick={() => approveCharter(activeCharter.id)}
-                  disabled={approving}
-                  className="text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-50"
-                  style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer' }}
+                  onClick={() => toggleCharterVisibility(activeCharter.id, !activeCharter.is_public)}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={{
+                    background: activeCharter.is_public ? 'rgba(37,99,235,0.1)' : 'rgba(100,116,139,0.08)',
+                    color: activeCharter.is_public ? 'var(--blue-600)' : 'var(--text-disabled)',
+                    border: `1px solid ${activeCharter.is_public ? 'rgba(37,99,235,0.3)' : 'var(--border-subtle)'}`,
+                    cursor: 'pointer',
+                  }}
                 >
-                  {approving ? '처리 중…' : '✓ 승인'}
+                  {activeCharter.is_public ? '👁 공개됨' : '🔒 비공개'}
                 </button>
-              ) : null}
+              )}
+
+              {/* 오른쪽: 승인 배지 또는 승인 버튼 */}
+              <div>
+                {activeCharter?.admin_approved_at ? (
+                  <span
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                    style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success)', border: '1px solid rgba(22,163,74,0.3)' }}
+                  >
+                    ✓ 승인됨 · {new Date(activeCharter.admin_approved_at).toLocaleDateString('ko-KR')}
+                  </span>
+                ) : activeCharter ? (
+                  <button
+                    onClick={() => approveCharter(activeCharter.id)}
+                    disabled={approving}
+                    className="text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-50"
+                    style={{ background: 'rgba(37,99,235,0.1)', color: 'var(--blue-600)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'pointer' }}
+                  >
+                    {approving ? '처리 중…' : '✓ 승인'}
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
 

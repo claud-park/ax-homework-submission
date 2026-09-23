@@ -45,6 +45,7 @@ export interface CharterSubmission {
   user_id: string
   season_id: string
   previous_charter_id: string | null
+  is_public: boolean
   title: string | null
   project_name: string | null
   content: {
@@ -236,7 +237,7 @@ export interface SeasonEnrollment {
 
 // ─── User Group ──────────────────────────────────────────────────────────────
 
-export type UserGroup = 'champion' | 'partner' | 'admin'
+export type UserGroup = 'champion' | 'partner' | 'viewer' | 'admin'
 
 export interface UserManagementEntry {
   id: string

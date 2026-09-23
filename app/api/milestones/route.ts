@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
-import { requireUser } from '@/lib/api/guard'
+import { requireUser, requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { filterMilestonesByCharter, resolveFirstCharterId } from '@/lib/milestone-filter'
 import type { Milestone, MilestoneStatus } from '@/lib/types'
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
   const body = await req.json()
   const { title, start_date, due_date, description, publish_status, parent_milestone_id, charter_submission_id } = body

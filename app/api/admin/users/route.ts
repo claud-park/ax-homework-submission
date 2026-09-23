@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
-import type { UserManagementEntry } from '@/lib/types'
+import type { UserGroup, UserManagementEntry } from '@/lib/types'
 import { requireAdmin } from '@/lib/api/guard'
 
 export async function GET(req: NextRequest) {
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       displayName,
       department,
       email: auth?.email ?? '',
-      userGroup: auth?.isAdmin ? 'admin' : (u.user_group as 'champion' | 'partner'),
+      userGroup: auth?.isAdmin ? 'admin' : (u.user_group as UserGroup),
       createdAt: u.created_at,
     }
   })
