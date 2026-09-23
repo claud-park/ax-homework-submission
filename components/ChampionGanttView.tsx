@@ -534,7 +534,11 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
   const [nudgeState, setNudgeState] = useState<NudgeState | null>(null)
   const lastMousePos = useRef({ x: 0, y: 0 })
   const ganttWrapperRef = useRef<HTMLDivElement>(null)
-  const [ganttScrollLeft, setGanttScrollLeft] = useState(0)
+  const todayLineRef = useRef<HTMLDivElement>(null)
+  const scrollElRef = useRef<HTMLElement | null>(null)
+  const todayLineXRef = useRef<number | null>(null)
+  const listWidthRef = useRef(0)
+  const scrollRafRef = useRef<number | null>(null)
   const [ganttBodyHeight, setGanttBodyHeight] = useState(0)
 
   const listWidth = W.name + W.dept + projectW + W.charter
@@ -674,16 +678,48 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
     [tasks, viewMode, listWidth, columnWidth],
   )
 
+  // Position the today-line by writing directly to the DOM (rAF-throttled) instead of
+  // routing scroll position through React state. gantt-task-react already re-renders its
+  // entire chart (grid + bars + task list) on every scroll tick via its own internal
+  // scrollX state — mirroring that into a React state update here would force a second,
+  // redundant top-level re-render of this component (and therefore of <Gantt> again) per
+  // scroll event, which is what caused the scrolling jitter.
+  const applyTodayLinePosition = useCallback(() => {
+    const lineEl = todayLineRef.current
+    if (!lineEl) return
+    const x = todayLineXRef.current
+    const scrollLeft = scrollElRef.current?.scrollLeft ?? 0
+    lineEl.style.left = x === null ? '-9999px' : `${x - listWidthRef.current - scrollLeft}px`
+  }, [])
+
+  // Keep "latest" refs in sync so the scroll handler (attached once per tasks/viewMode
+  // change) always reads current values instead of a stale closure.
+  useEffect(() => {
+    todayLineXRef.current = todayLineX
+    listWidthRef.current = listWidth
+    applyTodayLinePosition()
+  }, [todayLineX, listWidth, applyTodayLinePosition])
+
   // Re-attach scroll listener whenever tasks or viewMode change
   useEffect(() => {
     if (!ganttWrapperRef.current) return
     const scrollEl = ganttWrapperRef.current.querySelector<HTMLElement>('._2k9Ys')
     if (!scrollEl) return
-    const handler = () => setGanttScrollLeft(scrollEl.scrollLeft)
+    scrollElRef.current = scrollEl
+    const handler = () => {
+      if (scrollRafRef.current !== null) return
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollRafRef.current = null
+        applyTodayLinePosition()
+      })
+    }
     scrollEl.addEventListener('scroll', handler, { passive: true })
-    handler()
-    return () => scrollEl.removeEventListener('scroll', handler)
-  }, [tasks.length, viewMode])
+    applyTodayLinePosition()
+    return () => {
+      scrollEl.removeEventListener('scroll', handler)
+      if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current)
+    }
+  }, [tasks.length, viewMode, applyTodayLinePosition])
 
   // ResizeObserver: calculate ganttBodyHeight to enable internal scroll (sticky header).
   // Deps include filteredChampions.length so the observer re-attaches whenever the wrapper
@@ -1088,12 +1124,15 @@ export function ChampionGanttView({ isAdmin = false, initialData }: ChampionGant
                   left: listWidth, right: 0,
                   overflow: 'hidden', pointerEvents: 'none', zIndex: 5,
                 }}>
-                  <div style={{
-                    position: 'absolute', top: 0, bottom: 0,
-                    left: todayLineX - listWidth - ganttScrollLeft,
-                    width: 2,
-                    background: 'rgba(37,99,235,0.7)',
-                  }} />
+                  <div
+                    ref={todayLineRef}
+                    style={{
+                      position: 'absolute', top: 0, bottom: 0,
+                      left: todayLineX - listWidth,
+                      width: 2,
+                      background: 'rgba(37,99,235,0.7)',
+                    }}
+                  />
                 </div>
               )}
             </div>
