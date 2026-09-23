@@ -1,6 +1,6 @@
-# Entity Relationship Diagram — v8
+# Entity Relationship Diagram — v9
 
-> ax-homework-submission · Supabase PostgreSQL · Updated 2026-09-22
+> ax-homework-submission · Supabase PostgreSQL · Updated 2026-09-23
 
 ---
 
@@ -14,7 +14,7 @@
 | name | text | from Google OAuth |
 | avatar_url | text | from Google OAuth |
 | created_at | timestamptz | |
-| user_group | text | `champion`(default) \| `partner` — CHECK constraint. `admin` 여부는 `auth.users.app_metadata.is_admin`에서 런타임 파생 |
+| user_group | text | `champion` \| `partner` \| `viewer`(default) — CHECK constraint. `admin` 여부는 `auth.users.app_metadata.is_admin`에서 런타임 파생 |
 
 ### `homeworks`
 | Column | Type | Notes |
@@ -83,6 +83,7 @@ Each champion's submitted/saved 과제정의서 versions. Mutable — champion c
 | submitted_at | timestamptz | original submission time |
 | updated_at | timestamptz | last resubmit time |
 | publish_status | enum | `draft` \| `published` — default `published` |
+| is_public | boolean NOT NULL | default `false` — true인 차터만 `/gallery`(뷰어 화면)에 노출; 관리자가 챔피언 상세 화면에서 토글 (v9, `20260923000000_add_viewer_role.sql`) |
 
 Unique constraint: `(user_id, homework_id) WHERE homework_id IS NOT NULL` — one 과제정의서 per homework per champion.
 

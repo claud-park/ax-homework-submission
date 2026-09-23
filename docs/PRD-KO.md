@@ -1,8 +1,8 @@
 # 디시인사이드 과제 관리 플랫폼 — 제품 요구사항 명세서 (PRD)
 
-> **문서 버전** 2.5 · **최종 업데이트** 2026-09-22 · **작성자** yr.park@dreamus.io
+> **문서 버전** 2.6 · **최종 업데이트** 2026-09-23 · **작성자** yr.park@dreamus.io
 > **상태** 사내 검토 중 · **저장소** `AX/ax-homework-submission`
-> **이전 버전** v2.4 (2026-09-22) · v2.3 (2026-06-24) · v2.2 (2026-06-16) · v2.1 (2026-06-08) · v2.0 (2026-06-02)
+> **이전 버전** v2.5 (2026-09-22) · v2.4 (2026-09-22) · v2.3 (2026-06-24) · v2.2 (2026-06-16) · v2.1 (2026-06-08) · v2.0 (2026-06-02)
 
 ---
 
@@ -11,8 +11,8 @@
 | 항목 | 내용 |
 |---|---|
 | 프로젝트명 | 디시인사이드 과제 관리 플랫폼 (ax-homework-submission) |
-| 버전 | v2.5 |
-| 작성일 | 2026-09-22 |
+| 버전 | v2.6 |
+| 작성일 | 2026-09-23 |
 | 작성자 | yr.park@dreamus.io |
 | 검토자 | Strategy Lead · Engineering Lead |
 
@@ -132,8 +132,9 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 ### 2.4 권한 모델
 
 ```
-챔피언 : user_metadata.is_admin = false, users.user_group = 'champion'  (기본값)
+챔피언 : user_metadata.is_admin = false, users.user_group = 'champion'
 파트너  : user_metadata.is_admin = false, users.user_group = 'partner'
+뷰어   : user_metadata.is_admin = false, users.user_group = 'viewer'  (신규 가입 기본값, v2.6)
 어드민  : user_metadata.is_admin = true   (user_group은 DB에 저장하지 않음)
 ```
 
@@ -155,6 +156,22 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 - **동시 작업 충돌 방지**: 낙관적 동시성(`expectedUpdatedAt`)과 결합하여 동시 편집 충돌 감지
 
 **프로비저닝**: `scripts/create-admins.ts` (멱등 실행, `.env`로 이메일·비밀번호 주입, `SUPABASE_SERVICE_KEY` 사용)
+
+#### 2.4.2 뷰어(Viewer) 티어 (v2.6 추가)
+
+챔피언·파트너가 아닌 일반 사원을 위한 제한된 권한 티어. 과제 수행·제출 대상이 아니며, 게시된 Charter 요약을 열람하는 용도로만 로그인을 허용한다.
+
+| 항목 | 내용 |
+|---|---|
+| 로그인 제한 | 이메일 도메인이 `ALLOWED_EMAIL_DOMAIN`(`@dreamus.io`)로 끝나지 않으면 `app/auth/callback/route.ts`에서 로그인 자체를 거부 — **fail-closed**: 환경변수 미설정 시 모든 로그인이 차단됨 |
+| Google OAuth `hd` 힌트 | 로그인 화면의 도메인 힌트 표시 등 UX 편의일 뿐 보안 경계가 아님 — 실제 검증은 콜백의 서버 사이드 도메인 체크가 담당 |
+| 접근 가능 화면 | `/gallery` — 시즌별 공개(`is_public = true`) Charter 요약 열람 전용 |
+| 접근 불가 | 챔피언 라우트(`/my-project/**` 등) 접근 시 `middleware.ts`가 `/gallery`로 리다이렉트 |
+| 승격 | 관리자가 `/admin/users`에서 `champion`/`partner`로 그룹 변경 + `/admin/seasons/[id]`에서 시즌 배정 — 현재는 두 액션을 별도로 수행해야 함 (후속 개선 과제) |
+
+- `charter_submissions.is_public`(boolean, 기본 `false`)이 true인 항목만 `/gallery`에 노출되며, 관리자가 챔피언 상세 화면(`/admin/champions/[userId]`)에서 토글한다 (`PATCH /api/admin/charters/[charterId]/visibility`)
+- 신규 API: `GET /api/viewer/charters`(시즌별 공개 Charter 목록), `GET /api/viewer/seasons`(시즌 목록) — 둘 다 로그인한 사용자라면 역할과 무관하게 호출 가능
+- `admin`은 이 티어와 무관 — `app_metadata.is_admin` 기반 전역 권한은 그대로 유지 (§2.4)
 
 ### 2.5 시즌(기수) 모델 (v2.4 추가)
 
@@ -918,6 +935,7 @@ WBS 마일스톤 등록 (depth-0 그룹 → depth-1 마일스톤) → Gantt 시�
 | v2.3 | 2026-06-24 | 1-on-1 세션(체크업 세션) 신규 기능 전체; 어드민 공유→개별 3계정 전환; Storage `check-up-sessions` 버킷; 신규 테이블 3개(`check_up_sessions`, `session_action_items`, `session_comments`); API +11 (세션·업로드·처리·액션 아이템·댓글); 신규 의존성 (openai/Whisper, tiptap-markdown, react-markdown) |
 | v2.4 | 2026-09-22 | 시즌(기수) 모델 신설(§2.5): `seasons`·`season_enrollments` 테이블 추가, champion/partner 판별 기준을 `users.user_group`에서 현재 시즌 enrollment로 전환; 시즌 스코프 테이블 5개(`charter_submissions`·`milestones`·`check_up_sessions`·`champion_weekly_sessions`·`session_action_items`)에 `season_id` 추가, `charter_submissions.previous_charter_id` 추가(`project_charters`는 실제 DB에 없는 죽은 테이블로 확인되어 제외); 1기 데이터 백필 |
 | v2.5 | 2026-09-22 | 시즌 관리 Admin UI(§2.5): `/admin/seasons`에서 시즌 생성, 참여자 배정(이어하기/신규/종료), 전환 확정 지원; `activate_season(p_new_season_id UUID) RETURNS VOID` RPC로 현재 시즌 플래그를 원자적으로 전환 |
+| v2.6 | 2026-09-23 | 뷰어(Viewer) 권한 티어 신설(§2.4.2): `users.user_group`에 `viewer` 추가(신규 가입 기본값), 로그인을 `ALLOWED_EMAIL_DOMAIN`(`@dreamus.io`) 도메인으로 제한(fail-closed); `charter_submissions.is_public` 컬럼 추가 및 어드민 공개 토글(`PATCH /api/admin/charters/[charterId]/visibility`); 신규 API `GET /api/viewer/charters`·`GET /api/viewer/seasons`; 뷰어 전용 갤러리 화면(`/gallery`) 추가, `middleware.ts`에서 뷰어의 챔피언 라우트 접근을 `/gallery`로 리다이렉트; `/admin/users`에서 `viewer` 그룹 설정 지원 |
 
 ---
 
