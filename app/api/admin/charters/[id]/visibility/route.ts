@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { charterId: string } },
+  { params }: { params: { id: string } },
 ) {
   const admin = await requireAdmin(req)
   if (admin instanceof NextResponse) return admin
@@ -18,7 +18,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from('charter_submissions')
     .update({ is_public: isPublic })
-    .eq('id', params.charterId)
+    .eq('id', params.id)
     .select()
     .single()
 
