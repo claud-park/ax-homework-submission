@@ -40,6 +40,28 @@ export async function requireAdmin(req: NextRequest): Promise<User | NextRespons
 }
 
 /**
+ * 인증된 사용자를 반환하되, user_group === 'viewer'면 403.
+ * admin은 user_group 조회 없이 통과. 조회 실패/행 없음 시에도 fail-closed(403)로 처리한다
+ * (middleware.ts의 viewer 리다이렉트와 달리 여기서는 조회 실패를 "허용"으로 취급하지 않는다).
+ */
+export async function requireNonViewer(req: NextRequest): Promise<User | NextResponse> {
+  const user = await verifyJWT(req)
+  if (!user) return unauthorized()
+  if (user.app_metadata?.is_admin === true) return user
+
+  const supabase = createServiceClient()
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('user_group')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (error || !profile) return forbidden('사용자 정보를 확인할 수 없습니다')
+  if (profile.user_group === 'viewer') return forbidden('viewer 권한으로는 접근할 수 없습니다')
+
+  return user
+}
+
+/**
  * 현재 시즌에 지정된 role로 활성 enrollment가 있는 사용자를 반환하거나,
  * 미인증 시 401, enrollment 없음 시 403 NextResponse를 반환한다.
  */

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUser } from '@/lib/api/guard'
+import { requireNonViewer } from '@/lib/api/guard'
 import { notifyNewSubmission } from '@/lib/notifications'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -11,7 +11,7 @@ function sanitizeFileName(name: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
 
   const contentType = req.headers.get('content-type') ?? ''

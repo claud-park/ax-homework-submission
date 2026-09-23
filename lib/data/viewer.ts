@@ -17,6 +17,11 @@ interface PublicCharterRow {
   admin_approved_at: string | null
 }
 
+/** TipTap이 만든 HTML 태그를 제거하고 공백을 정규화한다 (갤러리 카드에 태그가 그대로 노출되는 것 방지). */
+function plainText(html: string | null | undefined): string {
+  return (html ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 function deriveStatusBadge(row: PublicCharterRow): PublicCharterEntry['statusBadge'] {
   if (row.admin_approved_at) return 'approved'
   if (row.publish_status === 'published') return 'in_review'
@@ -52,7 +57,7 @@ export async function getPublicCharters(
   return rows.map((row) => ({
     championName: parseName(nameMap.get(row.user_id) ?? '').displayName,
     projectTitle: row.project_name?.trim() || '제목없음',
-    oneLiner: row.title?.trim() || row.content?.summary?.trim() || '',
+    oneLiner: plainText(row.title) || plainText(row.content?.summary).slice(0, 120) || '',
     statusBadge: deriveStatusBadge(row),
   }))
 }

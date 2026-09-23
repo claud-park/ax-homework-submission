@@ -37,6 +37,22 @@ describe('getPublicCharters', () => {
     ])
   })
 
+  it('strips HTML tags when oneLiner falls back to content.summary', async () => {
+    const supabase = createSupabaseMock({
+      charter_submissions: {
+        data: [
+          { user_id: 'u1', project_name: '프로젝트C', title: null, content: { summary: '<p>우리는 사내 배포 프로세스를 개선합니다</p><ul><li>bullet</li></ul>' }, publish_status: 'published', admin_approved_at: null },
+        ],
+        error: null,
+      },
+      users: { data: [{ id: 'u1', name: '이영희/인프라팀' }], error: null },
+    })
+    const [entry] = await getPublicCharters(supabase, 's2')
+    expect(entry.oneLiner).not.toContain('<')
+    expect(entry.oneLiner).not.toContain('>')
+    expect(entry.oneLiner).toBe('우리는 사내 배포 프로세스를 개선합니다 bullet')
+  })
+
   it('returns an empty array when there are no public charters', async () => {
     const supabase = createSupabaseMock({
       charter_submissions: { data: [], error: null },

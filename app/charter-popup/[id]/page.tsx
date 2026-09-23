@@ -23,6 +23,16 @@ export default async function CharterPopupPage({ params }: { params: { id: strin
 
   const supabase = createServiceClient()
 
+  // viewer는 차터 상세를 볼 수 없다 — fail-closed: 조회 실패/행 없음도 viewer로 간주해 갤러리로 보낸다.
+  if (!isAdmin) {
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('user_group')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profileError || !profile || profile.user_group === 'viewer') redirect('/gallery')
+  }
+
   const [charterResult, milestonesResult] = await Promise.all([
     supabase
       .from('charter_submissions')

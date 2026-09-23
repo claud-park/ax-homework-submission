@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUser } from '@/lib/api/guard'
+import { requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, renderAdminMentions } from '@/lib/one-on-one/slack'
 import { formatSlotLabel, isWorkingHour, overlapsLunchBreak } from '@/lib/one-on-one/slot-utils'
@@ -34,7 +34,7 @@ function buildBlocks(bookingId: string, text: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
 
   const { duration, slotStart, slotEnd, availableAdmins, agenda: agendaRaw } = await req.json() as {

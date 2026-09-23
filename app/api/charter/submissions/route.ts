@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
-import { requireUser } from '@/lib/api/guard'
+import { requireUser, requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
   const { title, project_name, content, publish_status } = await req.json()
   const status = publish_status === 'published' ? 'published' : 'draft'

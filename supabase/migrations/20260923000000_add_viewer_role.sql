@@ -6,7 +6,15 @@
 
 BEGIN;
 
-ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_user_group_check;
+-- 제약명이 기본값에서 달라졌을 수 있으므로 이름을 추측하지 않고 실제 정의를 찾아 드롭한다.
+DO $$
+DECLARE c RECORD;
+BEGIN
+  FOR c IN SELECT conname FROM pg_constraint
+           WHERE conrelid = 'public.users'::regclass AND contype = 'c'
+             AND pg_get_constraintdef(oid) ILIKE '%user_group%'
+  LOOP EXECUTE format('ALTER TABLE public.users DROP CONSTRAINT %I', c.conname); END LOOP;
+END $$;
 ALTER TABLE public.users ADD CONSTRAINT users_user_group_check
   CHECK (user_group IN ('champion', 'partner', 'viewer'));
 ALTER TABLE public.users ALTER COLUMN user_group SET DEFAULT 'viewer';

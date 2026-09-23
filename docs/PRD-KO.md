@@ -166,12 +166,14 @@ AX 프로그램 운영 시 4개의 정보 흐름이 각기 다른 채널에서 �
 | 로그인 제한 | 이메일 도메인이 `ALLOWED_EMAIL_DOMAIN`(`@dreamus.io`)로 끝나지 않으면 `app/auth/callback/route.ts`에서 로그인 자체를 거부 — **fail-closed**: 환경변수 미설정 시 모든 로그인이 차단됨 |
 | Google OAuth `hd` 힌트 | 로그인 화면의 도메인 힌트 표시 등 UX 편의일 뿐 보안 경계가 아님 — 실제 검증은 콜백의 서버 사이드 도메인 체크가 담당 |
 | 접근 가능 화면 | `/gallery` — 시즌별 공개(`is_public = true`) Charter 요약 열람 전용 |
-| 접근 불가 | 챔피언 라우트(`/my-project/**` 등) 접근 시 `middleware.ts`가 `/gallery`로 리다이렉트 |
+| 접근 불가 (화면) | 챔피언 라우트(`/my-project/**` 등) 접근 시 `middleware.ts`가 `/gallery`로 리다이렉트, 차터 팝업(`/charter-popup/[id]`)은 서버 컴포넌트에서 `/gallery`로 리다이렉트 |
+| 접근 불가 (API) | `lib/api/guard.ts`의 `requireNonViewer` 가드가 적용된 라우트에서 403 — 챔피언 상세 조회(`/api/champions`, `/api/champions/[userId]`, `/api/champions/gantt`)와 쓰기 라우트(`POST /api/charter/submissions`, `POST /api/milestones`, `POST /api/milestones/batch`, `POST /api/submissions`, `POST /api/one-on-one/book`, `POST /api/hotline/messages`, `DELETE /api/devices`). 조회 실패 시에도 fail-closed(403) |
 | 승격 | 관리자가 `/admin/users`에서 `champion`/`partner`로 그룹 변경 + `/admin/seasons/[id]`에서 시즌 배정 — 현재는 두 액션을 별도로 수행해야 함 (후속 개선 과제) |
 
 - `charter_submissions.is_public`(boolean, 기본 `false`)이 true인 항목만 `/gallery`에 노출되며, 관리자가 챔피언 상세 화면(`/admin/champions/[userId]`)에서 토글한다 (`PATCH /api/admin/charters/[charterId]/visibility`)
 - 신규 API: `GET /api/viewer/charters`(시즌별 공개 Charter 목록), `GET /api/viewer/seasons`(시즌 목록) — 둘 다 로그인한 사용자라면 역할과 무관하게 호출 가능
 - `admin`은 이 티어와 무관 — `app_metadata.is_admin` 기반 전역 권한은 그대로 유지 (§2.4)
+- 뷰어의 쓰기 차단은 시즌 enrollment가 아니라 `requireNonViewer`(=`users.user_group`이 `viewer`면 403)가 담당한다. 위 표에 나열된 라우트에만 적용되며, 그 외 `requireUser`만 쓰는 라우트는 아직 그룹 구분이 없다 (후속 과제)
 
 ### 2.5 시즌(기수) 모델 (v2.4 추가)
 
@@ -186,7 +188,7 @@ AX 프로그램이 매 기수(시즌)마다 새로운 챔피언 코호트를 받
 - `seasons`: 시즌 메타데이터(`name`, `status`: `recruiting`\|`active`\|`closed`\|`archived`, `is_current`). 동시에 하나의 시즌만 `is_current = true`일 수 있음 (부분 유니크 인덱스).
 - `season_enrollments`: 사람×시즌×역할, `(season_id, user_id)` 유니크. `continued_from_enrollment_id`로 이전 시즌 enrollment와 연결해 연속 참여를 추적.
 - `charter_submissions.previous_charter_id`: 시즌을 이어가는 챔피언이 새 시즌에 새 차터를 작성할 때, 직전 시즌 차터를 참조용으로 연결. (`project_charters`는 실제 운영 DB에 존재하지 않는 죽은 테이블로 2026-09-22 확인되어 시즌 모델 범위에서 제외됨 — 별도 정리 필요)
-- 애플리케이션 코드는 `lib/data/season.ts` 헬퍼로 "현재 시즌의 champion/partner user id 목록"을 조회하며, 쓰기 API는 `requireCurrentEnrollment` 가드로 현재 시즌 미등록 사용자의 쓰기를 차단한다.
+- 애플리케이션 코드는 `lib/data/season.ts` 헬퍼로 "현재 시즌의 champion/partner user id 목록"을 조회한다. `requireCurrentEnrollment` 가드(`lib/api/guard.ts`)는 정의돼 있으나 아직 어떤 라우트에도 연결되지 않았다 — 쓰기 API를 enrollment 기준으로 묶는 것은 후속 과제이며, 현재 뷰어의 쓰기 차단은 `requireNonViewer`가 담당한다 (§2.4.2).
 - **admin은 이 모델 밖**: 시즌과 무관한 전역 권한이므로 `app_metadata.is_admin` 판별을 그대로 유지한다 (§2.4).
 - **마이그레이션**: 1기(그동안의 데이터)는 `status='closed', is_current=true`로 백필하여 기존 화면 동작을 그대로 보존한다. 상세는 `docs/ERD.md` "Season Tables" 참고.
 - **시즌 관리 Admin UI (v2.5 추가)**: 관리자는 `/admin/seasons`에서 시즌 생성·참여자 배정(이어하기/신규/종료)·전환 확정을 수행한다. 전환 확정은 `activate_season` RPC(상세는 `docs/ERD.md` "Season Tables" 참고)로 원자적으로 처리된다.

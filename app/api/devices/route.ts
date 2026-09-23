@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUser } from '@/lib/api/guard'
+import { requireUser, requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { isPatBearer } from '@/lib/auth'
 
@@ -28,7 +28,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
 
   const id = req.nextUrl.searchParams.get('id')

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUser } from '@/lib/api/guard'
+import { requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { ChampionProject } from '@/lib/types'
 
@@ -7,7 +7,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { userId: string } }
 ) {
-  const user = await requireUser(req)
+  const user = await requireNonViewer(req)
   if (user instanceof NextResponse) return user
 
   const { userId } = params
