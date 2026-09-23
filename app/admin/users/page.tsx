@@ -41,7 +41,7 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  async function handleGroupChange(userId: string, newGroup: 'champion' | 'partner') {
+  async function handleGroupChange(userId: string, newGroup: 'champion' | 'partner' | 'viewer') {
     setChanging(userId)
     try {
       await apiFetch(`/api/admin/users/${userId}`, {
@@ -121,7 +121,7 @@ export default function AdminUsersPage() {
                         <select
                           value={u.userGroup}
                           disabled={isChanging}
-                          onChange={e => handleGroupChange(u.id, e.target.value as 'champion' | 'partner')}
+                          onChange={e => handleGroupChange(u.id, e.target.value as 'champion' | 'partner' | 'viewer')}
                           style={{
                             fontSize: 12, padding: '3px 6px', borderRadius: 4,
                             border: '1px solid var(--border)', background: 'var(--surface-primary)',
@@ -131,6 +131,7 @@ export default function AdminUsersPage() {
                         >
                           <option value="champion">champion</option>
                           <option value="partner">partner</option>
+                          <option value="viewer">viewer</option>
                         </select>
                       )}
                     </td>

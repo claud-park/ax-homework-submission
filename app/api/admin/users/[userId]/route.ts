@@ -14,7 +14,7 @@ export async function PATCH(
   const body = await req.json() as { userGroup: string }
   const { userGroup } = body
 
-  if (!['champion', 'partner'].includes(userGroup)) {
+  if (!['champion', 'partner', 'viewer'].includes(userGroup)) {
     return NextResponse.json(
       { error: 'admin 그룹은 이 API로 변경할 수 없습니다' },
       { status: 400 },
