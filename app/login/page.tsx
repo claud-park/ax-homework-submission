@@ -6,12 +6,16 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 function LoginPageInner() {
   const supabase = createSupabaseBrowserClient()
   const searchParams = useSearchParams()
+  const loginError = searchParams.get('error')
 
   async function handleGoogleLogin() {
     const next = searchParams.get('next') ?? '/'
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+      options: {
+        redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        queryParams: { hd: 'dreamus.io' },
+      },
     })
   }
 
@@ -43,6 +47,14 @@ function LoginPageInner() {
           챔피언 로그인
         </p>
 
+        {loginError === 'domain_not_allowed' && (
+          <p
+            className="text-center mb-4 text-flo-caption1"
+            style={{ color: 'var(--error)' }}
+          >
+            사내(@dreamus.io) 계정으로만 로그인할 수 있습니다.
+          </p>
+        )}
         <button
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-2.5 rounded-xl text-flo-body2 font-semibold text-white transition-opacity hover:opacity-90"

@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
   if (error || !data.user) return NextResponse.redirect(`${origin}/login?error=auth_failed`)
 
+  const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN
+  if (!allowedDomain || !data.user.email?.toLowerCase().endsWith(`@${allowedDomain.toLowerCase()}`)) {
+    await supabase.auth.signOut()
+    return NextResponse.redirect(`${origin}/login?error=domain_not_allowed`)
+  }
+
   // Upsert user record via service key (bypasses RLS)
   const serviceClient = createServiceClient()
   const user = data.user
