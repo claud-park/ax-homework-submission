@@ -79,7 +79,7 @@ describe('getCurrentSeasonUserIds', () => {
 
   it('keeps completed enrollments but excludes dropped ones', async () => {
     const supabase = createSupabaseMock({
-      seasons: { data: { id: 'season-2' }, error: null },
+      seasons: { data: { id: 'season-2', status: 'active' }, error: null },
       season_enrollments: {
         data: [
           { user_id: 'u1', status: 'completed' },
@@ -89,6 +89,17 @@ describe('getCurrentSeasonUserIds', () => {
       },
     })
     expect(await getCurrentSeasonUserIds(supabase, 'champion')).toEqual(['u1'])
+  })
+
+  it('returns an empty array when the current season itself is closed', async () => {
+    const supabase = createSupabaseMock({
+      seasons: { data: { id: 'season-1', status: 'closed' }, error: null },
+      season_enrollments: {
+        data: [{ user_id: 'u1', status: 'completed' }],
+        error: null,
+      },
+    })
+    expect(await getCurrentSeasonUserIds(supabase, 'champion')).toEqual([])
   })
 })
 
