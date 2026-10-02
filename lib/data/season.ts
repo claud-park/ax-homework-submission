@@ -17,6 +17,17 @@ export async function getCurrentSeasonUserIds(
 ): Promise<string[]> {
   const seasonId = await getCurrentSeasonId(supabase)
   if (!seasonId) return []
+
+  const { data: season, error: statusErr } = await supabase
+    .from('seasons')
+    .select('status')
+    .eq('id', seasonId)
+    .maybeSingle()
+  if (statusErr) console.error('[season] getCurrentSeasonUserIds failed:', statusErr.message)
+  // 시즌 자체가 closed면(예: 다음 시즌이 아직 활성화되지 않은 공백 구간) 진행상황 추적 화면에는
+  // 아무도 표시하지 않는다 — is_current 플래그만으로는 "진짜로 진행 중"을 보장하지 못한다.
+  if ((season as { status?: string } | null)?.status === 'closed') return []
+
   const { data, error } = await supabase
     .from('season_enrollments')
     .select('user_id')
