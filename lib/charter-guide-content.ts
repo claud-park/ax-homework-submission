@@ -1,5 +1,5 @@
 export const CHARTER_GUIDE_MD = `# 과제정의서 읽는 법
-> 비개발자를 위한 1페이지 안내서 · Dreamus Champions' League
+> 비개발자를 위한 1페이지 안내서 · Dreamus Champions League
 
 ---
 
@@ -100,4 +100,4 @@ export const CHARTER_GUIDE_MD = `# 과제정의서 읽는 법
 
 ---
 
-*Dreamus Champions' League · 2026.06*`
+*Dreamus Champions League · 2026.06*`

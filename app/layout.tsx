@@ -12,8 +12,8 @@ const pretendard = localFont({
 })
 
 export const metadata: Metadata = {
-  title: "AX Champions' League",
-  description: "AX Champions' League — Dreamus AX 과제 관리 플랫폼",
+  title: "AX Champions League",
+  description: "AX Champions League — Dreamus AX 과제 관리 플랫폼",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

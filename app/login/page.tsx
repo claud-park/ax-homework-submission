@@ -41,7 +41,7 @@ function LoginPageInner() {
         </div>
 
         <h1 className="text-flo-h400 font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-          AX Champions&apos; League
+          AX Champions League
         </h1>
         <p className="text-flo-body2 mb-8" style={{ color: 'var(--text-secondary)' }}>
           챔피언 로그인

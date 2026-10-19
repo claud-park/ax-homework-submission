@@ -81,7 +81,7 @@ export function ChampionSidebar() {
             style={{ color: 'var(--text-primary)' }}
             onClick={() => setDrawerOpen(false)}
           >
-            AX Champions&apos; League
+            AX Champions League
           </Link>
           <button
             className="md:hidden p-1 rounded"
@@ -157,7 +157,7 @@ export function ChampionSidebar() {
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
         <span className="text-flo-body2 font-semibold" style={{ color: 'var(--text-primary)' }}>
-          AX Champions&apos; League
+          AX Champions League
         </span>
       </div>
 
