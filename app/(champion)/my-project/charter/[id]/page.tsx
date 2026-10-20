@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createUserServerClient, createServiceClient } from '@/lib/supabase/server'
 import type { CharterSubmission } from '@/lib/types'
 import { CharterClient } from '../CharterClient'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export default async function CharterDetailPage({ params }: { params: { id: string } }) {
   const supabase = createUserServerClient()
@@ -18,6 +19,8 @@ export default async function CharterDetailPage({ params }: { params: { id: stri
     .single()
 
   if (!submission) redirect('/my-project/charter')
+  // 지난 시즌 차터는 읽기전용 아카이브 — 편집기가 아니라 열람용 팝업으로 보낸다.
+  if (submission.season_id !== await getCurrentSeasonIdOrNil(serviceClient)) redirect(`/charter-popup/${params.id}`)
 
   return <CharterClient
     initialSubmission={submission as CharterSubmission}

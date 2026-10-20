@@ -157,7 +157,7 @@ export function CharterListClient({ initialCharters, previousCharters = [] }: { 
             {previousCharters.map(charter => (
               <div
                 key={charter.id}
-                onClick={() => router.push(`/my-project/charter/${charter.id}`)}
+                onClick={() => window.open(`/charter-popup/${charter.id}`, '_blank', 'noopener')}
                 onMouseEnter={() => setHovered(charter.id)}
                 onMouseLeave={() => setHovered(null)}
                 style={{

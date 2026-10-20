@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { filterMilestonesByCharter, resolveFirstCharterId } from '@/lib/milestone-filter'
 import type { Milestone, MilestoneStatus } from '@/lib/types'
 import { requireCurrentSeasonIdForWrite, getCurrentSeasonIdOrNil } from '@/lib/data/season'
+import { isOwnCurrentSeasonCharter } from '@/lib/data/charter-lineage'
 
 function computeStatus(milestone: {
   due_date: string | null
@@ -104,6 +105,10 @@ export async function POST(req: NextRequest) {
     seasonId = await requireCurrentSeasonIdForWrite(supabase)
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
+
+  if (charter_submission_id && !(await isOwnCurrentSeasonCharter(supabase, charter_submission_id, user.id, seasonId))) {
+    return NextResponse.json({ error: '현재 시즌의 본인 과제정의서에만 마일스톤을 추가할 수 있습니다' }, { status: 403 })
   }
   const { data, error } = await supabase
     .from('milestones')

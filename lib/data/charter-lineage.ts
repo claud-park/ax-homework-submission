@@ -24,3 +24,27 @@ export async function findPreviousCharterId(
   }
   return (data as { id: string } | null)?.id ?? null
 }
+
+/**
+ * 마일스톤을 붙일 차터가 "본인 소유 + 현재 시즌"인지 검사한다.
+ * 지난 시즌 차터 id로 현재 시즌 마일스톤을 만들어 집계를 오염시키는 경로를 막는다.
+ */
+export async function isOwnCurrentSeasonCharter(
+  supabase: SupabaseClient,
+  charterId: string,
+  userId: string,
+  currentSeasonId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('charter_submissions')
+    .select('id')
+    .eq('id', charterId)
+    .eq('user_id', userId)
+    .eq('season_id', currentSeasonId)
+    .maybeSingle()
+  if (error) {
+    console.error('[charter-lineage] isOwnCurrentSeasonCharter failed:', error.message)
+    return false
+  }
+  return !!data
+}

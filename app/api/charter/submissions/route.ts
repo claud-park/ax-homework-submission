@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
-import { requireUser, requireNonViewer } from '@/lib/api/guard'
+import { requireUser, requireCurrentEnrollment } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireCurrentSeasonIdForWrite, getCurrentSeasonIdOrNil } from '@/lib/data/season'
 import { findPreviousCharterId } from '@/lib/data/charter-lineage'
@@ -55,7 +55,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireNonViewer(req)
+  // 현재 시즌 champion enrollment가 있어야 새 차터를 만들 수 있다(이어하지 않은 지난 시즌 챔피언 차단)
+  const user = await requireCurrentEnrollment(req, 'champion')
   if (user instanceof NextResponse) return user
   const { title, project_name, content, publish_status } = await req.json()
   const status = publish_status === 'published' ? 'published' : 'draft'

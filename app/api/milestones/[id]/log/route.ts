@@ -4,7 +4,7 @@ import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { notifyMilestoneCompleted } from '@/lib/notifications'
 import type { MilestoneStatus, User } from '@/lib/types'
-import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
+import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
 
 function computeStatus(milestone: {
   due_date: string | null
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .from('charter_submissions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .eq('season_id', await getCurrentSeasonIdOrNil(supabase)) // 지난 시즌 승인으로는 통과 불가
+      .eq('season_id', await requireCurrentSeasonIdForWrite(supabase)) // 지난 시즌 승인으로는 통과 불가
       .not('admin_approved_at', 'is', null)
     if (!count || count === 0) {
       return NextResponse.json({ error: 'charter_not_approved' }, { status: 403 })
