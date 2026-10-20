@@ -9,7 +9,8 @@ const schedulerSupabase = createClient(
 )
 
 export type AdminId = 'claud' | 'alex' | 'jennifer'
-export const ADMIN_IDS: AdminId[] = ['claud', 'alex', 'jennifer']
+// alex는 1-on-1 스케줄링 대상에서 제외 (타입은 기존 예약 데이터 호환을 위해 유지)
+export const ADMIN_IDS: AdminId[] = ['claud', 'jennifer']
 
 // 캘린더 초대용: 주어진 어드민들의 Google 이메일 조회 (연결 안 된 어드민은 제외)
 export async function getAdminEmails(adminIds: AdminId[]): Promise<string[]> {
