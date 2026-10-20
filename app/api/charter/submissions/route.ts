@@ -3,6 +3,7 @@ import { isAdminUser } from '@/lib/auth'
 import { requireUser, requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireCurrentSeasonIdForWrite, getCurrentSeasonIdOrNil } from '@/lib/data/season'
+import { findPreviousCharterId } from '@/lib/data/charter-lineage'
 
 function stripHtml(s: string | undefined | null) {
   return (s ?? '').replace(/<[^>]*>/g, '').trim()
@@ -71,11 +72,14 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 })
   }
+  // 복귀 챔피언: 직전 시즌의 최신 published 차터를 참조로 연결(없으면 null)
+  const previousCharterId = await findPreviousCharterId(supabase, user.id, seasonId)
   const { data, error } = await supabase
     .from('charter_submissions')
     .insert({
       user_id: user.id,
       season_id: seasonId,
+      previous_charter_id: previousCharterId,
       title: title ?? null,
       project_name: project_name ?? null,
       content: content ?? {},
