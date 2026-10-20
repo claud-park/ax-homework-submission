@@ -8,6 +8,7 @@ import {
   getUnassignedUsers,
   assignEnrollments,
   activateSeason,
+  promoteEnrolledViewers,
 } from '@/lib/data/seasons-admin'
 
 function createQueryBuilder(result: { data: unknown; error: unknown }) {
@@ -15,6 +16,7 @@ function createQueryBuilder(result: { data: unknown; error: unknown }) {
     select: vi.fn(() => builder),
     insert: vi.fn(() => builder),
     upsert: vi.fn(() => builder),
+    update: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     in: vi.fn(() => builder),
     order: vi.fn(() => builder),
@@ -178,9 +180,26 @@ describe('assignEnrollments', () => {
 
 describe('activateSeason', () => {
   it('calls the activate_season RPC with the new season id', async () => {
-    const supabase = createSupabaseMock({})
+    const supabase = createSupabaseMock({ season_enrollments: { data: [], error: null } })
     await activateSeason(supabase, 's2')
     expect(supabase.rpc).toHaveBeenCalledWith('activate_season', { p_new_season_id: 's2' })
+  })
+
+  it('promotes enrolled viewers after the RPC succeeds', async () => {
+    const supabase = createSupabaseMock({
+      season_enrollments: { data: [{ user_id: 'u1', role_in_season: 'champion' }], error: null },
+      users: { data: [{ id: 'u1' }], error: null },
+    })
+    await activateSeason(supabase, 's2')
+    const usersCalls = (supabase.from as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[0] === 'users')
+    expect(usersCalls).toHaveLength(2) // viewer 조회 + champion 승격
+  })
+
+  it('does not throw when promotion fails after a successful RPC', async () => {
+    const supabase = createSupabaseMock({
+      season_enrollments: { data: null, error: { message: 'select failed' } },
+    })
+    await expect(activateSeason(supabase, 's2')).resolves.toBeUndefined()
   })
 
   it('throws when the RPC fails', async () => {
@@ -189,5 +208,44 @@ describe('activateSeason', () => {
       rpc: vi.fn(() => Promise.resolve({ data: null, error: { message: 'rpc failed' } })),
     } as unknown as SupabaseClient
     await expect(activateSeason(supabase, 's2')).rejects.toThrow('rpc failed')
+  })
+})
+
+describe('promoteEnrolledViewers', () => {
+  it('returns 0 and skips users lookup when the season has no active enrollments', async () => {
+    const supabase = createSupabaseMock({ season_enrollments: { data: [], error: null } })
+    expect(await promoteEnrolledViewers(supabase, 's2')).toBe(0)
+    expect(supabase.from).not.toHaveBeenCalledWith('users')
+  })
+
+  it('promotes only viewers, grouped by role', async () => {
+    const builders: Record<string, unknown>[] = []
+    const responses: Record<string, { data: unknown; error: unknown }> = {
+      season_enrollments: {
+        data: [
+          { user_id: 'u1', role_in_season: 'champion' },
+          { user_id: 'u2', role_in_season: 'partner' },
+          { user_id: 'u3', role_in_season: 'champion' }, // 이미 champion → viewer 조회에 안 나옴
+        ],
+        error: null,
+      },
+      users: { data: [{ id: 'u1' }, { id: 'u2' }], error: null },
+    }
+    const supabase = {
+      from: vi.fn((table: string) => { const b = createQueryBuilder(responses[table]); builders.push(b); return b }),
+      rpc: vi.fn(),
+    } as unknown as SupabaseClient
+    expect(await promoteEnrolledViewers(supabase, 's2')).toBe(2)
+    const updates = builders.filter((b) => (b.update as ReturnType<typeof vi.fn>).mock.calls.length > 0)
+    expect(updates).toHaveLength(2)
+    expect(updates[0].update).toHaveBeenCalledWith({ user_group: 'champion' })
+    expect(updates[0].in).toHaveBeenCalledWith('id', ['u1'])
+    expect(updates[1].update).toHaveBeenCalledWith({ user_group: 'partner' })
+    expect(updates[1].in).toHaveBeenCalledWith('id', ['u2'])
+  })
+
+  it('throws when the enrollments query fails', async () => {
+    const supabase = createSupabaseMock({ season_enrollments: { data: null, error: { message: 'boom' } } })
+    await expect(promoteEnrolledViewers(supabase, 's2')).rejects.toThrow('boom')
   })
 })

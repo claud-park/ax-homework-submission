@@ -35,6 +35,7 @@ import {
   applyPendingInvitesForUser,
   createSeasonInvites,
   deleteSeasonInvite,
+  resolvePromotedGroup,
 } from '@/lib/data/season-invites'
 
 type Result = { data: unknown; error: unknown }
@@ -90,6 +91,7 @@ describe('applyPendingInvitesForUser', () => {
     const { client, builders } = createSupabaseMock({
       season_invites: [ok(invites), ok(null)],
       season_enrollments: [ok(null)],
+      seasons: [ok({ id: 'sA' })],
       users: [ok({ user_group: 'viewer' }), ok(null)],
     })
     expect(await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')).toEqual({ applied: 2 })
@@ -99,7 +101,7 @@ describe('applyPendingInvitesForUser', () => {
         { season_id: 'sA', user_id: 'u1', role_in_season: 'champion', status: 'active' },
         { season_id: 'sB', user_id: 'u1', role_in_season: 'partner', status: 'active' },
       ],
-      { onConflict: 'season_id,user_id' },
+      { onConflict: 'season_id,user_id', ignoreDuplicates: true },
     )
     expect(builders.users[1].update).toHaveBeenCalledWith({ user_group: 'champion' })
     const consume = builders.season_invites[1]
@@ -113,10 +115,24 @@ describe('applyPendingInvitesForUser', () => {
     const { client, builders } = createSupabaseMock({
       season_invites: [ok(invites), ok(null)],
       season_enrollments: [ok(null)],
+      seasons: [ok({ id: 'sB' })],
       users: [ok({ user_group: 'champion' })],
     })
     await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')
     expect(builders.users).toHaveLength(1) // select만, update 없음
+  })
+
+  it('enrolls but does not touch user_group when the invited season is not current', async () => {
+    const invites = [{ id: 'i1', season_id: 'sNext', email: 'a@dreamus.io', role_in_season: 'champion' }]
+    const { client, builders } = createSupabaseMock({
+      season_invites: [ok(invites), ok(null)],
+      season_enrollments: [ok(null)],
+      seasons: [ok({ id: 'sCurrent' })],
+    })
+    expect(await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')).toEqual({ applied: 1 })
+    expect(builders.season_enrollments[0].upsert).toHaveBeenCalled()
+    expect(builders.users).toBeUndefined()
+    expect(builders.season_invites[1].update.mock.calls[0][0]).toMatchObject({ consumed_user_id: 'u1' })
   })
 
   it('promotes viewer to partner for a partner invite', async () => {
@@ -124,6 +140,7 @@ describe('applyPendingInvitesForUser', () => {
     const { client, builders } = createSupabaseMock({
       season_invites: [ok(invites), ok(null)],
       season_enrollments: [ok(null)],
+      seasons: [ok({ id: 'sB' })],
       users: [ok({ user_group: 'viewer' }), ok(null)],
     })
     await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')
@@ -134,6 +151,7 @@ describe('applyPendingInvitesForUser', () => {
     const { client, builders } = createSupabaseMock({ season_invites: [ok([])] })
     expect(await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')).toEqual({ applied: 0 })
     expect(builders.season_enrollments).toBeUndefined()
+    expect(builders.seasons).toBeUndefined()
     expect(builders.users).toBeUndefined()
     expect(builders.season_invites).toHaveLength(1)
   })
@@ -156,6 +174,7 @@ describe('createSeasonInvites', () => {
         ok([{ id: 'i-y', season_id: 's2', email: 'y@dreamus.io', role_in_season: 'champion' }]), // y의 pending 조회
         ok(null), // y 소비
       ],
+      seasons: [ok({ id: 's2' })],
       users: [
         ok([{ id: 'u-y', email: 'Y@dreamus.io' }]), // 가입자 조회 (대소문자 무시 매칭)
         ok({ user_group: 'viewer' }),
@@ -164,7 +183,14 @@ describe('createSeasonInvites', () => {
       season_enrollments: [ok(null)],
     })
     const result = await createSeasonInvites(client, 's2', emails, 'champion')
-    expect(result).toEqual({ created: 2, appliedNow: 1, skippedConsumed: ['x@dreamus.io'] })
+    expect(result).toEqual({ created: 2, appliedNow: 1, skippedConsumed: ['x@dreamus.io'], failed: [] })
+    // 즉시 적용 경로가 실제로 enrollment/승격/소비까지 수행했는지
+    expect(builders.season_enrollments[0].upsert).toHaveBeenCalledWith(
+      [{ season_id: 's2', user_id: 'u-y', role_in_season: 'champion', status: 'active' }],
+      { onConflict: 'season_id,user_id', ignoreDuplicates: true },
+    )
+    expect(builders.users[2].update).toHaveBeenCalledWith({ user_group: 'champion' })
+    expect(builders.season_invites[3].in).toHaveBeenCalledWith('id', ['i-y'])
     expect(builders.season_invites[1].upsert).toHaveBeenCalledWith(
       [
         { season_id: 's2', email: 'y@dreamus.io', role_in_season: 'champion' },
@@ -179,8 +205,48 @@ describe('createSeasonInvites', () => {
       season_invites: [ok([{ email: 'x@dreamus.io', consumed_at: '2026-10-01T00:00:00Z' }])],
     })
     expect(await createSeasonInvites(client, 's2', ['x@dreamus.io'], 'partner'))
-      .toEqual({ created: 0, appliedNow: 0, skippedConsumed: ['x@dreamus.io'] })
+      .toEqual({ created: 0, appliedNow: 0, skippedConsumed: ['x@dreamus.io'], failed: [] })
     expect(builders.season_invites).toHaveLength(1)
+  })
+
+  it('isolates a per-user apply failure and reports it in failed', async () => {
+    const { client } = createSupabaseMock({
+      season_invites: [
+        ok([]), // 기존 조회
+        ok(null), // upsert
+        { data: null, error: { message: 'boom' } }, // a의 pending 조회 실패
+        ok([{ id: 'i-b', season_id: 's2', email: 'b@dreamus.io', role_in_season: 'champion' }]), // b pending
+        ok(null), // b 소비
+      ],
+      seasons: [ok({ id: 's2' })],
+      users: [
+        ok([{ id: 'u-a', email: 'a@dreamus.io' }, { id: 'u-b', email: 'b@dreamus.io' }]),
+        ok({ user_group: 'viewer' }),
+        ok(null),
+      ],
+      season_enrollments: [ok(null)],
+    })
+    expect(await createSeasonInvites(client, 's2', ['a@dreamus.io', 'b@dreamus.io'], 'champion'))
+      .toEqual({ created: 2, appliedNow: 1, skippedConsumed: [], failed: ['a@dreamus.io'] })
+  })
+})
+
+describe('resolvePromotedGroup', () => {
+  it('promotes viewer to champion when any role is champion', () => {
+    expect(resolvePromotedGroup('viewer', ['partner', 'champion'])).toBe('champion')
+  })
+  it('promotes viewer to partner for partner-only roles', () => {
+    expect(resolvePromotedGroup('viewer', ['partner'])).toBe('partner')
+  })
+  it('never demotes champion to partner', () => {
+    expect(resolvePromotedGroup('champion', ['partner'])).toBeNull()
+  })
+  it('promotes partner to champion', () => {
+    expect(resolvePromotedGroup('partner', ['champion'])).toBe('champion')
+  })
+  it('returns null when already in the target group or current is unknown', () => {
+    expect(resolvePromotedGroup('champion', ['champion'])).toBeNull()
+    expect(resolvePromotedGroup(undefined, ['partner'])).toBeNull()
   })
 })
 

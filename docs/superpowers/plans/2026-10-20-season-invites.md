@@ -17,6 +17,9 @@
 - 이메일은 저장·비교 모두 소문자. `ALLOWED_EMAIL_DOMAIN`이 설정돼 있으면 그 도메인 외 이메일은 등록을 거부한다(로그인 자체가 막혀 영원히 소비되지 않으므로).
 - 로그인 콜백에서 초대 적용 실패는 로그인 실패로 번지면 안 된다(try/catch + console.error).
 - 초대 역할이 `champion`이면 `user_group`을 champion으로 올린다. `partner`면 현재 `viewer`일 때만 partner로 올린다(champion을 partner로 강등하지 않는다).
+- **(리뷰 반영)** `user_group` 승격은 초대된 시즌이 현재 시즌(`is_current`)일 때만 한다. 권한 판단(middleware, `requireNonViewer`)은 `user_group`만 보므로, 활성화 전 시즌 초대로 미리 올리면 닫힌 직전 시즌에 차터 등이 쓰인다. 활성화 전 시즌 초대는 enrollment만 만들고, `activateSeason`이 RPC 성공 직후 `promoteEnrolledViewers`로 일괄 승격한다.
+- **(리뷰 반영)** enrollment upsert는 `ignoreDuplicates: true`로 기존 행(역할·상태·`continued_from_enrollment_id`)을 덮어쓰지 않는다.
+- **(리뷰 반영)** `createSeasonInvites`의 즉시 적용은 사용자별 try/catch로 격리하고 `failed`로 돌려준다.
 - 신규 dynamic route 폴더(`[inviteId]`)가 생기므로 최종 검증에 `bun run build`를 포함한다(`feedback_dynamic_route_naming`).
 - 커밋 메시지 접두사 `[AX-1]`, Co-Authored-By 라인 필수.
 

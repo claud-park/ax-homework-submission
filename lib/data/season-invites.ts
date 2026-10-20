@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SeasonInvite, SeasonRole } from '@/lib/types'
+import { getCurrentSeasonId } from '@/lib/data/season'
 
 /**
  * 관리자가 붙여넣은 원문을 이메일 배열로 정규화한다.
@@ -53,9 +54,24 @@ export async function listSeasonInvites(supabase: SupabaseClient, seasonId: stri
 type PendingInvite = Pick<SeasonInvite, 'id' | 'season_id' | 'role_in_season'>
 
 /**
+ * 현재 user_group과 시즌 역할들로 승격 결과를 정한다. 변경이 필요 없으면 null.
+ * champion 역할이 있으면 champion. partner만 있으면 viewer일 때만 partner(champion→partner 강등 없음).
+ */
+export function resolvePromotedGroup(current: string | undefined, roles: SeasonRole[]): SeasonRole | null {
+  const next: SeasonRole | null = roles.includes('champion') ? 'champion' : current === 'viewer' && roles.includes('partner') ? 'partner' : null
+  return next && next !== current ? next : null
+}
+
+/**
  * 이메일에 걸린 미소비 초대를 모두 enrollment로 변환하고 user_group을 올린 뒤 초대를 소비 처리한다.
  * auth callback(첫 로그인)과 createSeasonInvites(이미 가입한 사용자)에서 호출된다.
- * 역할 규칙: champion 초대가 하나라도 있으면 champion. partner 초대만 있으면 현재 viewer일 때만 partner(강등 없음).
+ *
+ * - enrollment는 없을 때만 만든다(ignoreDuplicates). 이미 배정된 시즌의 역할/상태는 덮어쓰지 않는다.
+ * - user_group 승격은 초대된 시즌이 **현재 시즌(is_current)** 일 때만 한다. 아직 활성화 전인 시즌의
+ *   초대로 로그인하면 enrollment만 생기고 viewer로 남는다 — 권한 판단(middleware, requireNonViewer)은
+ *   user_group만 보므로, 미리 올리면 닫힌 직전 시즌에 차터를 쓰는 등 잘못된 시즌에 데이터가 쌓인다.
+ *   시즌 활성화 시점에 promoteEnrolledViewers(seasons-admin)가 일괄 승격한다.
+ * - 역할 규칙: champion 초대가 있으면 champion. partner 초대만 있으면 현재 viewer일 때만 partner(강등 없음).
  */
 export async function applyPendingInvitesForUser(
   supabase: SupabaseClient,
@@ -75,22 +91,25 @@ export async function applyPendingInvitesForUser(
     .from('season_enrollments')
     .upsert(
       pending.map((i) => ({ season_id: i.season_id, user_id: userId, role_in_season: i.role_in_season, status: 'active' })),
-      { onConflict: 'season_id,user_id' },
+      { onConflict: 'season_id,user_id', ignoreDuplicates: true },
     )
   if (enrollErr) throw new Error(enrollErr.message)
 
-  const { data: profile, error: profileErr } = await supabase
-    .from('users')
-    .select('user_group')
-    .eq('id', userId)
-    .maybeSingle()
-  if (profileErr) throw new Error(profileErr.message)
-  const current = (profile as { user_group?: string } | null)?.user_group
-  const wantsChampion = pending.some((i) => i.role_in_season === 'champion')
-  const next: SeasonRole | null = wantsChampion ? 'champion' : current === 'viewer' ? 'partner' : null
-  if (next && next !== current) {
-    const { error: updateErr } = await supabase.from('users').update({ user_group: next }).eq('id', userId)
-    if (updateErr) throw new Error(updateErr.message)
+  const currentSeasonId = await getCurrentSeasonId(supabase)
+  const currentSeasonInvites = pending.filter((i) => i.season_id === currentSeasonId)
+  if (currentSeasonInvites.length > 0) {
+    const { data: profile, error: profileErr } = await supabase
+      .from('users')
+      .select('user_group')
+      .eq('id', userId)
+      .maybeSingle()
+    if (profileErr) throw new Error(profileErr.message)
+    const current = (profile as { user_group?: string } | null)?.user_group
+    const next = resolvePromotedGroup(current, currentSeasonInvites.map((i) => i.role_in_season))
+    if (next) {
+      const { error: updateErr } = await supabase.from('users').update({ user_group: next }).eq('id', userId)
+      if (updateErr) throw new Error(updateErr.message)
+    }
   }
 
   const { error: consumeErr } = await supabase
@@ -102,16 +121,25 @@ export async function applyPendingInvitesForUser(
   return { applied: pending.length }
 }
 
+export interface CreateSeasonInvitesResult {
+  created: number
+  appliedNow: number
+  skippedConsumed: string[]
+  /** 초대는 저장됐지만 즉시 적용에 실패한 가입자 이메일. 다음 로그인 때 다시 시도된다. */
+  failed: string[]
+}
+
 /**
  * 시즌에 이메일들을 초대한다. 이미 소비된(적용된) 초대는 건드리지 않고 skippedConsumed로 돌려준다.
- * 이미 가입한 이메일은 로그인을 기다리지 않고 즉시 적용한다(appliedNow).
+ * 이미 가입한 이메일은 로그인을 기다리지 않고 즉시 적용한다(appliedNow). 한 명의 적용 실패가
+ * 나머지를 막지 않도록 사용자별로 격리하고 failed로 돌려준다(초대 자체는 남아 있어 멱등 재시도 가능).
  */
 export async function createSeasonInvites(
   supabase: SupabaseClient,
   seasonId: string,
   emails: string[],
   role: SeasonRole,
-): Promise<{ created: number; appliedNow: number; skippedConsumed: string[] }> {
+): Promise<CreateSeasonInvitesResult> {
   const { data: existing, error: existingErr } = await supabase
     .from('season_invites')
     .select('email, consumed_at')
@@ -125,7 +153,7 @@ export async function createSeasonInvites(
   )
   const skippedConsumed = emails.filter((e) => consumed.has(e))
   const toInvite = emails.filter((e) => !consumed.has(e))
-  if (toInvite.length === 0) return { created: 0, appliedNow: 0, skippedConsumed }
+  if (toInvite.length === 0) return { created: 0, appliedNow: 0, skippedConsumed, failed: [] }
 
   const { error: upsertErr } = await supabase
     .from('season_invites')
@@ -140,14 +168,20 @@ export async function createSeasonInvites(
   if (usersErr) throw new Error(usersErr.message)
   const inviteSet = new Set(toInvite)
   let appliedNow = 0
+  const failed: string[] = []
   for (const u of (users ?? []) as { id: string; email: string | null }[]) {
     const email = u.email?.toLowerCase()
     if (!email || !inviteSet.has(email)) continue
-    const { applied } = await applyPendingInvitesForUser(supabase, u.id, email)
-    if (applied > 0) appliedNow += 1
+    try {
+      const { applied } = await applyPendingInvitesForUser(supabase, u.id, email)
+      if (applied > 0) appliedNow += 1
+    } catch (e) {
+      console.error('[season-invites] immediate apply failed for', email, (e as Error).message)
+      failed.push(email)
+    }
   }
 
-  return { created: toInvite.length, appliedNow, skippedConsumed }
+  return { created: toInvite.length, appliedNow, skippedConsumed, failed }
 }
 
 /** 미소비 초대만 삭제한다. 이미 적용된 초대는 이력 보존을 위해 남긴다. */

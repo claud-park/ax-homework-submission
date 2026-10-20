@@ -36,6 +36,7 @@ interface CreateInvitesResponse {
   created: number
   appliedNow: number
   skippedConsumed: string[]
+  failed: string[]
 }
 
 const ROLE_LABEL: Record<SeasonRole, string> = { champion: 'Champion', partner: 'Partner' }
@@ -134,6 +135,9 @@ export function SeasonDetailClient({ seasonId }: { seasonId: string }) {
       toast.success(`${res.created}명 등록 (이미 가입해 즉시 적용 ${res.appliedNow}명)`)
       if (res.skippedConsumed.length > 0) {
         toast.info(`이미 적용된 초대라 건너뜀: ${res.skippedConsumed.join(', ')}`)
+      }
+      if (res.failed.length > 0) {
+        toast.error(`즉시 적용 실패 (다음 로그인 때 재시도됨): ${res.failed.join(', ')}`)
       }
       setInviteText('')
       load()
@@ -290,7 +294,7 @@ export function SeasonDetailClient({ seasonId }: { seasonId: string }) {
 
       <h2 className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>이메일로 사전 등록 (로그인 전 참여자)</h2>
       <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
-        아직 로그인하지 않은 사람은 위 목록에 나오지 않습니다. 이메일을 등록해 두면 첫 로그인 때 역할과 시즌 배정이 자동으로 적용됩니다. 이미 가입한 이메일은 즉시 적용됩니다.
+        아직 로그인하지 않은 사람은 위 목록에 나오지 않습니다. 이메일을 등록해 두면 첫 로그인 때 시즌 배정이 자동으로 붙고, 이 시즌이 현재 시즌이면 역할(champion/partner)도 바로 적용됩니다. 현재 시즌이 아니면 &quot;현재 시즌으로 전환&quot; 시점에 일괄 적용됩니다. 이미 가입한 이메일은 즉시 처리됩니다.
       </p>
       <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
         <textarea
@@ -337,7 +341,7 @@ export function SeasonDetailClient({ seasonId }: { seasonId: string }) {
                 <td style={tdStyle}>{invite.email}</td>
                 <td style={{ ...tdStyle, color: 'var(--text-secondary)' }}>{ROLE_LABEL[invite.role_in_season]}</td>
                 <td style={{ ...tdStyle, color: invite.consumed_at ? 'var(--success)' : 'var(--text-secondary)' }}>
-                  {invite.consumed_at ? `적용됨 ${invite.consumed_at.slice(0, 10)}` : '대기 (로그인 전)'}
+                  {invite.consumed_at ? `적용됨 ${new Date(invite.consumed_at).toLocaleDateString('ko-KR')}` : '대기 (로그인 전)'}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
                   {!invite.consumed_at && (
