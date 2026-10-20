@@ -235,6 +235,17 @@ export interface SeasonEnrollment {
   created_at: string
 }
 
+/** 로그인 전 사용자를 시즌에 미리 등록해 두는 초대. 첫 로그인 시 enrollment로 변환되고 consumed_at이 찍힌다. */
+export interface SeasonInvite {
+  id: string
+  season_id: string
+  email: string
+  role_in_season: SeasonRole
+  consumed_at: string | null
+  consumed_user_id: string | null
+  created_at: string
+}
+
 // ─── User Group ──────────────────────────────────────────────────────────────
 
 export type UserGroup = 'champion' | 'partner' | 'viewer' | 'admin'

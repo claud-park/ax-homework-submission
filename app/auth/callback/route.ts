@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 import { sanitizeRedirectPath } from '@/lib/safe-redirect'
+import { applyPendingInvitesForUser } from '@/lib/data/season-invites'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -48,6 +49,16 @@ export async function GET(request: NextRequest) {
     name: user.user_metadata?.full_name ?? user.email ?? '',
     avatar_url: user.user_metadata?.avatar_url ?? null,
   }, { onConflict: 'id' })
+
+  // 시즌 사전 등록(season_invites)이 있으면 enrollment/user_group으로 변환한다.
+  // 실패해도 로그인은 막지 않는다 — 관리자가 시즌 화면에서 수동 배정할 수 있다.
+  if (user.email) {
+    try {
+      await applyPendingInvitesForUser(serviceClient, user.id, user.email.toLowerCase())
+    } catch (e) {
+      console.error('[auth/callback] applyPendingInvitesForUser failed:', (e as Error).message)
+    }
+  }
 
   return response
 }
