@@ -252,7 +252,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
       )}
 
       {/* 모바일: 요약 + 그룹별 카드 */}
-      <div className="md:hidden flex flex-col gap-4">
+      <div data-testid="milestones-mobile" className="md:hidden flex flex-col gap-4">
         {published.length === 0 ? emptyAll : (
           <>
             <MilestoneSummary summary={summary} todayStr={todayStr} filter={filter} onFilterChange={setFilter} compact />
@@ -261,22 +261,24 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
               return (
                 <div key={g.parent?.id ?? 'loose'} className="flex flex-col gap-2">
                   {g.parent && (
-                    <div className="flex items-center gap-2">
-                      <span className="truncate" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{g.parent.title}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>{g.done}/{g.items.length}</span>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{g.parent.title}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>{g.done}/{g.items.length}</span>
+                      </div>
+                      <StageStepper
+                        stage={deriveStage(g.parent)}
+                        size="md"
+                        busy={busy.has(g.parent.id)}
+                        disabled={!charterApproved}
+                        disabledReason="과제정의서 승인 후 진행할 수 있습니다"
+                        onStart={() => handleStart(g.parent!.id)}
+                        onComplete={() => handleComplete(g.parent!.id)}
+                      />
                     </div>
                   )}
                   {g.visible.length === 0 ? emptyFilter : g.visible.map(m => (
-                    <MobileMilestoneCard
-                      key={m.id}
-                      milestone={m}
-                      todayStr={todayStr}
-                      charterApproved={charterApproved}
-                      onComplete={handleComplete}
-                      onIssueReport={id => setIssueMilestone(milestones.find(x => x.id === id) ?? null)}
-                      onDeadlineExtension={openDeadlineForCheckin}
-                      onNoteUpdate={handleNoteUpdate}
-                    />
+                    <MobileMilestoneCard key={m.id} m={m} busy={busy.has(m.id)} {...rowHandlers} />
                   ))}
                 </div>
               )

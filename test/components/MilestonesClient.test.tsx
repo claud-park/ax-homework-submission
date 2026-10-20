@@ -29,6 +29,11 @@ function renderClient(ms: Milestone[]) {
   return screen.getByTestId('milestones-desktop')
 }
 
+function renderMobile(ms: Milestone[]) {
+  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" />)
+  return screen.getByTestId('milestones-mobile')
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockApiFetch.mockImplementation(() => Promise.resolve({}))
@@ -145,5 +150,16 @@ describe('MilestonesClient status view', () => {
     expect(header).toHaveAttribute('aria-expanded', 'false')
     expect(within(desktop).queryByText('하위 작업')).not.toBeInTheDocument()
     expect(within(desktop).getAllByRole('group', { name: '진행 단계' })).toHaveLength(2)
+  })
+
+  it('mobile parent group header renders the parent stepper and completes it', async () => {
+    const parent = { ...base, id: 'p', title: '상위 단계', status: 'in_progress', is_manual_progress: true } as Milestone
+    const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p', status: 'not_started', is_manual_progress: false } as Milestone
+    mockApiFetch.mockResolvedValue({ milestone: { ...parent, is_manual_completed: true }, parentUpdated: null })
+    const mobile = renderMobile([parent, child])
+
+    // parent in_progress -> its stepper offers 완료로 (the child is not_started, so only the parent has it)
+    fireEvent.click(within(mobile).getByRole('button', { name: '완료로' }))
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith('/api/milestones/p', expect.objectContaining({ method: 'PATCH' })))
   })
 })
