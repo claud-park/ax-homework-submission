@@ -2,6 +2,7 @@ import { createUserServerClient, createServiceClient } from '@/lib/supabase/serv
 import { redirect } from 'next/navigation'
 import type { Milestone, CharterSubmission } from '@/lib/types'
 import { filterMilestonesByCharter } from '@/lib/milestone-filter'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 import { MilestonesClient } from './MilestonesClient'
 
 export default async function WorkStatusPage({
@@ -14,17 +15,21 @@ export default async function WorkStatusPage({
   if (!user) redirect('/login')
 
   const serviceClient = createServiceClient()
+  // 현재 시즌 데이터만 노출 — 복귀 챔피언의 지난 시즌 차터/마일스톤은 여기서 보이지 않는다.
+  const seasonId = await getCurrentSeasonIdOrNil(serviceClient)
   const [{ data: milestonesData }, { data: chartersData }] = await Promise.all([
     serviceClient
       .from('milestones')
       .select('*')
       .eq('user_id', user.id)
+      .eq('season_id', seasonId)
       .order('display_order')
       .order('start_date', { ascending: true, nullsFirst: false }),
     serviceClient
       .from('charter_submissions')
       .select('id, title, project_name, admin_approved_at')
       .eq('user_id', user.id)
+      .eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false }),
   ])

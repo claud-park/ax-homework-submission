@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
 import { requireUser, requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
+import { requireCurrentSeasonIdForWrite, getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 function stripHtml(s: string | undefined | null) {
   return (s ?? '').replace(/<[^>]*>/g, '').trim()
@@ -26,11 +26,13 @@ export async function GET(req: NextRequest) {
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 
   const supabase = createServiceClient()
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   if (isAdmin && !targetUserId) {
     const { data, error } = await supabase
       .from('charter_submissions')
       .select('*, users(*)')
+      .eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -41,6 +43,7 @@ export async function GET(req: NextRequest) {
     .from('charter_submissions')
     .select('*')
     .eq('user_id', effectiveUserId)
+    .eq('season_id', seasonId)
     .order('submitted_at', { ascending: false })
 
   if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
