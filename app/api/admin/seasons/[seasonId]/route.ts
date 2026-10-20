@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentSeasonId } from '@/lib/data/season'
 import { getPreviousSeasonRoster, getSeasonEnrollments, getUnassignedUsers } from '@/lib/data/seasons-admin'
+import { listSeasonInvites } from '@/lib/data/season-invites'
 
 export async function GET(req: NextRequest, { params }: { params: { seasonId: string } }) {
   const admin = await requireAdmin(req)
@@ -18,11 +19,12 @@ export async function GET(req: NextRequest, { params }: { params: { seasonId: st
   if (!season) return NextResponse.json({ error: 'Season not found' }, { status: 404 })
 
   const currentSeasonId = await getCurrentSeasonId(supabase)
-  const [previousRoster, currentEnrollments] = await Promise.all([
+  const [previousRoster, currentEnrollments, invites] = await Promise.all([
     currentSeasonId && currentSeasonId !== params.seasonId
       ? getPreviousSeasonRoster(supabase, currentSeasonId)
       : Promise.resolve([]),
     getSeasonEnrollments(supabase, params.seasonId),
+    listSeasonInvites(supabase, params.seasonId),
   ])
   const unassignedUsers = await getUnassignedUsers(
     supabase,
@@ -30,5 +32,5 @@ export async function GET(req: NextRequest, { params }: { params: { seasonId: st
     previousRoster.map((entry) => entry.userId),
   )
 
-  return NextResponse.json({ season, previousRoster, currentEnrollments, unassignedUsers })
+  return NextResponse.json({ season, previousRoster, currentEnrollments, unassignedUsers, invites })
 }
