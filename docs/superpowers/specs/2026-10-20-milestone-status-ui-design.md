@@ -44,7 +44,7 @@
 - **D-배지** (마감일 기준, 오늘 = 로컬 날짜):
   - 완료: `완료` (회색)
   - 마감일 없음: 배지 없음, 행에 "기한 설정" 링크
-  - 일정 지연(§4): `D+n 지연` 빨강 채움. 마감 전인데 시작일이 지났고 미시작이면 `시작 지연` 빨강 채움
+  - 일정 지연(§4): `D+n 지연` 빨강 채움. 마감 전인데 시작일이 지났고 미시작이면 `시작 지연`, 그 밖의 마감 전 일정 지연(예: 이슈 검토중)은 `지연` 빨강 채움
   - 오늘 마감: `D-DAY` 주황, 7일 이내: `D-n` 주황, 그 외: `D-n` 회색
 - **액션 클러스터**: 지연이고 이슈 미보고면 "이슈 보고" 빨강 아웃라인 버튼, 이슈 보고 후 검토 전이면 "이슈 검토중" 배지. 그 오른쪽에 스테퍼.
 - **펼침 패널**: 2열. 왼쪽 진행 노트(진행중일 때만 편집 가능, 기존 규칙)·관리자 답변·링크(노트 편집, 기한 변경/연장/설정, 이슈 보고). 오른쪽 작업 로그(기존 `MilestoneActivityLogToggle`을 펼침 시 자동 전개).
@@ -60,7 +60,7 @@
 | 진행중 | `✓ 시작` 흐림 | `진행중` 파랑 채움 | `완료로` 초록 글자, 클릭 가능 |
 | 완료 | `✓ 시작` 흐림 | `✓ 진행중` 흐림 | `✓ 완료` 초록 채움 |
 
-- **단계 도출**(`deriveStage`): `status === 'completed'` → 완료, `status === 'in_progress'` → 진행중, `status === 'delayed'` → `is_manual_progress ? 진행중 : 미시작`, 그 외 미시작. 즉 지연은 단계가 아니다.
+- **단계 도출**(`deriveStage`): 서버 `computeStatus` 순서대로 플래그 우선 — `is_manual_completed` → 완료, `is_manual_progress` → 진행중, 그 외 `status === 'completed'` → 완료, `status === 'in_progress'` → 진행중, 나머지(`delayed` 포함) 미시작. 즉 지연은 단계가 아니다(서버는 `due_date`가 있을 때만 `status`를 다시 계산하므로 플래그를 먼저 본다).
 - **일정 지연**(`isScheduleDelayed`): 완료가 아니면서 `status === 'delayed'` 이거나 `due_date < 오늘` 이거나 (`start_date < 오늘` 이고 단계가 미시작). 사이드바 배지와 같은 규칙.
 - 과제정의서 미승인(`charterApproved === false`)이면 스테퍼 전체 비활성 + `title="과제정의서 승인 후 진행할 수 있습니다"`. 지금의 "과제 정의서 검토중" 회색 칩을 대체한다.
 - 클릭 가능한 칸만 `<button>`이 활성이고 나머지는 `disabled`. 그룹 `role="group" aria-label="진행 단계"`.
@@ -69,11 +69,12 @@
 
 | 클릭 | PATCH body | 토스트 |
 |---|---|---|
-| 시작 | `{ is_manual_progress: true, is_manual_completed: false, bottleneck_type: null, bottleneck_note: null }` (기존과 동일) | "진행중으로 표시했습니다." + 되돌리기 |
+| 시작 | `{ is_manual_progress: true, is_manual_completed: false, bottleneck_type: null, bottleneck_note: null }` (기존과 동일). 단, 이슈 검토중(`isIssuePending`)이면 `{ is_manual_progress: true, is_manual_completed: false }`만 보내 보고를 철회하지 않는다 | "진행중으로 표시했습니다." + 되돌리기 |
 | 완료로 | `{ is_manual_completed: true, bottleneck_type: null, bottleneck_note: null }` (기존과 동일) | "완료로 표시했습니다." + 되돌리기 |
 | 되돌리기(시작 후) | `{ is_manual_progress: false }` | "되돌렸습니다." |
 | 되돌리기(완료 후) | `{ is_manual_completed: false, is_manual_progress: <완료 전 단계가 진행중이었으면 true, 아니면 false> }` | "되돌렸습니다." |
 
+- 이슈 보고 PATCH는 `{ bottleneck_type, bottleneck_note, is_manual_completed: false }`이며 `is_manual_progress`를 건드리지 않는다(진행중 항목은 진행중 단계를 유지한 채 일정 지연으로 표시).
 - 확인 모달 없음. PATCH는 즉시 보내고, 토스트는 6초간 "되돌리기" 액션을 보인다(sonner `toast.success(msg, { action, duration: 6000 })`).
 - 알려진 한계(결정): 완료 PATCH는 즉시 관리자 Slack/메일 알림을 보낸다. 되돌려도 알림은 취소되지 않는다. 지연 커밋 방식은 페이지 이탈 시 유실 위험이 있어 채택하지 않는다.
 - 403 `charter_not_approved`는 "과제정의서 승인 후 진행할 수 있습니다." 토스트로 안내.

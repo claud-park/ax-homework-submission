@@ -4,26 +4,43 @@ import {
   deriveStage, isScheduleDelayed, dueBadge, matchesFilter, summarize, groupByParent,
 } from '@/lib/milestone-view'
 
-const base = { id: 'm', status: 'not_started', is_manual_progress: false, start_date: '2026-10-13', due_date: '2026-10-17',
+const base = { id: 'm', status: 'not_started', is_manual_progress: false, is_manual_completed: false, start_date: '2026-10-13', due_date: '2026-10-17',
   bottleneck_type: null, bottleneck_reviewed_at: null, parent_milestone_id: null, publish_status: 'published' } as Milestone
 const today = '2026-10-20'
 
 describe('deriveStage', () => {
-  it('delayed + manual progress → in_progress', () => expect(deriveStage({ status: 'delayed', is_manual_progress: true })).toBe('in_progress'))
-  it('delayed without manual progress → not_started', () => expect(deriveStage({ status: 'delayed', is_manual_progress: false })).toBe('not_started'))
+  it('delayed + manual progress → in_progress', () =>
+    expect(deriveStage({ status: 'delayed', is_manual_progress: true, is_manual_completed: false })).toBe('in_progress'))
+  it('delayed without flags → not_started', () =>
+    expect(deriveStage({ status: 'delayed', is_manual_progress: false, is_manual_completed: false })).toBe('not_started'))
+  // 서버는 due_date가 없으면 status를 다시 계산하지 않으므로 플래그가 우선한다.
+  it('manual progress wins over stale not_started status', () =>
+    expect(deriveStage({ status: 'not_started', is_manual_progress: true, is_manual_completed: false })).toBe('in_progress'))
+  it('manual completed wins over stale not_started status', () =>
+    expect(deriveStage({ status: 'not_started', is_manual_progress: false, is_manual_completed: true })).toBe('completed'))
+  it('status fallback when no flags', () => {
+    expect(deriveStage({ status: 'completed', is_manual_progress: false, is_manual_completed: false })).toBe('completed')
+    expect(deriveStage({ status: 'in_progress', is_manual_progress: false, is_manual_completed: false })).toBe('in_progress')
+  })
 })
 describe('isScheduleDelayed', () => {
   it('start passed and not started, due in future → true', () =>
     expect(isScheduleDelayed({ ...base, due_date: '2026-10-30' }, today)).toBe(true))
   it('completed never delayed', () => expect(isScheduleDelayed({ ...base, status: 'completed' }, today)).toBe(false))
+  it('no due date, start passed, manually started → not delayed', () =>
+    expect(isScheduleDelayed({ ...base, due_date: null, is_manual_progress: true }, today)).toBe(false))
 })
 describe('dueBadge', () => {
   it('overdue → D+n 지연 over', () => expect(dueBadge(base, today)).toEqual({ label: 'D+3 지연', tone: 'over' }))
   it('start passed, due ahead → 시작 지연', () => expect(dueBadge({ ...base, due_date: '2026-10-30' }, today)).toEqual({ label: '시작 지연', tone: 'over' }))
+  it('in_progress with pending issue, due ahead → 지연 (not 시작 지연)', () =>
+    expect(dueBadge({ ...base, status: 'delayed', is_manual_progress: true, bottleneck_type: 'technical', due_date: '2026-10-30' } as Milestone, today))
+      .toEqual({ label: '지연', tone: 'over' }))
   it('due today → D-DAY soon', () => expect(dueBadge({ ...base, start_date: today, due_date: today }, today)).toEqual({ label: 'D-DAY', tone: 'soon' }))
   it('due in 18 days → D-18 ok', () => expect(dueBadge({ ...base, start_date: '2026-10-27', due_date: '2026-11-07' }, today)).toEqual({ label: 'D-18', tone: 'ok' }))
   it('completed → 완료 muted; no due → null', () => {
     expect(dueBadge({ ...base, status: 'completed' }, today)).toEqual({ label: '완료', tone: 'muted' })
+    expect(dueBadge({ ...base, is_manual_completed: true }, today)).toEqual({ label: '완료', tone: 'muted' })
     expect(dueBadge({ ...base, due_date: null, start_date: null }, today)).toBeNull()
   })
 })

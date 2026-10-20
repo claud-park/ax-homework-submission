@@ -13,7 +13,7 @@ import { MilestoneSummary } from '@/components/milestones/MilestoneSummary'
 import { StageStepper } from '@/components/milestones/StageStepper'
 import { IssueReportDialog } from '@/components/milestones/IssueReportDialog'
 import {
-  deriveStage, fmtRange, groupByParent, matchesFilter, summarize,
+  deriveStage, fmtRange, groupByParent, isIssuePending, matchesFilter, summarize,
   type Stage, type ViewFilter,
 } from '@/lib/milestone-view'
 import type { BottleneckType, CharterSubmission } from '@/lib/types'
@@ -93,7 +93,8 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
 
   async function undo(id: string, action: 'start' | 'complete', prevStage: Stage) {
     // 시작 되돌리기는 진행 표시만 끄고, 완료 되돌리기는 완료 직전 단계(진행중/미시작)로 복원한다.
-    // 모바일 카드는 미시작에서 바로 완료할 수 있으므로 action과 prevStage를 따로 받는다.
+    // prevStage만으로는 '시작 후'와 '진행중에서 완료 후'를 구분할 수 없어(둘 다 이전 단계가 진행중일 수 있음)
+    // 어떤 전환을 되돌리는지 action으로 명시한다.
     const body = action === 'start'
       ? { is_manual_progress: false }
       : { is_manual_completed: false, is_manual_progress: prevStage === 'in_progress' }
@@ -110,8 +111,13 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
 
   async function handleStart(id: string) {
     const prevStage = stageOf(id)
+    const target = milestones.find(x => x.id === id)
+    // 검토 대기 중인 이슈 보고는 시작으로 조용히 철회하지 않는다.
+    const body = target && isIssuePending(target)
+      ? { is_manual_progress: true, is_manual_completed: false }
+      : { is_manual_progress: true, bottleneck_type: null, bottleneck_note: null, is_manual_completed: false }
     try {
-      const updated = await patchStage(id, { is_manual_progress: true, bottleneck_type: null, bottleneck_note: null, is_manual_completed: false })
+      const updated = await patchStage(id, body)
       if (updated) toast.success('진행중으로 표시했습니다.', { duration: 6000, action: undoAction(id, 'start', prevStage) })
     } catch (e: unknown) {
       stageError(e, '상태 변경에 실패했습니다: ')
@@ -132,7 +138,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
     try {
       const { milestone: updated } = await apiFetch<PatchResult>(`/api/milestones/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ bottleneck_type: type, bottleneck_note: note, is_manual_completed: false, is_manual_progress: false }),
+        body: JSON.stringify({ bottleneck_type: type, bottleneck_note: note, is_manual_completed: false }),
       })
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
       toast.success('이슈가 보고되었습니다. 관리자에게 알림이 전송되었습니다.')
@@ -150,6 +156,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
       setMilestones(prev => prev.map(m => m.id === id ? updated : m))
     } catch (e: unknown) {
       toast.error('노트 저장에 실패했습니다: ' + errorText(e))
+      throw e // 편집기가 초안을 유지하도록 호출부에 실패를 알린다.
     }
   }
 
@@ -197,12 +204,14 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
   }, [])
 
   const published = useMemo(() => milestones.filter(m => m.publish_status === 'published'), [milestones])
-  const summary = useMemo(() => summarize(published, todayStr), [published, todayStr])
-  const groups = useMemo(() => groupByParent(published).map(g => ({
+  const grouped = useMemo(() => groupByParent(published), [published])
+  // 그룹 헤더(상위 마일스톤)는 행으로 나오지 않으므로 요약·칩 집계에서 뺀다.
+  const summary = useMemo(() => summarize(grouped.flatMap(g => g.items), todayStr), [grouped, todayStr])
+  const groups = useMemo(() => grouped.map(g => ({
     ...g,
     visible: g.items.filter(m => matchesFilter(m, filter, todayStr)),
     done: g.items.filter(m => deriveStage(m) === 'completed').length,
-  })), [published, filter, todayStr])
+  })), [grouped, filter, todayStr])
 
   const rowHandlers = {
     todayStr,

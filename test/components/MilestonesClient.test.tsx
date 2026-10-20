@@ -152,6 +152,63 @@ describe('MilestonesClient status view', () => {
     expect(within(desktop).getAllByRole('group', { name: '진행 단계' })).toHaveLength(2)
   })
 
+  it('summary and chips count only group items, not the parent header', () => {
+    // parent: start passed, not started → would be 지연 if counted
+    const parent = { ...base, id: 'p', title: '상위 단계', status: 'not_started', is_manual_progress: false, start_date: '2026-01-01' } as Milestone
+    const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p', status: 'delayed', is_manual_progress: true, due_date: '2026-01-10' } as Milestone
+    const desktop = renderClient([parent, child])
+
+    expect(within(desktop).getByRole('button', { name: '전체 1' })).toBeInTheDocument()
+    expect(within(desktop).getByRole('button', { name: '지연 1' })).toBeInTheDocument()
+    expect(within(desktop).getByText('/ 1 완료')).toBeInTheDocument()
+    expect(within(desktop).getByText('1건')).toBeInTheDocument() // 지연 n건 in the right panel
+  })
+
+  it('issue report PATCH keeps is_manual_progress untouched', async () => {
+    const m = { ...base, status: 'delayed', is_manual_progress: true, due_date: '2026-01-10' } as Milestone
+    mockApiFetch.mockResolvedValue({ milestone: { ...m, bottleneck_type: 'technical' }, parentUpdated: null })
+    const desktop = renderClient([m])
+
+    fireEvent.click(within(desktop).getByRole('button', { name: '이슈 보고' }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'technical' } })
+    fireEvent.change(within(dialog).getByPlaceholderText('이슈 상황을 자세히 설명해주세요'), { target: { value: 'API 지연' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '보고하기' }))
+
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith('/api/milestones/m1', expect.objectContaining({ method: 'PATCH' })))
+    const body = JSON.parse(mockApiFetch.mock.calls[0][1].body)
+    expect(body).toEqual({ bottleneck_type: 'technical', bottleneck_note: 'API 지연', is_manual_completed: false })
+    expect(body).not.toHaveProperty('is_manual_progress')
+  })
+
+  it('starting a not_started item with a pending issue does not clear the report', async () => {
+    const m = { ...base, status: 'delayed', is_manual_progress: false, bottleneck_type: 'technical', bottleneck_note: '막힘' } as Milestone
+    mockApiFetch.mockResolvedValue({ milestone: { ...m, is_manual_progress: true }, parentUpdated: null })
+    const desktop = renderClient([m])
+
+    fireEvent.click(within(desktop).getByRole('button', { name: '▶ 시작' }))
+
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1))
+    const body = JSON.parse(mockApiFetch.mock.calls[0][1].body)
+    expect(body).toEqual({ is_manual_progress: true, is_manual_completed: false })
+    expect(body).not.toHaveProperty('bottleneck_type')
+  })
+
+  it('note save failure keeps the editor open with the draft and shows an error toast', async () => {
+    mockApiFetch.mockImplementation((_url: string, init?: { method?: string }) =>
+      init?.method === 'PATCH' ? Promise.reject(new Error('boom')) : Promise.resolve({ logs: [] }))
+    const desktop = renderClient([base])
+
+    fireEvent.click(within(desktop).getByRole('button', { name: '상세 펼치기' }))
+    fireEvent.click(within(desktop).getByRole('button', { name: '노트 편집' }))
+    fireEvent.change(within(desktop).getByPlaceholderText('진행 상황을 간단히 메모해주세요'), { target: { value: '새 노트 초안' } })
+    fireEvent.click(within(desktop).getByRole('button', { name: '저장' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('노트 저장에 실패했습니다: boom'))
+    await waitFor(() => expect(within(desktop).getByRole('button', { name: '저장' })).not.toBeDisabled())
+    expect(within(desktop).getByPlaceholderText('진행 상황을 간단히 메모해주세요')).toHaveValue('새 노트 초안')
+  })
+
   it('mobile parent group header renders the parent stepper and completes it', async () => {
     const parent = { ...base, id: 'p', title: '상위 단계', status: 'in_progress', is_manual_progress: true } as Milestone
     const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p', status: 'not_started', is_manual_progress: false } as Milestone

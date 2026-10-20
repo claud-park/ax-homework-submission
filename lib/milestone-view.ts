@@ -6,13 +6,18 @@ export type DueBadge = { label: string; tone: 'ok' | 'soon' | 'over' | 'muted' }
 export interface MilestoneGroup { parent: Milestone | null; items: Milestone[] }
 export interface ViewSummary { total: number; done: number; prog: number; over: number; not: number; pending: number; thisWeek: number }
 
-type StageInput = Pick<Milestone, 'status' | 'is_manual_progress'>
-type ScheduleInput = Pick<Milestone, 'status' | 'is_manual_progress' | 'start_date' | 'due_date'>
+type StageInput = Pick<Milestone, 'status' | 'is_manual_progress' | 'is_manual_completed'>
+type ScheduleInput = StageInput & Pick<Milestone, 'start_date' | 'due_date'>
 
+/**
+ * 단계 도출. 서버 computeStatus 순서대로 수동 플래그를 먼저 본다 —
+ * 서버는 due_date가 있을 때만 status를 다시 계산하므로 기한 없는 마일스톤은 플래그로만 단계가 바뀐다.
+ */
 export function deriveStage(m: StageInput): Stage {
+  if (m.is_manual_completed) return 'completed'
+  if (m.is_manual_progress) return 'in_progress'
   if (m.status === 'completed') return 'completed'
   if (m.status === 'in_progress') return 'in_progress'
-  if (m.status === 'delayed') return m.is_manual_progress ? 'in_progress' : 'not_started'
   return 'not_started'
 }
 
@@ -40,7 +45,11 @@ export function dueBadge(m: ScheduleInput, todayStr: string): DueBadge {
   if (!m.due_date) return null
   const d = daysBetween(todayStr, m.due_date)
   if (d < 0) return { label: `D+${-d} 지연`, tone: 'over' }
-  if (isScheduleDelayed(m, todayStr)) return { label: '시작 지연', tone: 'over' }
+  if (isScheduleDelayed(m, todayStr)) {
+    // 시작 지연은 시작일이 지난 미시작 항목에만. 그 외 지연(예: 이슈 검토중인 진행중 항목)은 '지연'.
+    const startLate = deriveStage(m) === 'not_started' && !!m.start_date && m.start_date < todayStr
+    return { label: startLate ? '시작 지연' : '지연', tone: 'over' }
+  }
   if (d === 0) return { label: 'D-DAY', tone: 'soon' }
   if (d <= 7) return { label: `D-${d}`, tone: 'soon' }
   return { label: `D-${d}`, tone: 'ok' }
