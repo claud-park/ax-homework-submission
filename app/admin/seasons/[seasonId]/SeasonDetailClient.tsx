@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
-import type { Season, SeasonRole } from '@/lib/types'
+import type { Season, SeasonInvite, SeasonRole } from '@/lib/types'
 
 interface RosterEntry {
   userId: string
@@ -28,6 +28,14 @@ interface SeasonDetailResponse {
   previousRoster: RosterEntry[]
   currentEnrollments: CurrentEnrollmentEntry[]
   unassignedUsers: UnassignedUser[]
+  invites: SeasonInvite[]
+}
+
+interface CreateInvitesResponse {
+  ok: true
+  created: number
+  appliedNow: number
+  skippedConsumed: string[]
 }
 
 const ROLE_LABEL: Record<SeasonRole, string> = { champion: 'Champion', partner: 'Partner' }
@@ -39,6 +47,9 @@ export function SeasonDetailClient({ seasonId }: { seasonId: string }) {
   const [newRoles, setNewRoles] = useState<Record<string, SeasonRole | ''>>({})
   const [saving, setSaving] = useState(false)
   const [activating, setActivating] = useState(false)
+  const [inviteText, setInviteText] = useState('')
+  const [inviteRole, setInviteRole] = useState<SeasonRole>('champion')
+  const [inviting, setInviting] = useState(false)
 
   function load() {
     setLoading(true)
@@ -106,6 +117,43 @@ export function SeasonDetailClient({ seasonId }: { seasonId: string }) {
       console.error(e)
     } finally {
       setActivating(false)
+    }
+  }
+
+  async function handleCreateInvites() {
+    if (!inviteText.trim()) {
+      toast.error('등록할 이메일을 입력해주세요.')
+      return
+    }
+    setInviting(true)
+    try {
+      const res = await apiFetch<CreateInvitesResponse>(`/api/admin/seasons/${seasonId}/invites`, {
+        method: 'POST',
+        body: JSON.stringify({ emails: inviteText, roleInSeason: inviteRole }),
+      })
+      toast.success(`${res.created}명 등록 (이미 가입해 즉시 적용 ${res.appliedNow}명)`)
+      if (res.skippedConsumed.length > 0) {
+        toast.info(`이미 적용된 초대라 건너뜀: ${res.skippedConsumed.join(', ')}`)
+      }
+      setInviteText('')
+      load()
+    } catch (e) {
+      toast.error((e as Error).message || '등록 실패')
+      console.error(e)
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleDeleteInvite(invite: SeasonInvite) {
+    if (!confirm(`${invite.email} 초대를 삭제하시겠습니까?`)) return
+    try {
+      await apiFetch(`/api/admin/seasons/${seasonId}/invites/${invite.id}`, { method: 'DELETE' })
+      toast.success('초대가 삭제되었습니다.')
+      load()
+    } catch (e) {
+      toast.error((e as Error).message || '삭제 실패')
+      console.error(e)
     }
   }
 
@@ -239,6 +287,76 @@ export function SeasonDetailClient({ seasonId }: { seasonId: string }) {
       >
         배정 저장
       </button>
+
+      <h2 className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>이메일로 사전 등록 (로그인 전 참여자)</h2>
+      <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
+        아직 로그인하지 않은 사람은 위 목록에 나오지 않습니다. 이메일을 등록해 두면 첫 로그인 때 역할과 시즌 배정이 자동으로 적용됩니다. 이미 가입한 이메일은 즉시 적용됩니다.
+      </p>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+        <textarea
+          value={inviteText}
+          onChange={e => setInviteText(e.target.value)}
+          placeholder="한 줄에 하나씩, 또는 쉼표로 구분"
+          rows={4}
+          style={{
+            width: '100%', fontSize: 13, padding: 8, borderRadius: 6, resize: 'vertical',
+            border: '1px solid var(--border)', background: 'var(--surface-primary)', color: 'var(--text-primary)',
+          }}
+        />
+        <div className="mt-2 flex items-center gap-2">
+          <select value={inviteRole} onChange={e => setInviteRole(e.target.value as SeasonRole)} style={selectStyle}>
+            <option value="champion">Champion으로 등록</option>
+            <option value="partner">Partner로 등록</option>
+          </select>
+          <button
+            onClick={handleCreateInvites}
+            disabled={inviting}
+            style={{
+              fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 6,
+              background: 'var(--blue-600)', color: '#fff', border: 'none',
+              cursor: inviting ? 'not-allowed' : 'pointer', opacity: inviting ? 0.5 : 1,
+            }}
+          >
+            등록
+          </button>
+        </div>
+      </div>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, marginBottom: 24, overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+          <thead>
+            <tr style={{ background: 'var(--surface-secondary)' }}>
+              <th style={thStyle}>이메일</th>
+              <th style={thStyle}>역할</th>
+              <th style={thStyle}>상태</th>
+              <th style={thStyle}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.invites.map(invite => (
+              <tr key={invite.id} style={{ background: 'var(--background)' }}>
+                <td style={tdStyle}>{invite.email}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-secondary)' }}>{ROLE_LABEL[invite.role_in_season]}</td>
+                <td style={{ ...tdStyle, color: invite.consumed_at ? 'var(--success)' : 'var(--text-secondary)' }}>
+                  {invite.consumed_at ? `적용됨 ${invite.consumed_at.slice(0, 10)}` : '대기 (로그인 전)'}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  {!invite.consumed_at && (
+                    <button
+                      onClick={() => handleDeleteInvite(invite)}
+                      style={{ fontSize: 12, color: 'var(--error)', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      삭제
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {data.invites.length === 0 && (
+              <tr><td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-disabled)', padding: 20 }}>사전 등록된 이메일이 없습니다</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <h2 className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>이번 시즌 확정 참여자 ({data.currentEnrollments.length}명)</h2>
       <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, overflowX: 'auto' }}>
