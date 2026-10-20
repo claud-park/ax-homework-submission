@@ -2,9 +2,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { ReportChampion } from '@/app/api/admin/reports/overview/route'
 import { ReportsClient } from './ReportsClient'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 async function fetchReportsData(): Promise<ReportChampion[]> {
   const supabase = createServiceClient()
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   const [
     { data: users },
@@ -12,10 +14,10 @@ async function fetchReportsData(): Promise<ReportChampion[]> {
     { data: milestones },
   ] = await Promise.all([
     supabase.from('users').select('id, name'),
-    supabase.from('charter_submissions').select('user_id, project_name'),
+    supabase.from('charter_submissions').select('user_id, project_name').eq('season_id', seasonId),
     supabase
       .from('milestones')
-      .select('id, user_id, title, status, week_number, start_date, due_date, bottleneck_type')
+      .select('id, user_id, title, status, week_number, start_date, due_date, bottleneck_type').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('week_number', { nullsFirst: false })
       .order('display_order'),

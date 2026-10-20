@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { ChampionProject } from '@/lib/types'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export async function GET(
   req: NextRequest,
@@ -12,6 +13,7 @@ export async function GET(
 
   const { userId } = params
   const supabase = createServiceClient()
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   const [
     { data: userRow, error: userErr },
@@ -22,13 +24,13 @@ export async function GET(
     supabase.from('users').select('*').eq('id', userId).single(),
     supabase
       .from('charter_submissions')
-      .select('*')
+      .select('*').eq('season_id', seasonId)
       .eq('user_id', userId)
       .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false }),
     supabase
       .from('milestones')
-      .select('*')
+      .select('*').eq('season_id', seasonId)
       .eq('user_id', userId)
       .eq('publish_status', 'published')
       .order('week_number')

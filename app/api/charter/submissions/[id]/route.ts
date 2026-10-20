@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
+import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
+
+// 지난 시즌 차터는 읽기전용 아카이브(시즌모델 스펙) — 수정/삭제 불가
+const PAST_SEASON_READONLY = '지난 시즌 과제정의서는 수정할 수 없습니다'
 
 function stripHtml(s: string | undefined | null) {
   return (s ?? '').replace(/<[^>]*>/g, '').trim()
@@ -24,6 +28,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data: existing } = await supabase
     .from('charter_submissions').select('*').eq('id', params.id).eq('user_id', user.id).single()
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  let currentSeasonId: string
+  try {
+    currentSeasonId = await requireCurrentSeasonIdForWrite(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
+  if (existing.season_id !== currentSeasonId) {
+    return NextResponse.json({ error: PAST_SEASON_READONLY }, { status: 403 })
+  }
 
   if (existing.publish_status === 'published' && publish_status === 'draft') {
     return NextResponse.json(
@@ -70,8 +83,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   const supabase = createServiceClient()
   const { data: existing } = await supabase
-    .from('charter_submissions').select('id').eq('id', params.id).eq('user_id', user.id).single()
+    .from('charter_submissions').select('id, season_id').eq('id', params.id).eq('user_id', user.id).single()
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  let currentSeasonId: string
+  try {
+    currentSeasonId = await requireCurrentSeasonIdForWrite(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+  }
+  if (existing.season_id !== currentSeasonId) {
+    return NextResponse.json({ error: PAST_SEASON_READONLY }, { status: 403 })
+  }
 
   const { error } = await supabase
     .from('charter_submissions').delete().eq('id', params.id).eq('user_id', user.id)

@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { MilestoneStatus } from '@/lib/types'
 import { requireAdmin } from '@/lib/api/guard'
-import { getCurrentSeasonUserIds } from '@/lib/data/season'
+import { getCurrentSeasonUserIds, getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export interface ReportMilestoneSummary {
   id: string
@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
   if (admin instanceof NextResponse) return admin
 
   const supabase = createServiceClient()
+
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
   const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
 
   const [
@@ -36,10 +38,10 @@ export async function GET(req: NextRequest) {
     { data: milestones, error: msErr },
   ] = await Promise.all([
     supabase.from('users').select('id, name').in('id', championIds),
-    supabase.from('charter_submissions').select('user_id, project_name'),
+    supabase.from('charter_submissions').select('user_id, project_name').eq('season_id', seasonId),
     supabase
       .from('milestones')
-      .select('id, user_id, title, status, week_number, start_date, due_date, bottleneck_type')
+      .select('id, user_id, title, status, week_number, start_date, due_date, bottleneck_type').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('week_number', { nullsFirst: false })
       .order('display_order'),

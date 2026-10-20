@@ -9,6 +9,7 @@ import {
   type CharterContent,
 } from '@/lib/milestone-ai'
 import { scheduleRelativeMilestones } from '@/lib/milestone-schedule'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 const MODEL = process.env.MILESTONE_AI_MODEL ?? 'claude-haiku-4-5'
 
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
       .from('charter_submissions')
       .select('content')
       .eq('user_id', user.id)
+      .eq('season_id', await getCurrentSeasonIdOrNil(supabase))
       .order('updated_at', { ascending: false })
     if (charter_id) charterQuery = charterQuery.eq('id', charter_id)
     const { data } = await charterQuery.limit(1).maybeSingle()

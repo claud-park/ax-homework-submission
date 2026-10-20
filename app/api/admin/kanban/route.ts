@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { KanbanCard, KanbanDataV2 } from '@/lib/types'
 import { requireAdmin } from '@/lib/api/guard'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin(req)
   if (admin instanceof NextResponse) return admin
 
   const supabase = createServiceClient()
+
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   const [
     { data: users, error: usersErr },
@@ -21,8 +24,8 @@ export async function GET(req: NextRequest) {
       .from('submissions')
       .select('id, user_id, file_name, link_url, status, attempt_number, submitted_at')
       .order('submitted_at', { ascending: false }),
-    supabase.from('milestones').select('user_id, status').eq('publish_status', 'published'),
-    supabase.from('charter_submissions').select('user_id, admin_approved_at').eq('publish_status', 'published'),
+    supabase.from('milestones').select('user_id, status').eq('season_id', seasonId).eq('publish_status', 'published'),
+    supabase.from('charter_submissions').select('user_id, admin_approved_at').eq('season_id', seasonId).eq('publish_status', 'published'),
     supabase.from('deadline_change_requests').select('user_id').eq('status', 'pending'),
   ])
 

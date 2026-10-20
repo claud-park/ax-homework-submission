@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminUser } from '@/lib/auth'
-import { requireUser, requireNonViewer } from '@/lib/api/guard'
+import { requireUser, requireCurrentEnrollment } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireCurrentSeasonIdForWrite } from '@/lib/data/season'
+import { requireCurrentSeasonIdForWrite, getCurrentSeasonIdOrNil } from '@/lib/data/season'
+import { findPreviousCharterId } from '@/lib/data/charter-lineage'
 
 function stripHtml(s: string | undefined | null) {
   return (s ?? '').replace(/<[^>]*>/g, '').trim()
@@ -26,11 +27,13 @@ export async function GET(req: NextRequest) {
   const effectiveUserId = isAdmin && targetUserId ? targetUserId : user.id
 
   const supabase = createServiceClient()
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   if (isAdmin && !targetUserId) {
     const { data, error } = await supabase
       .from('charter_submissions')
       .select('*, users(*)')
+      .eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -41,6 +44,7 @@ export async function GET(req: NextRequest) {
     .from('charter_submissions')
     .select('*')
     .eq('user_id', effectiveUserId)
+    .eq('season_id', seasonId)
     .order('submitted_at', { ascending: false })
 
   if (isAdmin && targetUserId) query = query.eq('publish_status', 'published')
@@ -51,7 +55,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireNonViewer(req)
+  // 현재 시즌 champion enrollment가 있어야 새 차터를 만들 수 있다(이어하지 않은 지난 시즌 챔피언 차단)
+  const user = await requireCurrentEnrollment(req, 'champion')
   if (user instanceof NextResponse) return user
   const { title, project_name, content, publish_status } = await req.json()
   const status = publish_status === 'published' ? 'published' : 'draft'
@@ -68,11 +73,14 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 })
   }
+  // 복귀 챔피언: 직전 시즌의 최신 published 차터를 참조로 연결(없으면 null)
+  const previousCharterId = await findPreviousCharterId(supabase, user.id, seasonId)
   const { data, error } = await supabase
     .from('charter_submissions')
     .insert({
       user_id: user.id,
       season_id: seasonId,
+      previous_charter_id: previousCharterId,
       title: title ?? null,
       project_name: project_name ?? null,
       content: content ?? {},

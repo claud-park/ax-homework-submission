@@ -6,6 +6,8 @@ import {
   isEnrolledInCurrentSeason,
   requireCurrentSeasonIdForWrite,
   getSeasonIdForCheckUpSession,
+  getCurrentSeasonIdOrNil,
+  NIL_SEASON_ID,
 } from '@/lib/data/season'
 
 function createQueryBuilder(result: { data: unknown; error: unknown }) {
@@ -152,5 +154,18 @@ describe('getSeasonIdForCheckUpSession', () => {
       check_up_sessions: { data: null, error: null },
     })
     expect(await getSeasonIdForCheckUpSession(supabase, 'session-1')).toBeNull()
+  })
+})
+
+describe('getCurrentSeasonIdOrNil', () => {
+  it('returns the current season id when one exists', async () => {
+    const supabase = createSupabaseMock({ seasons: { data: { id: 's2' }, error: null } })
+    expect(await getCurrentSeasonIdOrNil(supabase)).toBe('s2')
+  })
+
+  it('returns the nil uuid (matches no row) when there is no current season', async () => {
+    const supabase = createSupabaseMock({ seasons: { data: null, error: null } })
+    expect(await getCurrentSeasonIdOrNil(supabase)).toBe(NIL_SEASON_ID)
+    expect(NIL_SEASON_ID).toBe('00000000-0000-0000-0000-000000000000')
   })
 })

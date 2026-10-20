@@ -3,7 +3,7 @@ import { requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { ChampionSummary, MilestoneStatus } from '@/lib/types'
-import { getCurrentSeasonUserIds } from '@/lib/data/season'
+import { getCurrentSeasonUserIds, getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 function aggregateWeekStatus(milestones: { status: MilestoneStatus }[]): MilestoneStatus {
   if (milestones.some(m => m.status === 'delayed')) return 'delayed'
@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
   if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
+
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
   const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
 
   const [
@@ -25,8 +27,8 @@ export async function GET(req: NextRequest) {
     { data: milestones, error: msErr },
   ] = await Promise.all([
     supabase.from('users').select('id, name').in('id', championIds),
-    supabase.from('charter_submissions').select('user_id, id, project_name, publish_status'),
-    supabase.from('milestones').select('user_id, week_number, status').eq('publish_status', 'published'),
+    supabase.from('charter_submissions').select('user_id, id, project_name, publish_status').eq('season_id', seasonId),
+    supabase.from('milestones').select('user_id, week_number, status').eq('season_id', seasonId).eq('publish_status', 'published'),
   ])
 
   if (usersErr) return NextResponse.json({ error: usersErr.message }, { status: 500 })

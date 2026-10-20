@@ -3,7 +3,7 @@ import { requireNonViewer } from '@/lib/api/guard'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseName } from '@/lib/utils'
 import type { MilestoneStatus } from '@/lib/types'
-import { getCurrentSeasonUserIds } from '@/lib/data/season'
+import { getCurrentSeasonUserIds, getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export interface GanttMilestone {
   id: string
@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
   if (user instanceof NextResponse) return user
 
   const supabase = createServiceClient()
+
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
   const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
 
   const [
@@ -46,11 +48,11 @@ export async function GET(req: NextRequest) {
     supabase.from('users').select('id, name').in('id', championIds),
     supabase
       .from('charter_submissions')
-      .select('user_id, id, project_name, title')
+      .select('user_id, id, project_name, title').eq('season_id', seasonId)
       .eq('publish_status', 'published'),
     supabase
       .from('milestones')
-      .select('id, user_id, charter_submission_id, title, start_date, due_date, status, week_number, parent_milestone_id, display_order')
+      .select('id, user_id, charter_submission_id, title, start_date, due_date, status, week_number, parent_milestone_id, display_order').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('week_number', { nullsFirst: false })
       .order('display_order'),

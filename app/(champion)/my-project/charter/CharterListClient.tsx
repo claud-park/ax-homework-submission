@@ -28,7 +28,7 @@ function charterDisplayTitle(charter: CharterSubmission) {
 
 type ContextMenuState = { x: number; y: number; charterId: string } | null
 
-export function CharterListClient({ initialCharters }: { initialCharters: CharterSubmission[] }) {
+export function CharterListClient({ initialCharters, previousCharters = [] }: { initialCharters: CharterSubmission[]; previousCharters?: CharterSubmission[] }) {
   const router = useRouter()
   const [charters, setCharters] = useState(initialCharters)
   const [creating, setCreating] = useState(false)
@@ -140,10 +140,45 @@ export function CharterListClient({ initialCharters }: { initialCharters: Charte
         >
           <span style={{ width: 16, textAlign: 'center', fontSize: 14, color: 'var(--text-tertiary)', opacity: 0.6, flexShrink: 0 }}>+</span>
           <span style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>
-            {creating ? '생성 중...' : charters.length === 0 ? '첫 번째 과제정의서 작성' : '과제정의서 추가'}
+            {creating ? '생성 중...' : charters.length === 0 ? '이번 시즌 과제정의서 작성' : '과제정의서 추가'}
           </span>
         </div>
       </div>
+
+      {previousCharters.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)', marginBottom: 6 }}>
+            지난 시즌 과제정의서 (참고용)
+          </p>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)', marginBottom: 8 }}>
+            이번 시즌은 과제정의서를 새로 작성합니다. 지난 시즌 제출본은 열람만 가능합니다.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {previousCharters.map(charter => (
+              <div
+                key={charter.id}
+                onClick={() => window.open(`/charter-popup/${charter.id}`, '_blank', 'noopener')}
+                onMouseEnter={() => setHovered(charter.id)}
+                onMouseLeave={() => setHovered(null)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 8px', borderRadius: 6, cursor: 'pointer', opacity: 0.7,
+                  background: hovered === charter.id ? 'var(--surface-hover, rgba(0,0,0,0.04))' : 'transparent',
+                  transition: 'background 0.1s',
+                }}
+              >
+                <DocIcon />
+                <span style={{ fontSize: 14, color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {charterDisplayTitle(charter)}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                  지난 시즌{charter.admin_approved_at ? ' · 승인됨' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Context menu */}
       {contextMenu && (

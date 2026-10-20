@@ -44,6 +44,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       .from('milestones')
       .select('*')
       .eq('user_id', championUserId)
+      .eq('season_id', session.season_id) // 세션이 속한 시즌의 마일스톤만
       .eq('publish_status', 'published'),
   ])
 

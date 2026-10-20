@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { DelayReportsClient } from './DelayReportsClient'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 interface BottleneckReport {
   id: string
@@ -15,18 +16,19 @@ interface BottleneckReport {
 
 export default async function AdminDelayReportsPage() {
   const supabase = createServiceClient()
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   const [pendingResult, reviewedResult] = await Promise.all([
     supabase
       .from('milestones')
-      .select('*, users(*)')
+      .select('*, users(*)').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .not('bottleneck_type', 'is', null)
       .is('bottleneck_reviewed_at', null)
       .order('updated_at', { ascending: false }),
     supabase
       .from('milestones')
-      .select('*, users(*)')
+      .select('*, users(*)').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .not('bottleneck_type', 'is', null)
       .not('bottleneck_reviewed_at', 'is', null)
