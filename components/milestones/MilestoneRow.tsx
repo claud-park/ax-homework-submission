@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { Milestone } from '@/lib/types'
@@ -62,14 +62,20 @@ export function MilestoneRow({
   const badge = dueBadge(m, todayStr)
   const canEditNote = stage === 'in_progress'
   const hasAdminReply = !!m.bottleneck_reviewed_at && !!m.bottleneck_admin_comment
-  const isReschedule = (m.start_date ?? '') < todayStr && stage === 'not_started'
+  const isReschedule = !!m.start_date && m.start_date < todayStr && stage === 'not_started'
   const deadlineLabel = !m.due_date ? '기한 설정' : isReschedule ? '기한 변경' : '기한 연장'
+  const deadlineReschedule = !!m.due_date && isReschedule
   const showIssueReport = delayed && !pending
 
   const railColor = completed ? 'var(--success)'
     : delayed ? 'var(--error)'
     : stage === 'in_progress' ? 'var(--accent)'
     : 'var(--accent-disabled)'
+
+  useEffect(() => {
+    setNoteEditing(false)
+    setNoteValue('')
+  }, [m.id])
 
   function openNoteEdit() {
     setNoteValue(m.note ?? '')
@@ -83,9 +89,11 @@ export function MilestoneRow({
     setNoteSaving(true)
     try {
       await onNoteUpdate(m.id, next)
+      setNoteEditing(false)
+    } catch {
+      // keep the editor open with the draft; the parent surfaces the error
     } finally {
       setNoteSaving(false)
-      setNoteEditing(false)
     }
   }
 
@@ -278,7 +286,7 @@ export function MilestoneRow({
                 <button type="button" style={LINK_STYLE} onClick={openNoteEdit}>노트 편집</button>
               )}
               {!completed && (
-                <button type="button" style={LINK_STYLE} onClick={() => onDeadlineExtension(m, isReschedule && !!m.due_date)}>
+                <button type="button" style={LINK_STYLE} onClick={() => onDeadlineExtension(m, deadlineReschedule)}>
                   {deadlineLabel}
                 </button>
               )}

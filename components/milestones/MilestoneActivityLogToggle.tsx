@@ -30,6 +30,12 @@ export default function MilestoneActivityLogToggle({ milestoneId, userId, defaul
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const autoLoaded = useRef(false)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -37,12 +43,13 @@ export default function MilestoneActivityLogToggle({ milestoneId, userId, defaul
     try {
       const qs = userId ? `?user_id=${userId}` : ''
       const { logs: data } = await apiFetch<{ logs: MilestoneActivityLog[] }>(`/api/milestones/${milestoneId}/log${qs}`)
+      if (!mounted.current) return
       setLogs(data)
       onLoaded?.(data.length)
     } catch {
-      setError(true)
+      if (mounted.current) setError(true)
     } finally {
-      setLoading(false)
+      if (mounted.current) setLoading(false)
     }
   }
 
