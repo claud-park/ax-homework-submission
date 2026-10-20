@@ -26,3 +26,177 @@ describe('partitionInviteEmails', () => {
     expect(partitionInviteEmails(['b@gmail.com'], undefined)).toEqual({ valid: ['b@gmail.com'], invalid: [] })
   })
 })
+
+// ─── DB 함수 ────────────────────────────────────────────────────────────────
+import { vi } from 'vitest'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  listSeasonInvites,
+  applyPendingInvitesForUser,
+  createSeasonInvites,
+  deleteSeasonInvite,
+} from '@/lib/data/season-invites'
+
+type Result = { data: unknown; error: unknown }
+type Builder = Record<string, ReturnType<typeof vi.fn>> & { calls: unknown[][] }
+
+const CHAIN = ['select', 'insert', 'upsert', 'update', 'delete', 'eq', 'is', 'in', 'order'] as const
+
+function createBuilder(result: Result): Builder {
+  const calls: unknown[][] = []
+  const b = { calls } as Builder
+  for (const m of CHAIN) b[m] = vi.fn((...args: unknown[]) => { calls.push([m, ...args]); return b })
+  b.single = vi.fn(() => Promise.resolve(result))
+  b.maybeSingle = vi.fn(() => Promise.resolve(result))
+  ;(b as unknown as { then: (r: (v: unknown) => void) => void }).then = (resolve) => resolve(result)
+  return b
+}
+
+/** from(table) 호출 순서대로 queues[table]의 결과를 하나씩 꺼내 쓰는 mock. */
+function createSupabaseMock(queues: Record<string, Result[]>) {
+  const builders: Record<string, Builder[]> = {}
+  const client = {
+    from: vi.fn((table: string) => {
+      const result = queues[table]?.shift() ?? { data: null, error: null }
+      const b = createBuilder(result)
+      ;(builders[table] ??= []).push(b)
+      return b
+    }),
+  } as unknown as SupabaseClient
+  return { client, builders }
+}
+
+const ok = (data: unknown): Result => ({ data, error: null })
+
+describe('listSeasonInvites', () => {
+  it('returns invites for the season', async () => {
+    const rows = [{ id: 'i1', email: 'a@dreamus.io' }]
+    const { client } = createSupabaseMock({ season_invites: [ok(rows)] })
+    expect(await listSeasonInvites(client, 's2')).toEqual(rows)
+  })
+
+  it('returns [] on error', async () => {
+    const { client } = createSupabaseMock({ season_invites: [{ data: null, error: { message: 'boom' } }] })
+    expect(await listSeasonInvites(client, 's2')).toEqual([])
+  })
+})
+
+describe('applyPendingInvitesForUser', () => {
+  it('creates one enrollment per pending invite, promotes viewer to champion, consumes invites', async () => {
+    const invites = [
+      { id: 'i1', season_id: 'sA', email: 'a@dreamus.io', role_in_season: 'champion' },
+      { id: 'i2', season_id: 'sB', email: 'a@dreamus.io', role_in_season: 'partner' },
+    ]
+    const { client, builders } = createSupabaseMock({
+      season_invites: [ok(invites), ok(null)],
+      season_enrollments: [ok(null)],
+      users: [ok({ user_group: 'viewer' }), ok(null)],
+    })
+    expect(await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')).toEqual({ applied: 2 })
+
+    expect(builders.season_enrollments[0].upsert).toHaveBeenCalledWith(
+      [
+        { season_id: 'sA', user_id: 'u1', role_in_season: 'champion', status: 'active' },
+        { season_id: 'sB', user_id: 'u1', role_in_season: 'partner', status: 'active' },
+      ],
+      { onConflict: 'season_id,user_id' },
+    )
+    expect(builders.users[1].update).toHaveBeenCalledWith({ user_group: 'champion' })
+    const consume = builders.season_invites[1]
+    expect(consume.update.mock.calls[0][0]).toMatchObject({ consumed_user_id: 'u1' })
+    expect(consume.update.mock.calls[0][0].consumed_at).toEqual(expect.any(String))
+    expect(consume.in).toHaveBeenCalledWith('id', ['i1', 'i2'])
+  })
+
+  it('does not demote an existing champion invited as partner', async () => {
+    const invites = [{ id: 'i1', season_id: 'sB', email: 'a@dreamus.io', role_in_season: 'partner' }]
+    const { client, builders } = createSupabaseMock({
+      season_invites: [ok(invites), ok(null)],
+      season_enrollments: [ok(null)],
+      users: [ok({ user_group: 'champion' })],
+    })
+    await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')
+    expect(builders.users).toHaveLength(1) // select만, update 없음
+  })
+
+  it('promotes viewer to partner for a partner invite', async () => {
+    const invites = [{ id: 'i1', season_id: 'sB', email: 'a@dreamus.io', role_in_season: 'partner' }]
+    const { client, builders } = createSupabaseMock({
+      season_invites: [ok(invites), ok(null)],
+      season_enrollments: [ok(null)],
+      users: [ok({ user_group: 'viewer' }), ok(null)],
+    })
+    await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')
+    expect(builders.users[1].update).toHaveBeenCalledWith({ user_group: 'partner' })
+  })
+
+  it('writes nothing when there are no pending invites', async () => {
+    const { client, builders } = createSupabaseMock({ season_invites: [ok([])] })
+    expect(await applyPendingInvitesForUser(client, 'u1', 'a@dreamus.io')).toEqual({ applied: 0 })
+    expect(builders.season_enrollments).toBeUndefined()
+    expect(builders.users).toBeUndefined()
+    expect(builders.season_invites).toHaveLength(1)
+  })
+
+  it('queries by lowercased email and pending only', async () => {
+    const { client, builders } = createSupabaseMock({ season_invites: [ok([])] })
+    await applyPendingInvitesForUser(client, 'u1', 'A@Dreamus.io')
+    expect(builders.season_invites[0].eq).toHaveBeenCalledWith('email', 'a@dreamus.io')
+    expect(builders.season_invites[0].is).toHaveBeenCalledWith('consumed_at', null)
+  })
+})
+
+describe('createSeasonInvites', () => {
+  it('skips consumed emails, upserts the rest, and applies immediately for existing users', async () => {
+    const emails = ['x@dreamus.io', 'y@dreamus.io', 'z@dreamus.io']
+    const { client, builders } = createSupabaseMock({
+      season_invites: [
+        ok([{ email: 'x@dreamus.io', consumed_at: '2026-10-01T00:00:00Z' }]), // 기존 조회
+        ok(null), // upsert
+        ok([{ id: 'i-y', season_id: 's2', email: 'y@dreamus.io', role_in_season: 'champion' }]), // y의 pending 조회
+        ok(null), // y 소비
+      ],
+      users: [
+        ok([{ id: 'u-y', email: 'Y@dreamus.io' }]), // 가입자 조회 (대소문자 무시 매칭)
+        ok({ user_group: 'viewer' }),
+        ok(null),
+      ],
+      season_enrollments: [ok(null)],
+    })
+    const result = await createSeasonInvites(client, 's2', emails, 'champion')
+    expect(result).toEqual({ created: 2, appliedNow: 1, skippedConsumed: ['x@dreamus.io'] })
+    expect(builders.season_invites[1].upsert).toHaveBeenCalledWith(
+      [
+        { season_id: 's2', email: 'y@dreamus.io', role_in_season: 'champion' },
+        { season_id: 's2', email: 'z@dreamus.io', role_in_season: 'champion' },
+      ],
+      { onConflict: 'season_id,email' },
+    )
+  })
+
+  it('returns zeros without writing when every email is already consumed', async () => {
+    const { client, builders } = createSupabaseMock({
+      season_invites: [ok([{ email: 'x@dreamus.io', consumed_at: '2026-10-01T00:00:00Z' }])],
+    })
+    expect(await createSeasonInvites(client, 's2', ['x@dreamus.io'], 'partner'))
+      .toEqual({ created: 0, appliedNow: 0, skippedConsumed: ['x@dreamus.io'] })
+    expect(builders.season_invites).toHaveLength(1)
+  })
+})
+
+describe('deleteSeasonInvite', () => {
+  it('deletes a pending invite scoped to the season', async () => {
+    const { client, builders } = createSupabaseMock({ season_invites: [ok([{ id: 'i1' }])] })
+    await deleteSeasonInvite(client, 's2', 'i1')
+    const b = builders.season_invites[0]
+    expect(b.delete).toHaveBeenCalled()
+    expect(b.eq).toHaveBeenCalledWith('id', 'i1')
+    expect(b.eq).toHaveBeenCalledWith('season_id', 's2')
+    expect(b.is).toHaveBeenCalledWith('consumed_at', null)
+  })
+
+  it('throws when nothing was deleted (already consumed or missing)', async () => {
+    const { client } = createSupabaseMock({ season_invites: [ok([])] })
+    await expect(deleteSeasonInvite(client, 's2', 'i1')).rejects.toThrow('이미 적용된 초대')
+  })
+})
