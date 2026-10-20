@@ -4,6 +4,7 @@ import { createUserServerClient, createServiceClient } from '@/lib/supabase/serv
 import { isAdminUser } from '@/lib/auth'
 import { parseName } from '@/lib/utils'
 import { AdminSidebar } from './AdminSidebar'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const headersList = headers()
@@ -23,12 +24,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { displayName } = parseName(raw)
 
   const serviceClient = createServiceClient()
+
+  const seasonId = await getCurrentSeasonIdOrNil(serviceClient)
   const [bottleneckResult, chartersResult] = await Promise.all([
-    serviceClient.from('milestones').select('id')
+    serviceClient.from('milestones').select('id').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .not('bottleneck_type', 'is', null)
       .is('bottleneck_reviewed_at', null),
-    serviceClient.from('charter_submissions').select('id, admin_approved_at')
+    serviceClient.from('charter_submissions').select('id, admin_approved_at').eq('season_id', seasonId)
       .eq('publish_status', 'published'),
   ])
 

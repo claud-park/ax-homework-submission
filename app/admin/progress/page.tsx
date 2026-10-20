@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Milestone, User } from '@/lib/types'
 import { ProgressClient } from './ProgressClient'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 type MilestoneWithUser = Milestone & { users: User }
 
@@ -17,16 +18,17 @@ type CharterWithUser = {
 
 export default async function AdminProgressPage() {
   const supabase = createServiceClient()
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   const [milestonesResult, chartersResult] = await Promise.all([
     supabase
       .from('milestones')
-      .select('*, users(*)')
+      .select('*, users(*)').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('user_id').order('charter_submission_id').order('week_number').order('display_order'),
     supabase
       .from('charter_submissions')
-      .select('*, users(*)')
+      .select('*, users(*)').eq('season_id', seasonId)
       .eq('publish_status', 'published')
       .order('submitted_at', { ascending: false }),
   ])

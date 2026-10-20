@@ -7,6 +7,7 @@ import type { Milestone } from '@/lib/types'
 type CharterWithUser = {
   id: string
   user_id: string
+  season_id: string
   project_name: string | null
   content: Record<string, string>
   submitted_at: string
@@ -33,18 +34,11 @@ export default async function CharterPopupPage({ params }: { params: { id: strin
     if (profileError || !profile || profile.user_group === 'viewer') redirect('/gallery')
   }
 
-  const [charterResult, milestonesResult] = await Promise.all([
-    supabase
-      .from('charter_submissions')
-      .select('*, users(*)')
-      .eq('id', params.id)
-      .single(),
-    supabase
-      .from('milestones')
-      .select('*')
-      .eq('publish_status', 'published')
-      .order('display_order'),
-  ])
+  const charterResult = await supabase
+    .from('charter_submissions')
+    .select('*, users(*)')
+    .eq('id', params.id)
+    .single()
 
   if (charterResult.error || !charterResult.data) {
     return (
@@ -55,16 +49,27 @@ export default async function CharterPopupPage({ params }: { params: { id: strin
   }
 
   const charter = charterResult.data as CharterWithUser
-  const allMilestones = (milestonesResult.data ?? []) as Milestone[]
 
-  // orphan 마일스톤(FK null)은 챔피언의 첫 번째 published charter에만 표시
-  // (champion 본인 편집 화면 / Gantt와 동일)
-  const { data: publishedCharters } = await supabase
-    .from('charter_submissions')
-    .select('id')
-    .eq('user_id', charter.user_id)
-    .eq('publish_status', 'published')
-    .order('submitted_at', { ascending: false })
+  // 마일스톤/형제 차터는 "현재 시즌"이 아니라 이 차터의 시즌으로 한정한다 — 지난 시즌 차터 팝업도 그 시즌 데이터로 동작.
+  const [{ data: milestonesData }, { data: publishedCharters }] = await Promise.all([
+    supabase
+      .from('milestones')
+      .select('*')
+      .eq('user_id', charter.user_id)
+      .eq('season_id', charter.season_id)
+      .eq('publish_status', 'published')
+      .order('display_order'),
+    // orphan 마일스톤(FK null)은 챔피언의 첫 번째 published charter에만 표시
+    // (champion 본인 편집 화면 / Gantt와 동일)
+    supabase
+      .from('charter_submissions')
+      .select('id')
+      .eq('user_id', charter.user_id)
+      .eq('season_id', charter.season_id)
+      .eq('publish_status', 'published')
+      .order('submitted_at', { ascending: false }),
+  ])
+  const allMilestones = (milestonesData ?? []) as Milestone[]
   const firstCharterId = publishedCharters?.[0]?.id ?? null
 
   const charterMilestones = filterMilestonesByCharter(allMilestones, charter.id, {

@@ -4,7 +4,7 @@ import { nudgeOverdueMilestones } from '@/lib/notifications'
 import { findRecentNudge, recordNudge } from '@/lib/nudge/cooldown'
 import { hasOverdueMilestone, kstTodayStr, type OverdueCandidate } from '@/lib/nudge/overdue'
 import type { MilestoneStatus } from '@/lib/types'
-import { getCurrentSeasonUserIds } from '@/lib/data/season'
+import { getCurrentSeasonUserIds, getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
   const todayStr = kstTodayStr()
 
   const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const { data: milestones, error: msErr } = await supabase
     .from('milestones')
-    .select('user_id, status, start_date, due_date')
+    .select('user_id, status, start_date, due_date').eq('season_id', seasonId)
     .eq('publish_status', 'published')
 
   if (msErr) {

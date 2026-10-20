@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { nudgeChampion } from '@/lib/notifications'
 import { findRecentNudge, recordNudge } from '@/lib/nudge/cooldown'
-import { getCurrentSeasonUserIds } from '@/lib/data/season'
+import { getCurrentSeasonUserIds, getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
+
   // 현재 시즌에 champion으로 참여 중인 유저만 조회
   const championIds = await getCurrentSeasonUserIds(supabase, 'champion')
   const { data: champions, error: usersErr } = await supabase
@@ -41,11 +43,11 @@ export async function GET(req: NextRequest) {
   const [chartersResult, milestonesResult] = await Promise.all([
     supabase
       .from('charter_submissions')
-      .select('user_id')
+      .select('user_id').eq('season_id', seasonId)
       .eq('publish_status', 'published'),
     supabase
       .from('milestones')
-      .select('user_id')
+      .select('user_id').eq('season_id', seasonId)
       .eq('publish_status', 'published'),
   ])
 

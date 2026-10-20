@@ -1,9 +1,11 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { KanbanClient } from './KanbanClient'
 import type { KanbanCard, KanbanDataV2 } from '@/lib/types'
+import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 export default async function AdminKanbanPage() {
   const supabase = createServiceClient()
+  const seasonId = await getCurrentSeasonIdOrNil(supabase)
 
   const [
     { data: users },
@@ -17,8 +19,8 @@ export default async function AdminKanbanPage() {
       .from('submissions')
       .select('id, user_id, file_name, link_url, status, attempt_number, submitted_at')
       .order('submitted_at', { ascending: false }),
-    supabase.from('milestones').select('user_id, status').eq('publish_status', 'published'),
-    supabase.from('charter_submissions').select('user_id, admin_approved_at').eq('publish_status', 'published'),
+    supabase.from('milestones').select('user_id, status').eq('season_id', seasonId).eq('publish_status', 'published'),
+    supabase.from('charter_submissions').select('user_id, admin_approved_at').eq('season_id', seasonId).eq('publish_status', 'published'),
     supabase.from('deadline_change_requests').select('user_id').eq('status', 'pending'),
   ])
 
