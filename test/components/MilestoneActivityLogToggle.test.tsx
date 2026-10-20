@@ -104,4 +104,15 @@ describe('MilestoneActivityLogToggle', () => {
     await waitFor(() => expect(screen.getByText('기록된 작업 로그가 없습니다.')).toBeInTheDocument())
     expect(mockApiFetch).toHaveBeenCalledTimes(1)
   })
+
+  it('defaultExpanded fetches immediately, starts expanded, and reports the count via onLoaded', async () => {
+    const onLoaded = vi.fn()
+    mockApiFetch.mockResolvedValue({
+      logs: [{ id: 'l1', milestone_id: 'm1', user_id: 'u1', log_date: '2026-08-07', note: '즉시 로드', created_at: '2026-08-07T10:00:00Z' }],
+    })
+    render(<MilestoneActivityLogToggle milestoneId="m1" defaultExpanded onLoaded={onLoaded} />)
+    expect(mockApiFetch).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByText('즉시 로드')).toBeInTheDocument())
+    expect(onLoaded).toHaveBeenCalledWith(1)
+  })
 })

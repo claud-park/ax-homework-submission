@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { MilestoneActivityLog } from '@/lib/types'
 
@@ -20,29 +20,42 @@ function relativeDate(dateStr: string): string {
 interface MilestoneActivityLogToggleProps {
   milestoneId: string
   userId?: string
+  defaultExpanded?: boolean
+  onLoaded?: (count: number) => void
 }
 
-export default function MilestoneActivityLogToggle({ milestoneId, userId }: MilestoneActivityLogToggleProps) {
-  const [expanded, setExpanded] = useState(false)
+export default function MilestoneActivityLogToggle({ milestoneId, userId, defaultExpanded = false, onLoaded }: MilestoneActivityLogToggleProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const [logs, setLogs] = useState<MilestoneActivityLog[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+  const autoLoaded = useRef(false)
+
+  async function load() {
+    setLoading(true)
+    setError(false)
+    try {
+      const qs = userId ? `?user_id=${userId}` : ''
+      const { logs: data } = await apiFetch<{ logs: MilestoneActivityLog[] }>(`/api/milestones/${milestoneId}/log${qs}`)
+      setLogs(data)
+      onLoaded?.(data.length)
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!defaultExpanded || autoLoaded.current) return
+    autoLoaded.current = true
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function toggle() {
     if (loading) return
-    if (!expanded && logs === null) {
-      setLoading(true)
-      setError(false)
-      try {
-        const qs = userId ? `?user_id=${userId}` : ''
-        const { logs: data } = await apiFetch<{ logs: MilestoneActivityLog[] }>(`/api/milestones/${milestoneId}/log${qs}`)
-        setLogs(data)
-      } catch {
-        setError(true)
-      } finally {
-        setLoading(false)
-      }
-    }
+    if (!expanded && logs === null) await load()
     setExpanded(e => !e)
   }
 
