@@ -11,6 +11,17 @@ export async function getCurrentSeasonId(supabase: SupabaseClient): Promise<stri
   return (data as { id: string }).id
 }
 
+/** 어떤 행과도 매칭되지 않는 uuid. 현재 시즌이 없을 때 읽기 필터에 넣어 "빈 결과"를 보장한다. */
+export const NIL_SEASON_ID = '00000000-0000-0000-0000-000000000000'
+
+/**
+ * 읽기 쿼리의 `.eq('season_id', …)`에 쓸 현재 시즌 id. 현재 시즌이 없으면 NIL_SEASON_ID를 돌려준다
+ * — `.eq('season_id', null)`은 PostgREST가 uuid 파싱 에러를 내므로 null을 넘기면 안 된다.
+ */
+export async function getCurrentSeasonIdOrNil(supabase: SupabaseClient): Promise<string> {
+  return (await getCurrentSeasonId(supabase)) ?? NIL_SEASON_ID
+}
+
 export async function getCurrentSeasonUserIds(
   supabase: SupabaseClient,
   role: 'champion' | 'partner',
