@@ -8,6 +8,7 @@ import { Users, FileText, LayoutList, LogOut, Menu, X, Calendar, Video, Smartpho
 // Upload: 과제 제출 탭 비활성화로 미사용
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
 import type { Milestone } from '@/lib/types'
+import { groupByParent, isScheduleDelayed } from '@/lib/milestone-view'
 
 const NAV = [
   { icon: Users,      label: '전체 현황',        href: '/',                      match: (p: string) => p === '/' || p.startsWith('/champions') },
@@ -36,14 +37,14 @@ export function ChampionSidebar() {
   const [hasDelayed, setHasDelayed] = useState(false)
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const d = new Date()
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     apiFetch<Milestone[]>('/api/milestones')
       .then(milestones => {
-        setHasDelayed(milestones.some(m =>
-          m.publish_status === 'published' && m.start_date && m.due_date &&
-          m.status !== 'completed' &&
-          (m.due_date < today || (m.start_date < today && m.status === 'not_started'))
-        ))
+        // 마일스톤 현황 페이지의 지연 집계와 같은 규칙(그룹 헤더 제외, 게시된 항목만)
+        const published = milestones.filter(m => m.publish_status === 'published')
+        const items = groupByParent(published).flatMap(g => g.items)
+        setHasDelayed(items.some(m => isScheduleDelayed(m, today)))
       })
       .catch(() => {})
   }, [])
