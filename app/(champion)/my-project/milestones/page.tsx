@@ -4,6 +4,7 @@ import type { Milestone, CharterSubmission } from '@/lib/types'
 import { filterMilestonesByCharter } from '@/lib/milestone-filter'
 import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 import { MilestonesClient } from './MilestonesClient'
+import { kstTodayStr } from '@/lib/nudge/overdue'
 
 export default async function WorkStatusPage({
   searchParams,
@@ -56,6 +57,7 @@ export default async function WorkStatusPage({
       charterApproved={charterApproved}
       charters={charters}
       currentCharterId={charterId}
+      todayStr={kstTodayStr()}
     />
   )
 }

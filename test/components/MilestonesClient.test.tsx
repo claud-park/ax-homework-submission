@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 
 vi.mock('@/lib/api-client', () => ({ apiFetch: vi.fn(() => Promise.resolve({})) }))
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(() => 'tid'), error: vi.fn(), info: vi.fn(), dismiss: vi.fn() } }))
 
 import { describe, it, expect, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
@@ -25,12 +25,12 @@ const base: Milestone = {
 const charter = { id: 'c', title: '과제', project_name: '과제', admin_approved_at: '2026-01-01T00:00:00Z' } as any
 
 function renderClient(ms: Milestone[]) {
-  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" />)
+  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" todayStr="2026-06-01" />)
   return screen.getByTestId('milestones-desktop')
 }
 
 function renderMobile(ms: Milestone[]) {
-  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" />)
+  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" todayStr="2026-06-01" />)
   return screen.getByTestId('milestones-mobile')
 }
 
@@ -38,6 +38,18 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockApiFetch.mockImplementation(() => Promise.resolve({}))
 })
+
+/** PATCH body를 현재 마일스톤에 병합해 돌려주는 서버 흉내. */
+function reflectPatches(initial: Milestone) {
+  let current = initial
+  mockApiFetch.mockImplementation((_url: string, init?: { method?: string, body?: string }) => {
+    if (init?.method !== 'PATCH') return Promise.resolve({ logs: [] })
+    current = { ...current, ...JSON.parse(init.body ?? '{}') }
+    return Promise.resolve({ milestone: current, parentUpdated: null })
+  })
+}
+
+const patchCalls = () => mockApiFetch.mock.calls.filter(c => c[1]?.method === 'PATCH')
 
 describe('MilestonesClient charter dropdown', () => {
   it('falls back to project_name when title is an empty string, not just null/undefined', () => {
@@ -52,6 +64,7 @@ describe('MilestonesClient charter dropdown', () => {
         charterApproved={false}
         charters={charters}
         currentCharterId="a"
+        todayStr="2026-06-01"
       />
     )
 
@@ -76,7 +89,7 @@ describe('MilestonesClient status view', () => {
     expect(msg).toBe('완료로 표시했습니다.')
     expect(opts.duration).toBe(6000)
     expect(opts.action.label).toBe('되돌리기')
-    await waitFor(() => expect(within(desktop).getByRole('button', { name: '✓ 완료' })).toBeInTheDocument())
+    await waitFor(() => expect(within(desktop).getByRole('button', { name: '완료' })).toBeInTheDocument())
 
     mockApiFetch.mockResolvedValue({ milestone: m, parentUpdated: null })
     opts.action.onClick()
@@ -93,7 +106,7 @@ describe('MilestonesClient status view', () => {
     mockApiFetch.mockResolvedValue({ milestone: { ...m, status: 'in_progress', is_manual_progress: true }, parentUpdated: null })
     const desktop = renderClient([m])
 
-    fireEvent.click(within(desktop).getByRole('button', { name: '▶ 시작' }))
+    fireEvent.click(within(desktop).getByRole('button', { name: '시작' }))
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
     const [msg, opts] = (toast.success as Mock).mock.calls[0]
@@ -102,7 +115,7 @@ describe('MilestonesClient status view', () => {
     opts.action.onClick()
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(2))
     expect(JSON.parse(mockApiFetch.mock.calls[1][1].body)).toEqual({ is_manual_progress: false })
-    await waitFor(() => expect(within(desktop).getByRole('button', { name: '▶ 시작' })).toBeInTheDocument())
+    await waitFor(() => expect(within(desktop).getByRole('button', { name: '시작' })).toBeInTheDocument())
   })
 
   it('charter_not_approved error shows the approval toast', async () => {
@@ -113,6 +126,11 @@ describe('MilestonesClient status view', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('과제정의서 승인 후 진행할 수 있습니다.'))
     expect(toast.success).not.toHaveBeenCalled()
+  })
+
+  it('uses the server-provided todayStr for D-badges (no client Date)', () => {
+    const area = renderClient([{ ...base, due_date: '2026-06-03', status: 'in_progress' } as Milestone])
+    expect(within(area).getByText('D-2')).toBeInTheDocument()
   })
 
   it('filter chip 지연 hides non-delayed rows', () => {
@@ -186,7 +204,7 @@ describe('MilestonesClient status view', () => {
     mockApiFetch.mockResolvedValue({ milestone: { ...m, is_manual_progress: true }, parentUpdated: null })
     const desktop = renderClient([m])
 
-    fireEvent.click(within(desktop).getByRole('button', { name: '▶ 시작' }))
+    fireEvent.click(within(desktop).getByRole('button', { name: '시작' }))
 
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1))
     const body = JSON.parse(mockApiFetch.mock.calls[0][1].body)
@@ -218,5 +236,64 @@ describe('MilestonesClient status view', () => {
     // parent in_progress -> its stepper offers 완료로 (the child is not_started, so only the parent has it)
     fireEvent.click(within(mobile).getByRole('button', { name: '완료로' }))
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith('/api/milestones/p', expect.objectContaining({ method: 'PATCH' })))
+  })
+
+  it('a newer transition dismisses the previous undo toast and the stale undo is refused', async () => {
+    const m = { ...base, status: 'not_started', is_manual_progress: false } as Milestone
+    reflectPatches(m)
+    ;(toast.success as Mock).mockReturnValueOnce('t1').mockReturnValueOnce('t2')
+    const desktop = renderClient([m])
+
+    fireEvent.click(within(desktop).getByRole('button', { name: '시작' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
+    const startOpts = (toast.success as Mock).mock.calls[0][1]
+    expect(toast.dismiss).not.toHaveBeenCalled()
+
+    fireEvent.click(await within(desktop).findByRole('button', { name: '완료로' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2))
+    expect((toast.success as Mock).mock.calls[1][0]).toBe('완료로 표시했습니다.')
+    expect(toast.dismiss).toHaveBeenCalledWith('t1')
+    expect(patchCalls()).toHaveLength(2)
+
+    startOpts.action.onClick()
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('이미 다른 변경이 있어 되돌릴 수 없습니다.'))
+    expect(patchCalls()).toHaveLength(2)
+    expect(toast.success).toHaveBeenCalledTimes(2)
+  })
+
+  it('undo while the same milestone is busy shows an info toast and sends nothing', async () => {
+    const m = { ...base, status: 'not_started', is_manual_progress: false } as Milestone
+    reflectPatches(m)
+    const desktop = renderClient([m])
+
+    fireEvent.click(within(desktop).getByRole('button', { name: '시작' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
+    const opts = (toast.success as Mock).mock.calls[0][1]
+
+    // 첫 되돌리기 PATCH를 매달아 둔 채 두 번째 되돌리기를 누른다.
+    let release!: (v: unknown) => void
+    mockApiFetch.mockImplementation(() => new Promise(r => { release = r }))
+    opts.action.onClick()
+    await waitFor(() => expect(patchCalls()).toHaveLength(2))
+
+    opts.action.onClick()
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('처리 중입니다. 잠시 후 다시 시도해주세요.'))
+    expect(patchCalls()).toHaveLength(2)
+
+    release({ milestone: m, parentUpdated: null })
+    await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith('되돌렸습니다.'))
+  })
+
+  it('double-clicking 시작 sends a single PATCH', async () => {
+    const m = { ...base, status: 'not_started', is_manual_progress: false } as Milestone
+    reflectPatches(m)
+    const desktop = renderClient([m])
+
+    const btn = within(desktop).getByRole('button', { name: '시작' })
+    fireEvent.click(btn)
+    fireEvent.click(btn)
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
+    expect(patchCalls()).toHaveLength(1)
   })
 })
