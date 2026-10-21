@@ -52,7 +52,7 @@ describe('postRecapDraft', () => {
     expect(arg.channel).toBe('C_CFG')
     const actions = arg.blocks.find((b: { type: string }) => b.type === 'actions')
     expect(actions.elements.map((e: { action_id: string }) => e.action_id)).toEqual(['recap_send', 'recap_edit'])
-    expect(JSON.stringify(arg.blocks)).toContain('https://app.test/admin/champions/u1')
+    expect(JSON.stringify(arg.blocks)).toContain('https://app.test/my-project/sessions/s1')
     expect(updates).toContainEqual(expect.objectContaining({ recap_slack_channel: 'C_RES', recap_slack_ts: '1.23' }))
   })
 
@@ -62,6 +62,17 @@ describe('postRecapDraft', () => {
     const slackClient = { chat: { postMessage } } as never
     await postRecapDraft({ supabase: client, slackClient, env: { ...env, channelId: undefined } }, 's1')
     await postRecapDraft({ supabase: client, slackClient, env: { ...env, token: undefined } }, 's1')
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
+  it('trims padded channel id and token, and treats blank ones as unset', async () => {
+    const { client } = makeSupabase({})
+    const postMessage = vi.fn().mockResolvedValue({ ok: true, channel: 'C1', ts: '1.0' })
+    const slackClient = { chat: { postMessage } } as never
+    await postRecapDraft({ supabase: client, slackClient, env: { ...env, channelId: ' C_CFG\n' } }, 's1')
+    expect(postMessage.mock.calls[0][0].channel).toBe('C_CFG')
+    postMessage.mockClear()
+    await postRecapDraft({ supabase: client, slackClient, env: { ...env, token: '  ' } }, 's1')
     expect(postMessage).not.toHaveBeenCalled()
   })
 

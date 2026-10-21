@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WebClient } from '@slack/web-api'
 import { buildDraftBlocks, buildRecapText } from './format'
 import { recapSlack } from './slackClient'
+import { buildNoteUrl, resolveBaseUrl, trimEnv } from './noteUrl'
 
 export interface PostRecapDraftDeps {
   supabase: SupabaseClient
@@ -15,9 +16,9 @@ export interface PostRecapDraftDeps {
  */
 export async function postRecapDraft(deps: PostRecapDraftDeps, sessionId: string): Promise<void> {
   try {
-    const channelId = deps.env?.channelId ?? process.env.RECAP_SLACK_CHANNEL_ID
-    const token = deps.env?.token ?? process.env.RECAP_SLACK_BOT_TOKEN
-    const baseUrl = deps.env?.baseUrl ?? process.env.APP_BASE_URL ?? 'http://localhost:3000'
+    const channelId = trimEnv(deps.env?.channelId ?? process.env.RECAP_SLACK_CHANNEL_ID)
+    const token = trimEnv(deps.env?.token ?? process.env.RECAP_SLACK_BOT_TOKEN)
+    const baseUrl = resolveBaseUrl(deps.env?.baseUrl)
     if (!channelId || !token) return
 
     const { supabase } = deps
@@ -52,7 +53,7 @@ export async function postRecapDraft(deps: PostRecapDraftDeps, sessionId: string
         body: a.body,
         is_completed: a.is_completed,
       })),
-      noteUrl: `${baseUrl}/admin/champions/${session.champion_user_id}`,
+      noteUrl: buildNoteUrl({ baseUrl, sessionId }),
     })
     const blocks = buildDraftBlocks({
       sessionId,

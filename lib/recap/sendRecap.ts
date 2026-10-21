@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WebClient } from '@slack/web-api'
 import { buildRecapText, escapeSlack, truncateForSlack } from './format'
 import { recapSlack } from './slackClient'
+import { buildNoteUrl, resolveBaseUrl } from './noteUrl'
 
 export interface SendRecapDeps {
   supabase: SupabaseClient
@@ -72,7 +73,7 @@ export async function sendRecapToChampion(
   }
 
   try {
-    const baseUrl = deps.baseUrl ?? process.env.APP_BASE_URL ?? 'http://localhost:3000'
+    const baseUrl = resolveBaseUrl(deps.baseUrl)
     const slack = deps.slackClient ?? recapSlack
 
     const { data: session, error: sessionError } = await supabase
@@ -108,7 +109,7 @@ export async function sendRecapToChampion(
     if (!email) return { ok: false, reason: 'no_slack_user' }
 
     const championName: string = champion?.name ?? '챔피언'
-    const noteUrl = `${baseUrl}/admin/champions/${session.champion_user_id}`
+    const noteUrl = buildNoteUrl({ baseUrl, sessionId })
 
     // Atomic claim: only one caller can flip recap_sent_at from null.
     const now = new Date()

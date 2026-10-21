@@ -96,7 +96,7 @@ describe('sendRecapToChampion', () => {
     expect(postMessage).toHaveBeenCalledTimes(1)
     const arg = postMessage.mock.calls[0][0]
     expect(arg.channel).toBe('U_CHAMP')
-    expect(arg.text).toContain('https://app.test/admin/champions/u1')
+    expect(arg.text).toContain('https://app.test/my-project/sessions/s1')
     expect(session?.recap_sent_at).toBeTruthy()
     expect(session?.recap_sent_by).toBe('admin1')
   })
@@ -198,13 +198,13 @@ describe('sendRecapToChampion', () => {
     expect(text).toContain('&lt;@U123&gt;')
     expect(text).toContain('&amp; 끝')
     expect(text).not.toMatch(/<!channel>|<@U123>|<http/)
-    expect(text).toContain('노트 전체는 여기에서 볼 수 있어요: https://app.test/admin/champions/u1')
+    expect(text).toContain('노트 전체는 여기에서 볼 수 있어요: https://app.test/my-project/sessions/s1')
   })
 
   it('does not duplicate the note link when the override already contains it', async () => {
     const { client } = makeSupabase()
     const { slack, postMessage } = makeSlack()
-    const url = 'https://app.test/admin/champions/u1'
+    const url = 'https://app.test/my-project/sessions/s1'
     await sendRecapToChampion(
       { supabase: client, slackClient: slack, baseUrl },
       { sessionId: 's1', adminId: 'a1', textOverride: `내용이에요 ${url}` },
@@ -223,7 +223,7 @@ describe('sendRecapToChampion', () => {
     const text = postMessage.mock.calls[0][0].text
     expect(text.length).toBeLessThanOrEqual(2900)
     expect(text).toContain('…')
-    expect(text.endsWith('https://app.test/admin/champions/u1')).toBe(true)
+    expect(text.endsWith('https://app.test/my-project/sessions/s1')).toBe(true)
   })
 
   it('refuses as stale when the stored ts is null and expectedDraftTs is given', async () => {
@@ -258,7 +258,7 @@ describe('sendRecapToChampion', () => {
   it('keeps the note link even when the override contains it only in the truncated tail', async () => {
     const { client } = makeSupabase()
     const { slack, postMessage } = makeSlack()
-    const url = 'https://app.test/admin/champions/u1'
+    const url = 'https://app.test/my-project/sessions/s1'
     await sendRecapToChampion(
       { supabase: client, slackClient: slack, baseUrl },
       { sessionId: 's1', adminId: 'a1', textOverride: `${'가'.repeat(5000)} ${url}` },

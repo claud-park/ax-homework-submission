@@ -32,7 +32,9 @@ where table_name = 'check_up_sessions' and column_name like 'recap_%' order by c
 - [ ] 앱 설정 > Install App: Bot User OAuth Token(`xoxb-...`) 확인
 - [ ] 앱 설정 > Basic Information: Signing Secret 확인
 - [ ] Interactivity가 ON이고 Request URL이 `https://ax-homework-submission.vercel.app/api/one-on-one/slack/interactions`
-- [ ] Bot 스코프: `chat:write`, `chat:write.public`, `im:write`, `users:read`, `users:read.email` (`chat:write.public`이 있어 채널 초대는 필수 아님)
+- [ ] Bot 스코프: `chat:write`, `chat:write.public`, `im:write`, `users:read`, `users:read.email`
+- [ ] `AX-1on1-Recap` 봇을 채널 `C0CAZ6XP4F6`에 초대한다. 이 채널은 비공개라 `chat:write.public`(공개 채널 전용)이 적용되지 않고, 초대하지 않으면 게시가 `not_in_channel`로 실패한다(로그만 남음). `chat.postEphemeral`도 멤버십이 필요할 수 있다.
+- [ ] 채널은 Admin 전용이어야 한다. 처리 완료(`done`)된 모든 노트의 요약과 액션 아이템이 이 채널에 올라간다.
 - 기존 예약 앱 `AX-1-on-1`은 건드리지 않는다 (Interactivity URL이 다른 Vercel 프로젝트를 가리킴).
 
 ## 3. Vercel production 환경변수 (머지 전)
@@ -47,7 +49,9 @@ vercel env ls production                               # 이름만 확인
 
 - `RECAP_SLACK_SIGNING_SECRET`이 없으면 fail-closed라 모든 버튼 클릭이 401이 된다. 머지 전에 꼭 확인한다.
 - 새 env는 재배포해야 적용된다. 4단계에서 main 머지로 배포되므로 그대로 반영된다. 이미 배포된 뒤 값을 바꿨다면 `vercel redeploy <배포 URL>`.
-- `APP_BASE_URL`, `ADMIN_SLACK_*`는 기존 production 값을 확인만 한다.
+- `APP_BASE_URL`은 production URL이어야 한다. 아니면 DM 링크가 `http://localhost:3000`으로 나간다.
+- `ADMIN_SLACK_CLAUD/ALEX/JENNIFER`에는 실제 Slack ID가 들어 있어야 한다. 아니면 모든 클릭이 "Admin만"으로 거절된다.
+- 값 앞뒤 공백/줄바꿈은 코드에서 제거하지만, 입력할 때도 넣지 않는다.
 
 ## 4. 머지와 배포
 
@@ -61,10 +65,11 @@ vercel env ls production                               # 이름만 확인
 1. 해당 세션 재처리 (또는 짧은 테스트 녹음 처리)
 2. 채널 `C0CAZ6XP4F6`에 recap 초안과 [챔피언에게 발송], [수정 후 발송] 버튼이 뜨는지 확인
 3. [수정 후 발송] 클릭: 모달 prefill이 읽기 좋은 텍스트인지 확인 후 제출
-4. 본인 DM 수신 확인. 초안이 "발송했어요" 한 줄로 바뀌고 버튼은 사라진다.
+4. 본인 DM 수신 확인. DM의 노트 링크는 `<APP_BASE_URL>/my-project/sessions/<세션 id>` 형태여야 한다. 초안이 "발송했어요" 한 줄로 바뀌고 버튼은 사라진다.
 5. 같은 세션을 다시 재처리하면 새 초안이 버튼과 함께 올라오고 발송 상태가 초기화된다 (다시 보내면 챔피언에게 DM이 또 간다. 챔피언이 운영자 본인인 테스트 세션에서만 할 것). 재처리를 한 번 더 한 뒤 **이전** 초안의 버튼을 누르면 "이미 새 초안으로 대체됐어요"가 나와야 한다 (단, 이전 초안은 이미 발송됐다면 버튼이 없으니 발송 전 상태의 이전 초안으로 확인).
    "이미 발송됐어요"는 두 Admin이 동시에 누른 경합에서만 나온다.
-6. (가능하면) Admin이 아닌 계정의 클릭 시 본인에게만 보이는 "recap 발송은 Admin만 할 수 있어요" 확인
+6. Admin이 아닌 챔피언 계정으로 로그인해 DM 링크(본인 세션)를 열어 노트가 보이는지 확인한다. 운영자는 Admin이라 본인 테스트로는 죽은 링크를 알 수 없다.
+7. (가능하면) Admin이 아닌 계정의 클릭 시 본인에게만 보이는 "recap 발송은 Admin만 할 수 있어요" 확인
 
 | 증상 | 의미 |
 |---|---|

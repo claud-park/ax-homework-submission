@@ -7,6 +7,7 @@ import {
 } from '@/lib/recap/interactions'
 import { recapSlack } from '@/lib/recap/slackClient'
 import { sendRecapToChampion } from '@/lib/recap/sendRecap'
+import { trimEnv } from '@/lib/recap/noteUrl'
 import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, getAdminIdBySlackUserId, getSlackUserIdByAdminId, type AdminId } from '@/lib/one-on-one/slack'
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   // 같은 URL을 두 Slack 앱(booking: AX-1-on-1, recap: AX-1on1-Recap)이 쓴다 → 서명한 앱을 판별.
   const signedBy = resolveSignedBy(
     { body, timestamp, signature },
-    { booking: process.env.SLACK_SIGNING_SECRET, recap: process.env.RECAP_SLACK_SIGNING_SECRET },
+    { booking: process.env.SLACK_SIGNING_SECRET, recap: trimEnv(process.env.RECAP_SLACK_SIGNING_SECRET) },
   )
   if (!signedBy) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   const payload = parseInteractionPayload(body)
   if (!payload) return NextResponse.json({}, { status: 400 })
 
-  const route = dispatchInteraction(payload, signedBy, { recapAppId: process.env.RECAP_SLACK_APP_ID })
+  const route = dispatchInteraction(payload, signedBy, { recapAppId: trimEnv(process.env.RECAP_SLACK_APP_ID) })
   if (route === 'recap') {
     const result = await handleRecapAction(
       {
