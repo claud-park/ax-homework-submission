@@ -52,7 +52,7 @@ describe('MilestoneRow', () => {
   it('unapproved charter disables the stepper', () => {
     render(<MilestoneRow m={base} todayStr="2026-10-20" charterApproved={false} {...handlers} />)
     expect(screen.getByTitle('과제정의서 승인 후 진행할 수 있습니다')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /시작/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /시작/ })).toHaveAttribute('aria-disabled', 'true')
   })
 
   describe('deadline link in detail panel', () => {
