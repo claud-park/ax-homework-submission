@@ -39,12 +39,12 @@ const BADGE_STYLE: Record<'ok' | 'soon' | 'over' | 'muted', CSSProperties> = {
 
 export const CHIP_STYLE: CSSProperties = {
   fontSize: 11, background: 'var(--surface-primary)', color: 'var(--text-secondary)',
-  borderRadius: 4, padding: '1px 6px', flexShrink: 0,
+  borderRadius: 4, padding: '1px 6px', flexShrink: 0, whiteSpace: 'nowrap',
 }
 
 const LINK_STYLE: CSSProperties = {
   background: 'none', border: 'none', padding: 0, color: 'var(--text-secondary)',
-  cursor: 'pointer', textDecoration: 'underline',
+  cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap',
 }
 
 /** D-배지. 기한이 없고 미완료면 '기한 설정' 링크로 대체한다. */
@@ -56,7 +56,7 @@ export function DueBadge({ m, todayStr, onDeadlineExtension }: {
   const badge = dueBadge(m, todayStr)
   if (badge) {
     return (
-      <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 4, padding: '2px 6px', ...BADGE_STYLE[badge.tone] }}>
+      <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', flexShrink: 0, ...BADGE_STYLE[badge.tone] }}>
         {badge.label}
       </span>
     )
@@ -272,7 +272,7 @@ export function MilestoneRow({
             <button
               type="button"
               onClick={() => onIssueClick(m)}
-              className="text-xs font-semibold px-3"
+              className="text-xs font-semibold px-3 whitespace-nowrap flex-shrink-0"
               style={{ height: issueBtnHeight, borderRadius: 8, border: '1px solid var(--error)', color: 'var(--error)', background: 'transparent' }}
             >
               이슈 보고
@@ -280,7 +280,7 @@ export function MilestoneRow({
           )}
           {pending && !completed && (
             <span
-              className="text-xs font-semibold px-3 inline-flex items-center"
+              className="text-xs font-semibold px-3 inline-flex items-center whitespace-nowrap flex-shrink-0"
               style={{
                 height: issueBtnHeight, borderRadius: 8, color: 'var(--error)',
                 background: 'rgba(229,23,47,0.06)', border: '1px solid rgba(229,23,47,0.3)',
