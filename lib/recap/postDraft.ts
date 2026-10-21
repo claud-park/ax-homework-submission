@@ -63,22 +63,26 @@ export async function postRecapDraft(deps: PostRecapDraftDeps, sessionId: string
       previouslySent,
     })
 
-    // 재처리: 이전 발송 상태와 옛 초안 위치를 비운다(게시 실패 시 stale ts가 남지 않도록 먼저 비움).
-    await supabase
-      .from('check_up_sessions')
-      .update({ recap_sent_at: null, recap_sent_by: null, recap_slack_channel: null, recap_slack_ts: null })
-      .eq('id', sessionId)
-
     const res = await slackClient.chat.postMessage({
       channel: channelId,
       text: `${championName} 챔피언 recap 초안`,
       blocks,
     })
     if (res.channel && res.ts) {
-      await supabase
+      // 게시 성공 후에만 한 번에 갱신: 새 위치 저장 + 발송 상태 초기화.
+      // 실패 경로에서는 recap_sent_at/by 를 건드리지 않아 "이미 발송됨" 정보가 보존된다.
+      const { error } = await supabase
         .from('check_up_sessions')
-        .update({ recap_slack_channel: res.channel, recap_slack_ts: res.ts })
+        .update({
+          recap_slack_channel: res.channel,
+          recap_slack_ts: res.ts,
+          recap_sent_at: null,
+          recap_sent_by: null,
+        })
         .eq('id', sessionId)
+      if (error) {
+        console.error(`[session ${sessionId}] recap draft posted but state update failed:`, error.message)
+      }
     }
   } catch (err) {
     console.error(`[session ${sessionId}] recap draft post failed:`, err instanceof Error ? err.message : 'unknown error')
