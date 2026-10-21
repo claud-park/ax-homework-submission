@@ -92,6 +92,7 @@ export function StageStepper({
             aria-describedby={showReason ? reasonId : undefined}
             style={{
               flex: 1,
+              whiteSpace: 'nowrap',
               fontSize: 12,
               fontWeight: 600,
               border: 'none',

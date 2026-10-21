@@ -82,7 +82,7 @@ export function MobileMilestoneCard({
               <button
                 type="button"
                 onClick={() => onIssueClick(m)}
-                className="text-xs font-semibold px-3 flex-shrink-0"
+                className="text-xs font-semibold px-3 flex-shrink-0 whitespace-nowrap"
                 style={{ height: 34, borderRadius: 8, border: '1px solid var(--error)', color: 'var(--error)', background: 'transparent' }}
               >
                 이슈 보고
