@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const payload = parseInteractionPayload(body)
   if (!payload) return NextResponse.json({}, { status: 400 })
 
-  const route = dispatchInteraction(payload, signedBy)
+  const route = dispatchInteraction(payload, signedBy, { recapAppId: process.env.RECAP_SLACK_APP_ID })
   if (route === 'recap') {
     const result = await handleRecapAction(
       {

@@ -54,8 +54,14 @@ export type InteractionRoute = 'recap' | 'booking_confirm' | 'booking_cancel' | 
  * 어떤 핸들러를 실행할지 정한다. recap 요청은 recap 앱 서명일 때만, booking 요청은
  * booking 앱 서명일 때만 처리한다('both' = 같은 비밀 → action 소속으로 결정).
  */
-export function dispatchInteraction(payload: Payload, signedBy: SignedBy): InteractionRoute {
-  const recapOk = signedBy === 'recap' || signedBy === 'both'
+export function dispatchInteraction(
+  payload: Payload,
+  signedBy: SignedBy,
+  opts: { recapAppId?: string } = {},
+): InteractionRoute {
+  // RECAP_SLACK_APP_ID가 설정돼 있으면 recap 요청은 그 앱에서 온 것만 받는다(미설정 시 기존 동작).
+  const appOk = !opts.recapAppId || payload.api_app_id === opts.recapAppId
+  const recapOk = (signedBy === 'recap' || signedBy === 'both') && appOk
   const bookingOk = signedBy === 'booking' || signedBy === 'both'
 
   // view_submission에는 actions가 없으므로 먼저 분기한다.
@@ -153,6 +159,16 @@ async function updateDraftAsSent(
   )
 }
 
+/**
+ * escape된 recap 문구 → 모달에 넣을 사람이 읽는 문구. toSlackMrkdwn이 만든 `<https://…|label>` 링크는
+ * `label (url)`로 바꾼다(그대로 두면 제출 시 escape돼 DM에 `&lt;url|label&gt;`로 보인다).
+ * escape된 recap에서 `<`는 우리가 만든 링크 토큰뿐이다(사용자 `<`는 `&lt;`).
+ */
+export function toModalPrefill(escaped: string): string {
+  const delinked = escaped.replace(/<(https?:\/\/[^|>\s]+)\|([^>]*)>/g, '$2 ($1)')
+  return unescapeSlack(delinked).slice(0, MODAL_TEXT_MAX)
+}
+
 /** 초안 메시지의 본문(section mrkdwn, 이미 escape된 recap 문구)을 사람이 읽는 문구로 되돌린다. */
 function draftTextFromMessage(message: Payload): string {
   const blocks = Array.isArray(message.blocks) ? message.blocks : []
@@ -160,7 +176,7 @@ function draftTextFromMessage(message: Payload): string {
     const block = obj(b)
     const text = obj(block.text)
     if (block.type === 'section' && typeof text.text === 'string') {
-      return unescapeSlack(text.text).slice(0, MODAL_TEXT_MAX)
+      return toModalPrefill(text.text)
     }
   }
   return ''
@@ -278,7 +294,12 @@ async function handleEditSubmit(deps: RecapInteractionDeps, payload: Payload): P
     await updateDraftAsSent(deps, meta, adminId, result)
     return { response_action: 'clear' }
   }
-  if (result.reason === 'already_sent') return { response_action: 'clear' }
+  if (result.reason === 'already_sent') {
+    await safe('chat.postEphemeral', () =>
+      deps.slack.chat.postEphemeral({ channel: meta.channel, user: userId, text: MSG.alreadySent }),
+    )
+    return { response_action: 'clear' }
+  }
   return { response_action: 'errors', errors: { recap_text: failureMessage(result.reason) } }
 }
 

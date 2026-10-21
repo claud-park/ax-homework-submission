@@ -6,6 +6,7 @@ import {
   handleRecapAction,
   parseInteractionPayload,
   resolveSignedBy,
+  toModalPrefill,
   type RecapInteractionDeps,
 } from '@/lib/recap/interactions'
 import type { SendRecapResult } from '@/lib/recap/sendRecap'
@@ -342,14 +343,6 @@ describe('handleRecapAction: recap_edit_submit', () => {
     expect(slack.chat.postMessage).not.toHaveBeenCalled()
   })
 
-  it('already_sent closes the modal and updates nothing', async () => {
-    const { deps, slack } = makeDeps({ ok: false, reason: 'already_sent' })
-    const res = await handleRecapAction(deps, viewSubmission('x'))
-    expect(res).toEqual({ response_action: 'clear' })
-    expect(slack.chat.update).not.toHaveBeenCalled()
-    expect(slack.chat.postMessage).not.toHaveBeenCalled()
-  })
-
   it('failure reasons are shown as modal errors', async () => {
     const cases = [
       ['stale_draft', '이미 새 초안으로 대체됐어요. 최신 초안에서 발송해 주세요.'],
@@ -373,5 +366,78 @@ describe('handleRecapAction: recap_edit_submit', () => {
     err.mockRestore()
     expect(res).toEqual({ response_action: 'errors', errors: { recap_text: '이 세션은 지금 발송할 수 없어요.' } })
     expect(sendRecap).not.toHaveBeenCalled()
+  })
+})
+
+describe('fix round 1', () => {
+  it('modal already_sent closes the modal and notifies the submitter by ephemeral only', async () => {
+    const { deps, slack, calls } = makeDeps({ ok: false, reason: 'already_sent' })
+    const res = await handleRecapAction(deps, viewSubmission('x'))
+    expect(res).toEqual({ response_action: 'clear' })
+    expect(slack.chat.postEphemeral).toHaveBeenCalledWith({ channel: DRAFT_CHANNEL, user: ADMIN_SLACK, text: '이미 발송됐어요.' })
+    expect(slack.chat.update).not.toHaveBeenCalled()
+    expect(slack.chat.postMessage).not.toHaveBeenCalled()
+    expect(calls).toEqual(['sendRecap', 'chat.postEphemeral'])
+  })
+
+  describe('toModalPrefill', () => {
+    it('turns <https://…|label> link tokens into "label (url)"', () => {
+      expect(toModalPrefill('노트: <https://ax.example.com/a?x=1&amp;y=2|노트 &amp; 메모> 끝')).toBe(
+        '노트: 노트 & 메모 (https://ax.example.com/a?x=1&y=2) 끝',
+      )
+      expect(toModalPrefill('<http://a.io|a>')).toBe('a (http://a.io)')
+    })
+    it('leaves text without links unchanged (apart from unescaping)', () => {
+      expect(toModalPrefill('안녕하세요\n• 1 &lt; 2')).toBe('안녕하세요\n• 1 < 2')
+    })
+    it('does not treat non-http tokens or escaped literals as links', () => {
+      expect(toModalPrefill('<mailto:a@b.c|x>')).toBe('<mailto:a@b.c|x>')
+      expect(toModalPrefill('&lt;!channel&gt; &lt;https://evil.io|click&gt;')).toBe('<!channel> <https://evil.io|click>')
+    })
+    it('still round-trips escaped literals', () => {
+      for (const s of ['&amp;lt;', '&lt;&gt;&amp;', '<@U1> & <!here>', '&&&<<>>', '&amp;amp;gt;', '<https://x.io|y>', '']) {
+        expect(toModalPrefill(escapeSlack(s))).toBe(s)
+      }
+    })
+    it('a literal <!channel> from the prefill is passed through and escaped exactly once by sendRecap', async () => {
+      const prefill = toModalPrefill(escapeSlack('<!channel> 보세요'))
+      expect(prefill).toBe('<!channel> 보세요')
+      const { deps, sendRecap } = makeDeps()
+      await handleRecapAction(deps, viewSubmission(prefill))
+      expect(sendRecap).toHaveBeenCalledWith(expect.objectContaining({ textOverride: '<!channel> 보세요' }))
+      // sendRecap's escaping turns it into a non-mention literal
+      expect(escapeSlack(prefill)).toBe('&lt;!channel&gt; 보세요')
+    })
+    it('the edit modal prefill uses it', async () => {
+      const { deps, slack } = makeDeps()
+      const p = blockAction('recap_edit')
+      ;(p.message.blocks[2] as { text: { text: string } }).text.text = '여기: <https://ax.io/n|노트>'
+      await handleRecapAction(deps, p)
+      const view = ((slack.views.open.mock.calls[0] as unknown[])[0] as { view: { blocks: { element: { initial_value: string } }[] } }).view
+      expect(view.blocks[0].element.initial_value).toBe('여기: 노트 (https://ax.io/n)')
+    })
+  })
+
+  describe('RECAP_SLACK_APP_ID gate', () => {
+    const withApp = <T extends object>(p: T, id?: string) => ({ ...p, api_app_id: id })
+    it('set + match → handled', () => {
+      expect(dispatchInteraction(withApp(blockAction('recap_send'), 'A1'), 'recap', { recapAppId: 'A1' })).toBe('recap')
+      expect(dispatchInteraction(withApp(blockAction('recap_edit'), 'A1'), 'recap', { recapAppId: 'A1' })).toBe('recap')
+      expect(dispatchInteraction(withApp(viewSubmission('x'), 'A1'), 'both', { recapAppId: 'A1' })).toBe('recap')
+    })
+    it('set + mismatch/missing → ignored', () => {
+      expect(dispatchInteraction(withApp(blockAction('recap_send'), 'A2'), 'recap', { recapAppId: 'A1' })).toBe('ignore')
+      expect(dispatchInteraction(blockAction('recap_edit'), 'recap', { recapAppId: 'A1' })).toBe('ignore')
+      expect(dispatchInteraction(withApp(viewSubmission('x'), 'A2'), 'recap', { recapAppId: 'A1' })).toBe('ignore')
+    })
+    it('unset or empty → handled as before', () => {
+      expect(dispatchInteraction(withApp(blockAction('recap_send'), 'A2'), 'recap', {})).toBe('recap')
+      expect(dispatchInteraction(withApp(blockAction('recap_send'), 'A2'), 'recap', { recapAppId: '' })).toBe('recap')
+      expect(dispatchInteraction(blockAction('recap_send'), 'recap')).toBe('recap')
+    })
+    it('booking routes are not affected', () => {
+      expect(dispatchInteraction(withApp(blockAction('confirm_1on1'), 'A2'), 'booking', { recapAppId: 'A1' })).toBe('booking_confirm')
+      expect(dispatchInteraction(blockAction('cancel_1on1'), 'booking', { recapAppId: 'A1' })).toBe('booking_cancel')
+    })
   })
 })
