@@ -47,4 +47,40 @@ describe('pollProcessing', () => {
       pollProcessing('s1', async () => 'tok', () => {}, { intervalMs: 5, timeoutMs: 12 }),
     ).rejects.toThrow(/초과/)
   })
+
+  it('survives fetch throwing and resumes', async () => {
+    const ok = mockFetchSequence(['done'])
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async (...args: unknown[]) => {
+      calls++
+      if (calls <= 2) throw new TypeError('Failed to fetch')
+      return (ok as unknown as (...a: unknown[]) => Promise<Response>)(...args)
+    }))
+    const conn: boolean[] = []
+    const result = await pollProcessing('s1', async () => 'tok', () => {}, {
+      intervalMs: 1,
+      timeoutMs: 5000,
+      onConnection: c => conn.push(c),
+    })
+    expect(result.processing_status).toBe('done')
+    expect(conn).toEqual([false, true])
+  })
+
+  it('does not time out while disconnected', async () => {
+    const ok = mockFetchSequence(['done'])
+    const t0 = Date.now()
+    vi.stubGlobal('fetch', vi.fn(async (...args: unknown[]) => {
+      if (Date.now() - t0 < 200) throw new TypeError('Failed to fetch')
+      return (ok as unknown as (...a: unknown[]) => Promise<Response>)(...args)
+    }))
+    const result = await pollProcessing('s1', async () => 'tok', () => {}, { intervalMs: 1, timeoutMs: 50 })
+    expect(result.processing_status).toBe('done')
+  })
+
+  it('still times out when connected but never terminal', async () => {
+    vi.stubGlobal('fetch', mockFetchSequence(['summarizing']))
+    await expect(
+      pollProcessing('s1', async () => 'tok', () => {}, { intervalMs: 5, timeoutMs: 30, onConnection: () => {} }),
+    ).rejects.toThrow(/초과/)
+  })
 })
