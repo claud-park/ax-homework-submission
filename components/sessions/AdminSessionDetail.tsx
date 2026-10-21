@@ -1,8 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Trash2, Send, RefreshCw, Download, Pencil } from 'lucide-react'
 import { apiFetch, getAuthToken } from '@/lib/api-client'
 import { pollProcessing } from '@/lib/sessions/pollProcessing'
+import { deleteRecording } from '@/lib/audio/localRecordingStore'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { RecordingPanel } from '@/components/sessions/RecordingPanel'
@@ -42,6 +43,9 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   const [deleting, setDeleting] = useState(false)
 
   const [reprocessing, setReprocessing] = useState(false)
+  // 이 기기에 전체 녹음 보관본이 있으면 서버의 일부 청크 복구보다 보관본을 우선한다.
+  // RecordingPanel이 보관본 조회를 마치고 알려 주기 전까지는 true로 두어 복구 배너가 깜빡이지 않게 한다.
+  const [hasLocalCopy, setHasLocalCopy] = useState(true)
 
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -76,10 +80,27 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
   useEffect(() => { load() }, [sessionId])
 
-  async function refreshSessionMeta() {
+  // 서버가 이미 전체 오디오를 갖고 있으면(audio_file_path 설정 또는 처리 완료) 로컬 복사본은 불필요하다.
+  // 세션당 한 번만 정리해, 남은 복사본이 복원 배너를 띄우지 않게 한다.
+  const cleanedLocalRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!session || session.id !== sessionId || cleanedLocalRef.current === sessionId) return
+    const status = session.processing_status
+    if (session.audio_file_path || status === 'done' || status === 'low_quality') {
+      cleanedLocalRef.current = sessionId
+      void deleteRecording(sessionId)
+    }
+  }, [session, sessionId])
+
+  async function refreshSessionMeta(syncAudioPath = false) {
     try {
       const data = await apiFetch<CheckUpSession>(`/api/sessions/${sessionId}`)
-      setSession(prev => prev ? { ...prev, updated_at: data.updated_at } : prev)
+      setSession(prev => prev ? {
+        ...prev,
+        updated_at: data.updated_at,
+        // 복구 재처리는 서버가 audio_file_path 를 저장하므로 반영해 녹음 패널을 다운로드 영역으로 전환한다.
+        ...(syncAudioPath ? { audio_file_path: data.audio_file_path, stored_audio_chunk_count: 0 } : {}),
+      } : prev)
     } catch { /* best-effort: stale updated_at만 갱신 실패, 치명적 아님 */ }
   }
 
@@ -149,7 +170,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       setNotes(final.notes ?? '')
       setActionItems(final.action_items ?? [])
       setSession(prev => prev ? { ...prev, processing_status: final.processing_status, notes: final.notes } : prev)
-      await refreshSessionMeta()
+      await refreshSessionMeta(true)
       const u = final.processing_usage
       if (u) {
         toast.success(`재처리 완료! Whisper $${u.stt.cost.toFixed(3)} · Claude $${u.claude.cost.toFixed(4)} · 합계 $${u.totalCost.toFixed(4)}`)
@@ -307,6 +328,35 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         </div>
       )}
 
+      {/* Recovery banner — audio fully uploaded but /process never ran (audio_file_path empty) */}
+      {!session.audio_file_path
+        && (session.stored_audio_chunk_count ?? 0) > 0
+        && !reprocessing
+        && !hasLocalCopy
+        && session.processing_status !== 'transcribing'
+        && session.processing_status !== 'summarizing'
+        && session.processing_status !== 'done'
+        && session.processing_status !== 'low_quality' && (
+        <div
+          className="rounded-xl border p-3 mb-4 flex items-center justify-between"
+          style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
+        >
+          <div>
+            <p className="text-xs font-semibold" style={{ color: 'var(--error)' }}>처리되지 않은 녹음</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>업로드된 녹음이 있지만 처리되지 않았어요. 저장된 오디오로 처리할 수 있어요.</p>
+          </div>
+          <button
+            onClick={reprocess}
+            disabled={reprocessing}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-40"
+            style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+          >
+            <RefreshCw className="h-3 w-3" />
+            저장된 오디오로 처리
+          </button>
+        </div>
+      )}
+
       {/* Low quality banner — shown when transcript quality was too low */}
       {session.processing_status === 'low_quality' && (
         <div
@@ -335,7 +385,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
       {/* Recording panel (new session) OR downloads (already-recorded session) */}
       {!session.audio_file_path ? (
-        <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} />
+        <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} onRestorableChange={setHasLocalCopy} />
       ) : (
         <div
           className="rounded-xl border p-3 mb-4"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { claimSessionForProcessing } from '@/lib/sessions/lock'
 import { runProcessingInBackground } from '@/lib/sessions/runProcessingInBackground'
+import { listStoredChunkPaths } from '@/lib/sessions/storedAudio'
 import { requireAdmin } from '@/lib/api/guard'
 
 // 재처리도 백그라운드 실행 + 폴링. 클라이언트는 processing_status 를 폴링한다.
@@ -24,17 +25,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
-  const BUCKET = 'check-up-sessions'
-
   // 오디오 경로 확정 + 클레임은 동기(409/400 즉시 반환).
-  const { data: listed } = await supabase.storage.from(BUCKET).list(`sessions/${params.sessionId}`, { limit: 100 })
-  const chunkNames = (listed ?? [])
-    .map(o => o.name)
-    .filter(n => /^chunk_\d+\.wav$/.test(n))
-    .sort()
+  const chunkPaths = await listStoredChunkPaths(supabase, params.sessionId)
   let audioPaths: string[]
-  if (chunkNames.length > 0) {
-    audioPaths = chunkNames.map(n => `sessions/${params.sessionId}/${n}`)
+  if (chunkPaths.length > 0) {
+    audioPaths = chunkPaths
   } else if (session.audio_file_path) {
     audioPaths = [session.audio_file_path]   // 레거시 단일 파일
   } else {
@@ -47,6 +42,15 @@ export async function POST(req: NextRequest, { params }: Params) {
       { error: '이미 처리 중인 세션입니다. 잠시 후 다시 시도하세요.' },
       { status: 409 }
     )
+  }
+
+  // 업로드만 끝나고 /process 가 돌지 못한 세션(audio_file_path 비어 있음)을 복구하는 경우,
+  // /process 와 동일하게 경로를 저장해 완료 후 화면이 다운로드 영역으로 전환되게 한다.
+  // audio_file_path 가 이미 있으면(일반 재처리) 아무것도 바꾸지 않는다.
+  if (!session.audio_file_path) {
+    await supabase.from('check_up_sessions')
+      .update({ audio_file_path: audioPaths[0], audio_chunk_paths: audioPaths })
+      .eq('id', params.sessionId)
   }
 
   // 재처리도 응답 후 백그라운드에서 실행.
