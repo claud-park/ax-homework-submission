@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHmac, timingSafeEqual } from 'crypto'
+import { verifySlackSignature } from '@/lib/one-on-one/slackSignature'
 import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, getAdminIdBySlackUserId, getSlackUserIdByAdminId, type AdminId } from '@/lib/one-on-one/slack'
@@ -8,31 +8,17 @@ import { formatSlotLabel, formatSlotRange } from '@/lib/one-on-one/slot-utils'
 import { enableMeetAutoArtifacts } from '@/lib/one-on-one/meet'
 import { findFreeRoom } from '@/lib/one-on-one/meeting-rooms'
 
-function verifySlackSignature(
-  secret: string,
-  body: string,
-  timestamp: string,
-  signature: string
-): boolean {
-  const base = `v0:${timestamp}:${body}`
-  const hash = createHmac('sha256', secret).update(base).digest('hex')
-  const sigBuf = Buffer.from(signature)
-  const hashBuf = Buffer.from(`v0=${hash}`)
-  if (sigBuf.length !== hashBuf.length) return false
-  return timingSafeEqual(sigBuf, hashBuf)
-}
-
 export async function POST(req: NextRequest) {
   const body = await req.text()
-  const timestamp = req.headers.get('x-slack-request-timestamp') ?? ''
-  const signature = req.headers.get('x-slack-signature') ?? ''
+  const timestamp = req.headers.get('x-slack-request-timestamp')
+  const signature = req.headers.get('x-slack-signature')
 
-  if (!verifySlackSignature(
-    process.env.SLACK_SIGNING_SECRET!,
+  if (!verifySlackSignature({
     body,
     timestamp,
-    signature
-  )) {
+    signature,
+    secret: process.env.SLACK_SIGNING_SECRET!,
+  })) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
