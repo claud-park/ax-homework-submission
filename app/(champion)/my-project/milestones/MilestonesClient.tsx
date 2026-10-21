@@ -170,6 +170,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
   }
 
   // 이슈 보고·노트·기한 변경은 단계를 바꾸지 않으므로 전환 순번(transitionSeq)을 올리지 않는다.
+  // (이슈 보고 body의 is_manual_completed:false는 지연·미완료 항목에만 열리는 경로라 이미 false다.)
   async function handleCheckinIssueReport(id: string, type: BottleneckType, note: string | null) {
     try {
       const { milestone: updated } = await apiFetch<PatchResult>(`/api/milestones/${id}`, {

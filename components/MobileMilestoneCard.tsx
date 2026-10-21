@@ -63,7 +63,7 @@ export function MobileMilestoneCard({
               {fmtRange(m)}
             </span>
             <DueBadge m={m} todayStr={todayStr} onDeadlineExtension={onDeadlineExtension} />
-            {noteEditor.editing && !expanded && <span style={CHIP_STYLE}>노트 편집중</span>}
+            {noteEditor.editing && !expanded && stage === 'in_progress' && <span style={CHIP_STYLE}>노트 편집중</span>}
             {pending && !completed && (
               <span
                 className="text-xs font-semibold px-2 inline-flex items-center"

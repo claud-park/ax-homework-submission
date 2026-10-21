@@ -115,7 +115,7 @@ export function MilestoneDetailPanel({
     >
     <div className="flex flex-col gap-2 min-w-0">
       <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>진행 노트</span>
-      {noteEditor.editing ? (
+      {canEditNote && noteEditor.editing ? (
         <div className="flex flex-col gap-1.5">
           <textarea
             autoFocus
@@ -257,7 +257,7 @@ export function MilestoneRow({
           </span>
           {m.note && <span style={CHIP_STYLE}>노트</span>}
           {logCount !== null && <span style={CHIP_STYLE}>로그 {logCount}</span>}
-          {noteEditor.editing && !expanded && <span style={CHIP_STYLE}>노트 편집중</span>}
+          {noteEditor.editing && !expanded && stage === 'in_progress' && <span style={CHIP_STYLE}>노트 편집중</span>}
         </div>
 
         <div className="flex items-center gap-2">

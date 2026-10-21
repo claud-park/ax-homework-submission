@@ -122,3 +122,19 @@ describe('MilestoneRow', () => {
     expect(screen.queryByText('노트 편집중')).not.toBeInTheDocument()
   })
 })
+
+it('hides the editor and the 노트 편집중 chip once the stage leaves in_progress', () => {
+  const m = { ...base, status: 'in_progress', is_manual_progress: true, due_date: '2026-10-30' } as Milestone
+  const { rerender } = render(<MilestoneRow m={m} todayStr="2026-10-20" charterApproved {...handlers} />)
+  fireEvent.click(screen.getByRole('button', { name: '상세 펼치기' }))
+  fireEvent.click(screen.getByRole('button', { name: '노트 편집' }))
+  fireEvent.change(screen.getByPlaceholderText('진행 상황을 간단히 메모해주세요'), { target: { value: '초안' } })
+  fireEvent.click(screen.getByRole('button', { name: '상세 접기' }))
+  rerender(<MilestoneRow m={{ ...m, is_manual_completed: true }} todayStr="2026-10-20" charterApproved {...handlers} />)
+  expect(screen.queryByText('노트 편집중')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '상세 펼치기' }))
+  expect(screen.queryByPlaceholderText('진행 상황을 간단히 메모해주세요')).not.toBeInTheDocument()
+  // 다시 진행중이 되면 초안이 살아난다
+  rerender(<MilestoneRow m={m} todayStr="2026-10-20" charterApproved {...handlers} />)
+  expect(screen.getByPlaceholderText('진행 상황을 간단히 메모해주세요')).toHaveValue('초안')
+})
