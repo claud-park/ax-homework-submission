@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { toast } from 'sonner'
 import { StageStepper } from '@/components/milestones/StageStepper'
+
+vi.mock('sonner', () => ({ toast: { info: vi.fn() } }))
 
 describe('StageStepper', () => {
   it('not_started: only 시작 is enabled and calls onStart', () => {
@@ -30,10 +33,15 @@ describe('StageStepper', () => {
     expect(buttons.every(b => (b as HTMLButtonElement).disabled)).toBe(true)
   })
 
-  it('disabled with reason: nothing clickable, group has title', () => {
-    render(<StageStepper stage="not_started" disabled disabledReason="과제정의서 승인 후 진행할 수 있습니다" onStart={vi.fn()} onComplete={vi.fn()} />)
+  it('disabled with reason: group has title, 시작 is aria-disabled, click explains instead of acting', () => {
+    const onStart = vi.fn()
+    render(<StageStepper stage="not_started" disabled disabledReason="과제정의서 승인 후 진행할 수 있습니다" onStart={onStart} onComplete={vi.fn()} />)
     expect(screen.getByRole('group', { name: '진행 단계' })).toHaveAttribute('title', '과제정의서 승인 후 진행할 수 있습니다')
-    expect(screen.getAllByRole('button').every(b => (b as HTMLButtonElement).disabled)).toBe(true)
+    const start = screen.getByRole('button', { name: /시작/ })
+    expect(start).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(start)
+    expect(onStart).not.toHaveBeenCalled()
+    expect(toast.info).toHaveBeenCalledWith('과제정의서 승인 후 진행할 수 있습니다')
   })
 
   it('busy: all disabled without title', () => {
