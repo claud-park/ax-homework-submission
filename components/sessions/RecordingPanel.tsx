@@ -128,6 +128,8 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   }, [phase])
 
   async function startRecording() {
+    // 복원 대기 중인 녹음이 있으면 덮어쓰지 않도록 막는다([이어서 처리]/[버리기]를 먼저 고르게 한다).
+    if (restorable) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
@@ -194,6 +196,8 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   }
 
   async function handleFileFromDrop(file: File) {
+    // 파일 업로드 성공 시 deleteRecording이 복원 대기 녹음을 지우므로, 배너가 떠 있는 동안은 막는다.
+    if (restorable) return
     if (!isAcceptedAudio(file.name)) {
       toast.error('지원하지 않는 형식입니다. wav, mp3, m4a, webm 파일을 올려주세요.')
       return
@@ -432,7 +436,8 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
         </div>
       )}
 
-      {phase === 'idle' && (
+      {/* 복원 배너가 떠 있는 동안은 녹음/파일 올리기 컨트롤(토글·드롭존·숨은 input 포함)을 렌더하지 않는다. */}
+      {phase === 'idle' && !restorable && (
         <div>
           {/* Mode toggle: record vs upload */}
           <div className="flex gap-1 mb-3 p-1 rounded-lg w-fit" style={{ background: 'var(--surface-primary)', border: '1px solid var(--border-subtle)' }}>
