@@ -215,3 +215,35 @@ describe('buildSentBlocks time', () => {
     expect(s).toContain('(2026-10-21 10:05 KST)')
   })
 })
+
+describe('recap budget after escaping', () => {
+  const cases: Record<string, string> = {
+    amp: '&amp; '.repeat(25),
+    angle: '<>'.repeat(75),
+  }
+  for (const [k, body] of Object.entries(cases)) {
+    it(`stays <= 2900 with link last and draft parity (${k})`, () => {
+      const items = Array.from({ length: 10 }, () => ({ body: body.slice(0, 150), is_completed: false }))
+      const t = buildRecapText({ ...base, notes: 'z '.repeat(4000), actionItems: items })
+      expect(t.length).toBeLessThanOrEqual(2900)
+      expect(t.endsWith(base.noteUrl)).toBe(true)
+      const blocks = buildDraftBlocks({ sessionId: 's', championName: 'n', sessionTitle: null, sessionDate: 'd', recapText: t, previouslySent: false })
+      const sec = blocks.find((b) => b.type === 'section') as { text: { text: string } }
+      expect(sec.text.text).toBe(t)
+    })
+  }
+  it('keeps link when name/title/items are all huge and escape-heavy', () => {
+    const t = buildRecapText({
+      ...base,
+      championName: '&'.repeat(500),
+      sessionTitle: '<'.repeat(500),
+      actionItems: Array.from({ length: 40 }, () => ({ body: '&'.repeat(1000), is_completed: false })),
+    })
+    expect(t.length).toBeLessThanOrEqual(2900)
+    expect(t.endsWith(base.noteUrl)).toBe(true)
+  })
+  it('does not strip odd characters from a short name', () => {
+    const t = buildRecapText({ ...base, championName: 'Q&A *팀', actionItems: [] })
+    expect(t).toContain('Q&amp;A *팀 챔피언님')
+  })
+})

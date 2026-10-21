@@ -64,8 +64,14 @@ export function truncateForSlack(text: string, max: number = SLACK_TEXT_MAX): st
   return `${cut.trimEnd()}…`
 }
 
-const MAX_ACTION_ITEMS = 10
-const MAX_ACTION_BODY = 150
+// Progressive shrink levels for the action-item section: [max items, max chars per item (escaped)].
+const ACTION_LEVELS: [number, number][] = [
+  [10, 150],
+  [5, 80],
+  [3, 40],
+  [0, 0],
+]
+const MIN_SUMMARY_ROOM = 200
 
 export function buildRecapText(input: {
   championName: string
@@ -76,23 +82,38 @@ export function buildRecapText(input: {
   noteUrl: string
 }): string {
   const { championName, sessionTitle, sessionDate, notes, actionItems, noteUrl } = input
-  const name = escapeSlack(truncateForSlack(championName, 50))
+  // Escape FIRST, then cap the escaped text (structure-aware), so lengths are final.
+  const name = truncateForSlack(escapeSlack(championName), 100)
   const date = escapeSlack(sessionDate)
-  const label = sessionTitle ? `${date} ${escapeSlack(truncateForSlack(sessionTitle, 100))}` : date
+  const label = sessionTitle ? `${date} ${truncateForSlack(escapeSlack(sessionTitle), 150)}` : date
   const greeting = `안녕하세요, ${name} 챔피언님! ${label} 1:1 내용을 정리해 드려요.`
-
-  const todo = actionItems.filter((a) => !a.is_completed)
-  const shown = todo.slice(0, MAX_ACTION_ITEMS)
-  const lines = shown.map((a, i) => `${i + 1}. ${escapeSlack(truncateForSlack(a.body, MAX_ACTION_BODY))}`)
-  if (todo.length > shown.length) lines.push(`외 ${todo.length - shown.length}건`)
-  const actionSection = todo.length ? `*액션 아이템*\n${lines.join('\n')}` : ''
   const linkLine = `노트 전체는 여기에서 볼 수 있어요: ${noteUrl}`
 
-  // The recap never exceeds SLACK_TEXT_MAX so the draft preview equals what is sent.
-  // The summary is the only part that shrinks; the link is always last and preserved.
-  const fixed = [greeting, actionSection, linkLine].filter(Boolean).join('\n\n')
+  const todo = actionItems.filter((a) => !a.is_completed)
+  const escapedBodies = todo.map((a) => escapeSlack(a.body))
+  const buildActions = (maxItems: number, maxChars: number): string => {
+    if (!todo.length) return ''
+    const lines = escapedBodies
+      .slice(0, maxItems)
+      .map((b, i) => `${i + 1}. ${truncateForSlack(b, maxChars)}`)
+    const rest = todo.length - lines.length
+    if (rest > 0) lines.push(`외 ${rest}건`)
+    return `*액션 아이템*\n${lines.join('\n')}`
+  }
+  const fixedOf = (actionSection: string) =>
+    [greeting, actionSection, linkLine].filter(Boolean).join('\n\n')
+
+  // Shrink the action section until the fixed parts leave room for the summary.
+  let actionSection = ''
+  for (const [maxItems, maxChars] of ACTION_LEVELS) {
+    actionSection = buildActions(maxItems, maxChars)
+    if (fixedOf(actionSection).length <= SLACK_TEXT_MAX - MIN_SUMMARY_ROOM) break
+  }
+  // Last resort: drop the action section entirely; the link is never cut.
+  if (fixedOf(actionSection).length > SLACK_TEXT_MAX) actionSection = ''
+
   const summaryHeader = '*요약*\n'
-  const budget = SLACK_TEXT_MAX - fixed.length - summaryHeader.length - 4 - 1
+  const budget = SLACK_TEXT_MAX - fixedOf(actionSection).length - summaryHeader.length - 4 - 1
   const summarySection =
     budget > 20
       ? `${summaryHeader}${truncateForSlack(toSlackMrkdwn(extractAiSummary(notes)), budget)}`
@@ -100,6 +121,10 @@ export function buildRecapText(input: {
   return [greeting, summarySection, actionSection, linkLine].filter(Boolean).join('\n\n')
 }
 
+/**
+ * NOTE: `recapText` is trusted to be already Slack-escaped (see `escapeSlack`) and <= 2900 chars.
+ * Callers passing admin-typed text (e.g. modal edits) must escape/validate it first.
+ */
 export function buildDraftBlocks(input: {
   sessionId: string
   championName: string
