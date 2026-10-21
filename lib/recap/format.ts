@@ -22,6 +22,11 @@ export function escapeSlack(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+/** Reverse of escapeSlack (order matters: &amp; LAST, so `&amp;lt;` → `&lt;`, not `<`). */
+export function unescapeSlack(text: string): string {
+  return text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+}
+
 export function toSlackMrkdwn(md: string): string {
   return md
     .split('\n')

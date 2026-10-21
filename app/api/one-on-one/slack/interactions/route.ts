@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySlackSignature } from '@/lib/one-on-one/slackSignature'
+import {
+  dispatchInteraction,
+  handleRecapAction,
+  parseInteractionPayload,
+  resolveSignedBy,
+} from '@/lib/recap/interactions'
+import { recapSlack } from '@/lib/recap/slackClient'
+import { sendRecapToChampion } from '@/lib/recap/sendRecap'
 import { google } from 'googleapis'
 import { createServiceClient } from '@/lib/supabase/server'
 import { slack, getAdminIdBySlackUserId, getSlackUserIdByAdminId, type AdminId } from '@/lib/one-on-one/slack'
@@ -13,23 +20,37 @@ export async function POST(req: NextRequest) {
   const timestamp = req.headers.get('x-slack-request-timestamp')
   const signature = req.headers.get('x-slack-signature')
 
-  if (!verifySlackSignature({
-    body,
-    timestamp,
-    signature,
-    secret: process.env.SLACK_SIGNING_SECRET ?? '',
-  })) {
+  // 같은 URL을 두 Slack 앱(booking: AX-1-on-1, recap: AX-1on1-Recap)이 쓴다 → 서명한 앱을 판별.
+  const signedBy = resolveSignedBy(
+    { body, timestamp, signature },
+    { booking: process.env.SLACK_SIGNING_SECRET, recap: process.env.RECAP_SLACK_SIGNING_SECRET },
+  )
+  if (!signedBy) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  const payload = JSON.parse(new URLSearchParams(body).get('payload')!)
-  const action = payload.actions?.[0]
-  const actionId: string = action?.action_id ?? ''
+  const payload = parseInteractionPayload(body)
+  if (!payload) return NextResponse.json({}, { status: 400 })
+
+  const route = dispatchInteraction(payload, signedBy)
+  if (route === 'recap') {
+    const result = await handleRecapAction(
+      {
+        slack: recapSlack,
+        getAdminId: getAdminIdBySlackUserId,
+        sendRecap: (args) => sendRecapToChampion({ supabase: createServiceClient() }, args),
+      },
+      payload,
+    )
+    return NextResponse.json(result)
+  }
+
+  const action = (payload.actions as { action_id?: string; value?: string }[] | undefined)?.[0]
   const bookingId: string = action?.value ?? ''
 
-  if (actionId === 'confirm_1on1') {
+  if (route === 'booking_confirm') {
     await handleConfirm(payload, bookingId)
-  } else if (actionId === 'cancel_1on1') {
+  } else if (route === 'booking_cancel') {
     await handleAdminCancel(bookingId)
   }
 
