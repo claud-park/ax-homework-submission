@@ -442,7 +442,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
                 <button
                   type="submit"
                   className="flex-1 py-2 rounded-lg text-xs font-semibold"
-                  style={{ background: 'var(--blue-600)', color: '#fff' }}
+                  style={{ background: 'var(--blue-600)', color: 'var(--text-inverse)' }}
                 >
                   기한 변경
                 </button>

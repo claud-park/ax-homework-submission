@@ -47,7 +47,7 @@ export function MobileMilestoneCard({
               aria-expanded={expanded}
               onClick={() => setExpanded(e => !e)}
               className="inline-flex items-center justify-center flex-shrink-0"
-              style={{ width: 28, height: 28, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+              style={{ width: 44, height: 44, margin: '-8px -10px -8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
             >
               <ChevronDown
                 size={16}

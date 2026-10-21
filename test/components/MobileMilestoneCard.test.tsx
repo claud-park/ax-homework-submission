@@ -45,4 +45,10 @@ describe('MobileMilestoneCard', () => {
     expect(screen.getByText('진행 메모')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: '상세 접기' })).toBeInTheDocument())
   })
+
+  it('expand button is a 44px touch target', () => {
+    render(<MobileMilestoneCard m={base} todayStr="2026-10-20" charterApproved {...handlers} />)
+    const btn = screen.getByRole('button', { name: '상세 펼치기' })
+    expect(btn).toHaveStyle({ width: '44px', height: '44px' })
+  })
 })

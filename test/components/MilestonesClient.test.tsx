@@ -76,7 +76,7 @@ describe('MilestonesClient status view', () => {
     expect(msg).toBe('완료로 표시했습니다.')
     expect(opts.duration).toBe(6000)
     expect(opts.action.label).toBe('되돌리기')
-    await waitFor(() => expect(within(desktop).getByRole('button', { name: '✓ 완료' })).toBeInTheDocument())
+    await waitFor(() => expect(within(desktop).getByRole('button', { name: '완료' })).toBeInTheDocument())
 
     mockApiFetch.mockResolvedValue({ milestone: m, parentUpdated: null })
     opts.action.onClick()
@@ -93,7 +93,7 @@ describe('MilestonesClient status view', () => {
     mockApiFetch.mockResolvedValue({ milestone: { ...m, status: 'in_progress', is_manual_progress: true }, parentUpdated: null })
     const desktop = renderClient([m])
 
-    fireEvent.click(within(desktop).getByRole('button', { name: '▶ 시작' }))
+    fireEvent.click(within(desktop).getByRole('button', { name: '시작' }))
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
     const [msg, opts] = (toast.success as Mock).mock.calls[0]
@@ -102,7 +102,7 @@ describe('MilestonesClient status view', () => {
     opts.action.onClick()
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(2))
     expect(JSON.parse(mockApiFetch.mock.calls[1][1].body)).toEqual({ is_manual_progress: false })
-    await waitFor(() => expect(within(desktop).getByRole('button', { name: '▶ 시작' })).toBeInTheDocument())
+    await waitFor(() => expect(within(desktop).getByRole('button', { name: '시작' })).toBeInTheDocument())
   })
 
   it('charter_not_approved error shows the approval toast', async () => {
@@ -186,7 +186,7 @@ describe('MilestonesClient status view', () => {
     mockApiFetch.mockResolvedValue({ milestone: { ...m, is_manual_progress: true }, parentUpdated: null })
     const desktop = renderClient([m])
 
-    fireEvent.click(within(desktop).getByRole('button', { name: '▶ 시작' }))
+    fireEvent.click(within(desktop).getByRole('button', { name: '시작' }))
 
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1))
     const body = JSON.parse(mockApiFetch.mock.calls[0][1].body)

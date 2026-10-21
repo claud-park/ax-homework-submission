@@ -164,7 +164,7 @@ export function MilestoneDetailPanel({
               onClick={handleNoteSave}
               disabled={noteSaving}
               className="text-xs px-3 py-1 rounded-md font-semibold"
-              style={{ background: 'var(--blue-600)', color: '#fff', opacity: noteSaving ? 0.7 : 1 }}
+              style={{ background: 'var(--blue-600)', color: 'var(--text-inverse)', opacity: noteSaving ? 0.7 : 1 }}
             >
               저장
             </button>
