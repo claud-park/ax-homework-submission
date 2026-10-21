@@ -5,7 +5,7 @@ import { sendRecapToChampion } from '@/lib/recap/sendRecap'
 type Row = Record<string, unknown>
 
 // Stub that really simulates check_up_sessions.recap_sent_at / recap_sent_by state.
-function makeSupabase(opts: { session?: Row | null; claimError?: boolean } = {}) {
+function makeSupabase(opts: { session?: Row | null; claimError?: boolean; sessionReadError?: boolean; itemsError?: boolean } = {}) {
   const session: Row | null =
     opts.session === undefined
       ? {
@@ -34,12 +34,15 @@ function makeSupabase(opts: { session?: Row | null; claimError?: boolean } = {})
       q.select = () => q
       q.eq = (k: string, v: unknown) => (filters.push([k, v, 'eq']), q)
       q.is = (k: string, v: unknown) => (filters.push([k, v, 'is']), q)
-      q.order = () => Promise.resolve({ data: items, error: null })
+      q.order = () =>
+        Promise.resolve(opts.itemsError ? { data: null, error: { message: 'items down' } } : { data: items, error: null })
       q.single = () =>
         Promise.resolve(
           table === 'users'
             ? { data: user, error: null }
-            : { data: session, error: session ? null : { message: 'nf' } },
+            : opts.sessionReadError
+              ? { data: null, error: { message: 'db down', code: '500' } }
+              : { data: session, error: session ? null : { message: 'nf', code: 'PGRST116' } },
         )
       q.update = (p: Row) => ((patch = p), q)
       // awaiting the update chain (with or without .select)
@@ -59,9 +62,10 @@ function makeSupabase(opts: { session?: Row | null; claimError?: boolean } = {})
   return { client: client as unknown as SupabaseClient, session, writes }
 }
 
-function makeSlack(opts: { lookup?: 'ok' | 'notfound' | 'throw'; post?: 'ok' | 'fail' } = {}) {
+function makeSlack(opts: { lookup?: 'ok' | 'notfound' | 'throw' | 'nouser'; post?: 'ok' | 'fail' } = {}) {
   const lookupByEmail = vi.fn(async (_a: { email: string }) => {
     if (opts.lookup === 'notfound') throw Object.assign(new Error('users_not_found'), { data: { error: 'users_not_found' } })
+    if (opts.lookup === 'nouser') return { ok: true }
     if (opts.lookup === 'throw') throw new Error('network')
     return { ok: true, user: { id: 'U_CHAMP' } }
   })
@@ -69,7 +73,11 @@ function makeSlack(opts: { lookup?: 'ok' | 'notfound' | 'throw'; post?: 'ok' | '
     if (opts.post === 'fail') throw new Error('channel_not_found')
     return { ok: true }
   })
-  return { slack: { chat: { postMessage }, users: { lookupByEmail } } as never, postMessage, lookupByEmail }
+  const slack: { chat: { postMessage: (a: { channel: string; text: string }) => Promise<unknown> }; users: unknown } = {
+    chat: { postMessage },
+    users: { lookupByEmail },
+  }
+  return { slack: slack as never, chat: slack.chat, postMessage, lookupByEmail }
 }
 
 const baseUrl = 'https://app.test'
@@ -178,13 +186,6 @@ describe('sendRecapToChampion', () => {
     expect(fresh.ok).toBe(true)
   })
 
-  it('sends a matching expectedDraftTs-less call (check skipped)', async () => {
-    const { client } = makeSupabase()
-    const { slack } = makeSlack()
-    const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
-    expect(res.ok).toBe(true)
-  })
-
   it('escapes textOverride so it cannot trigger mentions, and appends the note link', async () => {
     const { client } = makeSupabase()
     const { slack, postMessage } = makeSlack()
@@ -223,5 +224,108 @@ describe('sendRecapToChampion', () => {
     expect(text.length).toBeLessThanOrEqual(2900)
     expect(text).toContain('…')
     expect(text.endsWith('https://app.test/admin/champions/u1')).toBe(true)
+  })
+
+  it('refuses as stale when the stored ts is null and expectedDraftTs is given', async () => {
+    const { client, writes } = makeSupabase({
+      session: { id: 's1', champion_user_id: 'u1', processing_status: 'done', recap_slack_ts: null, recap_sent_at: null },
+    })
+    const { slack, postMessage } = makeSlack()
+    const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1', expectedDraftTs: '1.23' })
+    expect(res).toEqual({ ok: false, reason: 'stale_draft' })
+    expect(writes).toHaveLength(0)
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
+  it('treats lookupByEmail resolving without a user as no_slack_user and rolls back', async () => {
+    const { client, session } = makeSupabase()
+    const { slack, postMessage } = makeSlack({ lookup: 'nouser' })
+    const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+    expect(res).toEqual({ ok: false, reason: 'no_slack_user' })
+    expect(postMessage).not.toHaveBeenCalled()
+    expect(session?.recap_sent_at).toBeNull()
+  })
+
+  it.each(['', '   \n '])('falls back to the generated recap for an empty override (%j)', async (override) => {
+    const { client } = makeSupabase()
+    const { slack, postMessage } = makeSlack()
+    await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1', textOverride: override })
+    const text = postMessage.mock.calls[0][0].text
+    expect(text).toContain('홍길동 챔피언님')
+    expect(text).toContain('*요약*')
+  })
+
+  it('keeps the note link even when the override contains it only in the truncated tail', async () => {
+    const { client } = makeSupabase()
+    const { slack, postMessage } = makeSlack()
+    const url = 'https://app.test/admin/champions/u1'
+    await sendRecapToChampion(
+      { supabase: client, slackClient: slack, baseUrl },
+      { sessionId: 's1', adminId: 'a1', textOverride: `${'가'.repeat(5000)} ${url}` },
+    )
+    const text = postMessage.mock.calls[0][0].text
+    expect(text.length).toBeLessThanOrEqual(2900)
+    expect(text.endsWith(url)).toBe(true)
+    expect(text.split(url)).toHaveLength(2)
+  })
+
+  it('returns dm_failed (not not_found) when the session read errors, with no claim or Slack call', async () => {
+    const { client, writes } = makeSupabase({ sessionReadError: true })
+    const { slack, postMessage, lookupByEmail } = makeSlack()
+    const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+    expect(res).toEqual({ ok: false, reason: 'dm_failed' })
+    expect(writes).toHaveLength(0)
+    expect(lookupByEmail).not.toHaveBeenCalled()
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
+  it('returns dm_failed when the action items read errors, with no claim or Slack call', async () => {
+    const { client, writes } = makeSupabase({ itemsError: true })
+    const { slack, postMessage } = makeSlack()
+    const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+    expect(res).toEqual({ ok: false, reason: 'dm_failed' })
+    expect(writes).toHaveLength(0)
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
+  it('rollback leaves the claim alone when only recap_sent_at differs', async () => {
+    const { client, session } = makeSupabase()
+    const { slack, chat } = makeSlack()
+    chat.postMessage = vi.fn(async () => {
+      Object.assign(session as Row, { recap_sent_at: 'later' }) // recap_sent_by still our admin
+      throw new Error('boom')
+    })
+    await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+    expect(session?.recap_sent_at).toBe('later')
+    expect(session?.recap_sent_by).toBe('a1')
+  })
+
+  it('rollback leaves the claim alone when only recap_sent_by differs', async () => {
+    const { client, session } = makeSupabase()
+    const { slack, chat } = makeSlack()
+    chat.postMessage = vi.fn(async () => {
+      Object.assign(session as Row, { recap_sent_by: 'other' }) // recap_sent_at still ours
+      throw new Error('boom')
+    })
+    await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+    expect(session?.recap_sent_by).toBe('other')
+    expect(session?.recap_sent_at).toBeTruthy()
+  })
+
+  it('logs platform errors by code and request errors as possibly-delivered', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const run = async (err: unknown) => {
+      const { client } = makeSupabase()
+      const { slack, chat } = makeSlack()
+      chat.postMessage = vi.fn(async () => {
+        throw err
+      })
+      await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+    }
+    await run(Object.assign(new Error('x'), { code: 'slack_webapi_platform_error', data: { error: 'channel_not_found' } }))
+    expect(spy.mock.calls.at(-1)?.[0]).toContain('channel_not_found')
+    await run(Object.assign(new Error('x'), { code: 'slack_webapi_request_error' }))
+    expect(spy.mock.calls.at(-1)?.[0]).toContain('DM outcome may be unknown (possible delivery) for session s1, claim rolled back')
+    spy.mockRestore()
   })
 })

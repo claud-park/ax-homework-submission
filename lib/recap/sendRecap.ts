@@ -24,10 +24,26 @@ const SLACK_TEXT_MAX = 2900
  */
 function buildOverrideText(override: string, noteUrl: string): string {
   const escaped = escapeSlack(override).trim()
-  if (escaped.includes(noteUrl)) return truncateForSlack(escaped, SLACK_TEXT_MAX - 1)
   const linkLine = `노트 전체는 여기에서 볼 수 있어요: ${noteUrl}`
+  if (escaped.includes(noteUrl)) {
+    const cut = truncateForSlack(escaped, SLACK_TEXT_MAX - 1)
+    if (cut.includes(noteUrl)) return cut
+  }
+  // Link absent (or cut away): truncate the body, leaving room, then append the link (check is post-truncation).
   const room = SLACK_TEXT_MAX - linkLine.length - 2 - 1
-  return [truncateForSlack(escaped, room), linkLine].filter(Boolean).join('\n\n')
+  const body = truncateForSlack(escaped.split(noteUrl).join('').trim(), room)
+  return [body, linkLine].filter(Boolean).join('\n\n')
+}
+
+function logDmFailure(sessionId: string, err: unknown) {
+  const e = err as { code?: string; data?: { error?: string }; message?: string }
+  if (e?.code === 'slack_webapi_platform_error') {
+    console.error(`[session ${sessionId}] recap DM rejected by Slack: ${e.data?.error ?? 'unknown'}`)
+  } else {
+    console.error(
+      `DM outcome may be unknown (possible delivery) for session ${sessionId}, claim rolled back (${e?.code ?? 'no_code'})`,
+    )
+  }
 }
 
 /**
@@ -59,11 +75,15 @@ export async function sendRecapToChampion(
     const baseUrl = deps.baseUrl ?? process.env.APP_BASE_URL ?? 'http://localhost:3000'
     const slack = deps.slackClient ?? recapSlack
 
-    const { data: session } = await supabase
+    const { data: session, error: sessionError } = await supabase
       .from('check_up_sessions')
       .select('id, champion_user_id, title, session_date, notes, processing_status, recap_slack_ts')
       .eq('id', sessionId)
       .single()
+    if (sessionError && !session && sessionError.code !== 'PGRST116') {
+      console.error(`[session ${sessionId}] recap session read failed:`, sessionError.message)
+      return { ok: false, reason: 'dm_failed' }
+    }
     if (!session) return { ok: false, reason: 'not_found' }
     if (session.processing_status !== 'done') return { ok: false, reason: 'not_done' }
     if (expectedDraftTs !== undefined && expectedDraftTs !== session.recap_slack_ts) {
@@ -75,14 +95,19 @@ export async function sendRecapToChampion(
       .select('name, email')
       .eq('id', session.champion_user_id)
       .single()
-    const { data: items } = await supabase
+    const { data: items, error: itemsError } = await supabase
       .from('session_action_items')
       .select('body, is_completed, display_order')
       .eq('session_id', sessionId)
       .order('display_order', { ascending: true })
-    if (!champion?.email) return { ok: false, reason: 'no_slack_user' }
+    if (itemsError) {
+      console.error(`[session ${sessionId}] recap action items read failed:`, itemsError.message)
+      return { ok: false, reason: 'dm_failed' }
+    }
+    const email = typeof champion?.email === 'string' ? champion.email.trim() : ''
+    if (!email) return { ok: false, reason: 'no_slack_user' }
 
-    const championName: string = champion.name ?? champion.email
+    const championName: string = champion?.name ?? '챔피언'
     const noteUrl = `${baseUrl}/admin/champions/${session.champion_user_id}`
 
     // Atomic claim: only one caller can flip recap_sent_at from null.
@@ -103,7 +128,7 @@ export async function sendRecapToChampion(
 
     let slackUserId: string | undefined
     try {
-      const res = await slack.users.lookupByEmail({ email: champion.email })
+      const res = await slack.users.lookupByEmail({ email })
       slackUserId = res.user?.id
     } catch (err) {
       console.error(`[session ${sessionId}] recap Slack user lookup failed:`, err instanceof Error ? err.message : 'unknown error')
@@ -114,7 +139,7 @@ export async function sendRecapToChampion(
     }
 
     const text =
-      textOverride !== undefined
+      textOverride !== undefined && textOverride.trim() !== ''
         ? buildOverrideText(textOverride, noteUrl)
         : buildRecapText({
             championName,
@@ -131,7 +156,7 @@ export async function sendRecapToChampion(
     try {
       await slack.chat.postMessage({ channel: slackUserId, text })
     } catch (err) {
-      console.error(`[session ${sessionId}] recap DM failed:`, err instanceof Error ? err.message : 'unknown error')
+      logDmFailure(sessionId, err)
       await rollback()
       return { ok: false, reason: 'dm_failed' }
     }
