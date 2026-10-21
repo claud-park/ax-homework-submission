@@ -131,3 +131,87 @@ describe('RECAP_ACTIONS', () => {
     expect(RECAP_ACTIONS).toEqual({ send: 'recap_send', edit: 'recap_edit', editSubmit: 'recap_edit_submit' })
   })
 })
+
+describe('escaping / injection', () => {
+  const evil = ['<!channel>', '<!here>', '<@U123>', '<https://evil|로그인>']
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const mk = (over: Partial<Parameters<typeof buildRecapText>[0]>) =>
+    buildRecapText({ ...base, actionItems: [], ...over })
+
+  for (const e of evil) {
+    it(`escapes ${e} everywhere`, () => {
+      expect(toSlackMrkdwn(e)).toBe(esc(e))
+      const asSummary = mk({ notes: `--\n\n---\n\n**🤖 AI 요약**\n\n${e}` })
+      expect(asSummary).toContain(esc(e))
+      expect(asSummary).not.toContain(e)
+      const asName = mk({ championName: e })
+      expect(asName).toContain(esc(e))
+      expect(asName).not.toContain(e)
+      const asTitle = mk({ sessionTitle: e })
+      expect(asTitle).toContain(esc(e))
+      expect(asTitle).not.toContain(e)
+      const asItem = mk({ actionItems: [{ body: e, is_completed: false }] })
+      expect(asItem).toContain(`1. ${esc(e)}`)
+      expect(asItem).not.toContain(e)
+      const sent = JSON.stringify(
+        buildSentBlocks({ championName: e, sentByLabel: e, sentAt: new Date(0) }),
+      )
+      expect(sent).toContain(`✅ ${esc(e)}님이 ${esc(e)} 챔피언에게`)
+      expect(sent).not.toContain(e)
+      const draft = JSON.stringify(
+        buildDraftBlocks({ sessionId: 's', championName: e, sessionTitle: e, sessionDate: 'd', recapText: 'x', previouslySent: false }),
+      )
+      expect(draft).not.toContain(`"mrkdwn","text":"d ${e}`)
+    })
+  }
+  it('escapes & and keeps real links as angle links', () => {
+    expect(toSlackMrkdwn('A & B')).toBe('A &amp; B')
+    expect(toSlackMrkdwn('[a&b](https://e.com/?x=1&y=2)')).toBe('<https://e.com/?x=1&amp;y=2|a&amp;b>')
+    expect(toSlackMrkdwn('> <!here>')).toBe('&lt;!here&gt;')
+  })
+})
+
+describe('recap budget', () => {
+  it('keeps link and stays <= 2900 with many long action items', () => {
+    const items = Array.from({ length: 30 }, (_, i) => ({ body: `긴 일 ${i} ` + '가'.repeat(400), is_completed: false }))
+    const t = buildRecapText({ ...base, actionItems: items })
+    expect(t.length).toBeLessThanOrEqual(2900)
+    expect(t).toContain(base.noteUrl)
+    expect(t).toContain('외 20건')
+    expect(t.endsWith(base.noteUrl)).toBe(true)
+  })
+  it('draft shows exactly the recap text (parity)', () => {
+    const t = buildRecapText({ ...base, notes: 'x '.repeat(5000), actionItems: [{ body: 'a', is_completed: false }] })
+    const blocks = buildDraftBlocks({ sessionId: 's', championName: 'n', sessionTitle: null, sessionDate: 'd', recapText: t, previouslySent: false })
+    const sec = blocks.find((b) => b.type === 'section') as { text: { text: string } }
+    expect(sec.text.text).toBe(t)
+    expect(sec.text.text).toContain(base.noteUrl)
+  })
+})
+
+describe('truncateForSlack structure-aware', () => {
+  it('does not cut inside a link', () => {
+    const text = 'aaa <https://example.com/path|링크 텍스트> bbb'
+    const out = truncateForSlack(text, 20)
+    expect(out).toBe('aaa…')
+  })
+  it('does not cut inside an entity', () => {
+    const out = truncateForSlack('abcd&amp;efgh', 7)
+    expect(out).toBe('abcd…')
+    expect(truncateForSlack('abcdef&amp;gh', 11)).toBe('abcdef&amp;…')
+  })
+  it('drops an odd bold marker', () => {
+    expect(truncateForSlack('*bold text here* tail', 8)).toBe('bold…')
+  })
+  it('does not split a surrogate pair', () => {
+    const out = truncateForSlack('😀'.repeat(10), 5)
+    expect(out).toBe('😀😀…')
+  })
+})
+
+describe('buildSentBlocks time', () => {
+  it('renders KST deterministically', () => {
+    const s = JSON.stringify(buildSentBlocks({ championName: 'c', sentByLabel: 's', sentAt: new Date('2026-10-21T01:05:00Z') }))
+    expect(s).toContain('(2026-10-21 10:05 KST)')
+  })
+})
