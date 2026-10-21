@@ -5,7 +5,7 @@ export const AI_DIVIDER = '\n\n---\n\n**🤖 AI 요약**\n\n'
 
 // Splits on the AI divider tolerantly: any emphasis markers (* _ ** __), 3+ dashes,
 // and flexible blank lines — so an editor markdown round-trip can't defeat de-nesting.
-const AI_DIVIDER_RE = /\n+-{3,}\n+[*_]*🤖 AI 요약[*_]*\n+/
+export const AI_DIVIDER_RE = /\n+-{3,}\n+[*_]*🤖 AI 요약[*_]*\n+/
 
 /**
  * Preserve the user's handwritten notes and append the AI summary below a divider.
