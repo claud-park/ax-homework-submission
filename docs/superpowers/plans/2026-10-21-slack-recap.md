@@ -14,6 +14,9 @@
 
 - 자동 발송 금지: 챔피언 DM은 Admin의 버튼 클릭으로만 나간다.
 - 초안 채널은 신규 환경변수 `RECAP_SLACK_CHANNEL_ID`(값 `C0CAZ6XP4F6`). 기존 `ADMIN_SLACK_CHANNEL_ID`는 쓰지 않는다 (production에 없고 켜면 기존 Admin 알림이 함께 활성화됨).
+- **recap은 별도 Slack 앱을 쓴다** (2026-10-21 결정): 앱 `AX-1on1-Recap`(App ID `A0CBPVA25UY`, Dreamus 워크스페이스, Interactivity Request URL = `https://ax-homework-submission.vercel.app/api/one-on-one/slack/interactions`). 기존 `AX-1-on-1` 앱의 Interactivity URL은 스케줄러 프로젝트(`ax-one-on-one-scheduler`)를 가리키므로 건드리지 않는다. 설치 승인은 ITS-14471(+ Slack 워크스페이스 설치 요청)로 진행 중이며, 승인 후 발급되는 값을 환경변수 `RECAP_SLACK_BOT_TOKEN`(봇 토큰), `RECAP_SLACK_SIGNING_SECRET`(서명 비밀)으로 쓴다.
+  - recap 코드는 기존 `slack` 클라이언트(`SLACK_BOT_TOKEN`)가 아니라 전용 클라이언트 `recapSlack`(`lib/recap/slackClient.ts`, `RECAP_SLACK_BOT_TOKEN`)을 쓴다.
+  - interactions 라우트는 요청 서명을 두 비밀(`SLACK_SIGNING_SECRET` = 예약 앱, `RECAP_SLACK_SIGNING_SECRET` = recap 앱) 각각으로 검증해 어느 앱이 서명했는지 결정한다. `recap_*`/recap 모달 요청은 recap 비밀로 서명된 경우에만, 예약 액션(`confirm_1on1`, `cancel_1on1`)은 기존 비밀로 서명된 경우에만 처리한다. 비밀이 비어 있으면 그 앱은 항상 거부(fail-closed).
 - Admin 판별은 `getAdminIdBySlackUserId`(`ADMIN_SLACK_*` 환경변수). 목록에 없는 사람이 눌러도 발송하지 않고 본인에게만 보이는 안내(ephemeral)를 준다. 기존 예약 버튼(`confirm_1on1`, `cancel_1on1`)의 동작은 바꾸지 않는다.
 - Slack 요청 서명 검증을 거친다. 5분을 넘긴 timestamp는 거부한다.
 - `low_quality` 노트에는 초안을 게시하지 않는다.
@@ -102,7 +105,7 @@
 - Consumes: `buildRecapText`, `buildDraftBlocks` (Task 2); `slack` from `lib/one-on-one/slack`.
 - Produces:
   - 컬럼(모두 nullable): `recap_slack_channel TEXT`, `recap_slack_ts TEXT`, `recap_sent_at TIMESTAMPTZ`, `recap_sent_by TEXT`. `CheckUpSession`에 같은 이름의 `string | null` 필드.
-  - `postRecapDraft(deps: { supabase: SupabaseClient; slackClient?: Pick<WebClient, 'chat'>; env?: { channelId?: string; token?: string; baseUrl?: string } }, sessionId: string): Promise<void>` — 절대 throw하지 않는다. `slackClient`/`env` 기본값은 실제 `slack`과 `process.env`(`RECAP_SLACK_CHANNEL_ID`, `SLACK_BOT_TOKEN`, `APP_BASE_URL`).
+  - `postRecapDraft(deps: { supabase: SupabaseClient; slackClient?: Pick<WebClient, 'chat'>; env?: { channelId?: string; token?: string; baseUrl?: string } }, sessionId: string): Promise<void>` — 절대 throw하지 않는다. `slackClient`/`env` 기본값은 `recapSlack`(`lib/recap/slackClient.ts`, 이 태스크에서 만든다: `export const recapSlack = new WebClient(process.env.RECAP_SLACK_BOT_TOKEN)`)과 `process.env`(`RECAP_SLACK_CHANNEL_ID`, `RECAP_SLACK_BOT_TOKEN`, `APP_BASE_URL`).
 - 동작: 채널/토큰이 없으면 조용히 반환. 세션 상태가 `done`이 아니면 반환. 세션(+챔피언 이름/이메일)·액션 아이템을 읽고, 이전에 `recap_sent_at`이 있었는지 기록한 뒤 `recap_sent_at/by`를 null로 초기화하고, `chat.postMessage`로 초안을 올려 반환된 `channel`/`ts`를 `recap_slack_channel/ts`에 저장한다. `runProcessingInBackground`는 `processSessionAudio`가 `lowQuality`가 아닌 결과를 반환했을 때만 호출하며 별도 try/catch로 감싸 기존 `.catch`(status를 `error`로 바꾸는 경로)와 섞이지 않게 한다.
 
 - [ ] **Step 1: Write the migration** (idempotent: `ADD COLUMN IF NOT EXISTS`, 파일 상단 주석에 목적과 "prod 수동 적용, 코드 배포 전" 명시) 
@@ -127,7 +130,7 @@
 
 **Interfaces:**
 - Consumes: `buildRecapText` (Task 2), 컬럼 (Task 3).
-- Produces: `sendRecapToChampion(deps: { supabase: SupabaseClient; slackClient?: Pick<WebClient, 'chat' | 'users'> }, args: { sessionId: string; adminId: string; textOverride?: string }): Promise<SendRecapResult>` where
+- Produces: `sendRecapToChampion(deps: { supabase: SupabaseClient; slackClient?: Pick<WebClient, 'chat' | 'users'> /* 기본 recapSlack */ }, args: { sessionId: string; adminId: string; textOverride?: string }): Promise<SendRecapResult>` where
   `type SendRecapResult = { ok: true; championName: string; sentAt: Date } | { ok: false; reason: 'not_found' | 'not_done' | 'already_sent' | 'no_slack_user' | 'dm_failed' }`.
 - 동작 순서: ① 세션 조회(없으면 `not_found`, 상태가 `done`이 아니면 `not_done`) ② 원자적 선점 `update({ recap_sent_at: now, recap_sent_by: adminId }).eq('id', sessionId).is('recap_sent_at', null).select('id')` — 반환 행이 없으면 `already_sent` ③ `users.lookupByEmail`(챔피언 이메일) — 실패/없음이면 선점을 롤백(`recap_sent_at/by`를 null로)하고 `no_slack_user` ④ `chat.postMessage({ channel: slackUserId, text: textOverride ?? buildRecapText(...) })` — 실패하면 선점을 롤백하고 `dm_failed`.
   `textOverride`가 있으면 그 문구를 그대로 보내되 3000자를 넘으면 절삭한다.
@@ -155,6 +158,7 @@
 
 **Interfaces:**
 - Consumes: `sendRecapToChampion` (Task 4), `buildSentBlocks`, `RECAP_ACTIONS`, `buildRecapText` (Task 2), `getAdminIdBySlackUserId` from `lib/one-on-one/slack`.
+- 이 태스크에서 라우트의 서명 검증을 두 비밀로 확장한다: `verifySlackSignature`를 `SLACK_SIGNING_SECRET`과 `RECAP_SLACK_SIGNING_SECRET`로 각각 호출해 `signedBy: 'booking' | 'recap' | null`을 정하고(둘 다 실패하면 기존대로 401), `recap_*`/recap 모달 요청은 `signedBy === 'recap'`일 때만, `confirm_1on1`/`cancel_1on1`은 `signedBy === 'booking'`일 때만 처리한다(그 외에는 200으로 무시하고 아무것도 보내지 않는다). 이 분기를 순수 함수 `resolveSignedBy(args, secrets)`로 빼서 단위 테스트한다(비밀이 비어 있으면 해당 앱은 fail-closed, 두 비밀이 같은 값이어도 booking이 우선하지 않도록 둘 다 같으면 거부하지 말고 recap/booking 구분은 action_id 소속과 함께 확인).
 - Produces: `handleRecapAction(deps, payload): Promise<void>` — `payload.type`이 `block_actions`이고 `action_id`가 `recap_send`/`recap_edit`일 때, 또는 `payload.type === 'view_submission'`이고 `view.callback_id === 'recap_edit_submit'`일 때 처리한다. 라우트는 `payload.type`이 `view_submission`이거나 `action_id`가 `recap_*`이면 이 함수로 넘기고, 그 외는 기존 `confirm_1on1`/`cancel_1on1` 경로를 그대로 탄다 (기존 코드는 `actions[0]`를 바로 읽으므로 `view_submission`을 먼저 분기해야 한다).
 - 동작:
   - **공통 Admin 확인:** `getAdminIdBySlackUserId(payload.user.id)`가 null이면 `chat.postEphemeral({ channel, user, text: 'recap 발송은 Admin만 할 수 있어요.' })`(모달 제출이면 모달 오류 대신 DM 없이 종료)만 하고 아무것도 보내지 않는다.
@@ -185,11 +189,11 @@
 - Modify: `.env.example`, `.env.local.example`
 - Create: `docs/superpowers/plans/2026-10-21-slack-recap-deploy-runbook.md` (배포 전 체크리스트; 또는 PR 설명으로 대체해도 되지만 repo에 남긴다)
 
-- [ ] **Step 1: Document** in both example files: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `ADMIN_SLACK_CLAUD`, `ADMIN_SLACK_ALEX`, `ADMIN_SLACK_JENNIFER`, `ADMIN_SLACK_CHANNEL_ID`(선택, 기존 Admin 알림용), `RECAP_SLACK_CHANNEL_ID`, `APP_BASE_URL`. 값은 비워 둔다.
+- [ ] **Step 1: Document** in both example files: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `ADMIN_SLACK_CLAUD`, `ADMIN_SLACK_ALEX`, `ADMIN_SLACK_JENNIFER`, `ADMIN_SLACK_CHANNEL_ID`(선택, 기존 Admin 알림용), `RECAP_SLACK_BOT_TOKEN`, `RECAP_SLACK_SIGNING_SECRET`, `RECAP_SLACK_CHANNEL_ID`, `APP_BASE_URL`. 값은 비워 둔다.
 - [ ] **Step 2: Write the runbook** — 배포 순서와 확인 항목:
   1. prod Supabase에 `20261021000000_session_recap_state.sql` 적용 (컬럼 4개 확인 쿼리 포함)
-  2. Vercel production에 `RECAP_SLACK_CHANNEL_ID=C0CAZ6XP4F6` 추가 후 재배포 필요 여부 확인 (`vercel env ls production`)
-  3. Slack 앱: 봇이 채널 `C0CAZ6XP4F6`에 초대돼 있는지, Interactivity가 켜져 있고 Request URL이 `/api/one-on-one/slack/interactions`인지, 스코프 `chat:write`·`users:read.email`(필요 시 `im:write`) 확인
+  2. `AX-1on1-Recap` 앱 설치 승인 확인(ITS-14471 + Slack 워크스페이스 설치 요청 승인) → 앱 설정 화면에서 Bot User OAuth Token(xoxb-)과 Signing Secret 확인. Vercel production에 `RECAP_SLACK_BOT_TOKEN`, `RECAP_SLACK_SIGNING_SECRET`, `RECAP_SLACK_CHANNEL_ID=C0CAZ6XP4F6` 추가 후 재배포 (`vercel env ls production`로 확인). 값은 채팅/로그/커밋에 남기지 않는다.
+  3. Slack 앱 `AX-1on1-Recap`(A0CBPVA25UY): Interactivity 켜짐 + Request URL이 `https://ax-homework-submission.vercel.app/api/one-on-one/slack/interactions`인지, 스코프 `chat:write`·`chat:write.public`·`im:write`·`users:read`·`users:read.email` 확인 (`chat:write.public`이 있어 채널 초대는 필수 아님)
   4. 배포 후 스모크: 테스트 세션 재처리 → 초안이 채널에 뜸 → 본인에게만 보내는 수동 테스트 방법(챔피언을 본인 계정으로 둔 테스트 세션) 
 - [ ] **Step 3: Run** `npm test && npx tsc --noEmit && npx next build` (필요한 env는 로컬 `.env.local`에서 읽는다) — Expected: 모두 통과
 - [ ] **Step 4: Commit** `git add .env.example .env.local.example docs/superpowers/plans/2026-10-21-slack-recap-deploy-runbook.md && git commit -m "[AX-1] docs(recap): 환경변수 문서화와 배포 런북"`
