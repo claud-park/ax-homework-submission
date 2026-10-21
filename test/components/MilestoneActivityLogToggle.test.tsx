@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { apiFetch } from '@/lib/api-client'
 import MilestoneActivityLogToggle from '@/components/milestones/MilestoneActivityLogToggle'
+import { kstTodayStr } from '@/lib/nudge/overdue'
 
 const mockApiFetch = apiFetch as unknown as ReturnType<typeof vi.fn>
 
@@ -75,10 +76,9 @@ describe('MilestoneActivityLogToggle', () => {
   })
 
   it('labels a log dated today as "오늘" and one from 3 days ago as "3일 전", independent of timezone', async () => {
-    const today = new Date()
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    const threeDaysAgo = new Date(today.getTime() - 3 * 86400000)
-    const threeDaysAgoStr = `${threeDaysAgo.getFullYear()}-${String(threeDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(threeDaysAgo.getDate()).padStart(2, '0')}`
+    // 컴포넌트와 같은 KST 기준으로 날짜를 만든다(UTC CI에서도 KST 자정 전후 흔들리지 않음).
+    const todayStr = kstTodayStr()
+    const threeDaysAgoStr = kstTodayStr(new Date(Date.now() - 3 * 86400000))
     mockApiFetch.mockResolvedValue({
       logs: [
         { id: 'l1', milestone_id: 'm1', user_id: 'u1', log_date: todayStr, note: '오늘 작업', created_at: `${todayStr}T10:00:00Z` },
