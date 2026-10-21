@@ -275,6 +275,7 @@ export interface CheckUpSession {
   notes: string | null
   audio_file_path: string | null
   audio_chunk_paths: string[] | null
+  stored_audio_chunk_count?: number
   recording_duration_sec: number | null
   processing_status: SessionProcessingStatus
   processing_started_at?: string | null

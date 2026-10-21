@@ -3,6 +3,7 @@ import { isAdminUser } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { resolveSessionRole } from '@/lib/sessions/access'
 import { allowedSessionUpdateFields } from '@/lib/sessions/permissions'
+import { listStoredChunkPaths } from '@/lib/sessions/storedAudio'
 import { requireUser, requireAdmin } from '@/lib/api/guard'
 
 type Params = { params: { sessionId: string } }
@@ -48,8 +49,15 @@ export async function GET(req: NextRequest, { params }: Params) {
       .eq('publish_status', 'published'),
   ])
 
+  // 업로드는 끝났지만 /process 전에 끊긴 세션 감지용(Admin 전용, audio_file_path 가 빈 경우만 Storage 조회).
+  const storedAudioChunkCount =
+    isAdmin && !(session as Record<string, unknown>).audio_file_path
+      ? (await listStoredChunkPaths(supabase, params.sessionId)).length
+      : 0
+
   return NextResponse.json({
     ...session,
+    stored_audio_chunk_count: storedAudioChunkCount,
     action_items: actionItemsResult.data ?? [],
     comments: commentsResult.data ?? [],
     milestones: milestonesResult.data ?? [],
