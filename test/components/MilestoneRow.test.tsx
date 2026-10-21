@@ -109,4 +109,16 @@ describe('MilestoneRow', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '저장' })).toBeEnabled())
     expect(screen.getByDisplayValue('초안 메모')).toBeInTheDocument()
   })
+
+  it('keeps the note draft when collapsed and re-expanded', () => {
+    render(<MilestoneRow m={{ ...base, status: 'in_progress', is_manual_progress: true, due_date: '2026-10-30' }} todayStr="2026-10-20" charterApproved {...handlers} />)
+    fireEvent.click(screen.getByRole('button', { name: '상세 펼치기' }))
+    fireEvent.click(screen.getByRole('button', { name: '노트 편집' }))
+    fireEvent.change(screen.getByPlaceholderText('진행 상황을 간단히 메모해주세요'), { target: { value: '초안 작성 중' } })
+    fireEvent.click(screen.getByRole('button', { name: '상세 접기' }))
+    expect(screen.getByText('노트 편집중')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '상세 펼치기' }))
+    expect(screen.getByPlaceholderText('진행 상황을 간단히 메모해주세요')).toHaveValue('초안 작성 중')
+    expect(screen.queryByText('노트 편집중')).not.toBeInTheDocument()
+  })
 })

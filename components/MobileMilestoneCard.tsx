@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { deriveStage, fmtRange, isIssuePending, isScheduleDelayed } from '@/lib/milestone-view'
 import { StageStepper } from '@/components/milestones/StageStepper'
+import { useNoteEditor } from '@/components/milestones/useNoteEditor'
 import {
-  DueBadge, MilestoneDetailPanel, railColorOf, type MilestoneRowProps,
+  CHIP_STYLE, DueBadge, MilestoneDetailPanel, railColorOf, type MilestoneRowProps,
 } from '@/components/milestones/MilestoneRow'
 
 export type MobileMilestoneCardProps = MilestoneRowProps
@@ -13,6 +14,7 @@ export function MobileMilestoneCard({
   m, todayStr, charterApproved, busy, onStart, onComplete, onIssueClick, onDeadlineExtension, onNoteUpdate,
 }: MobileMilestoneCardProps) {
   const [expanded, setExpanded] = useState(false)
+  const noteEditor = useNoteEditor(m, onNoteUpdate)
 
   const stage = deriveStage(m)
   const completed = stage === 'completed'
@@ -61,6 +63,7 @@ export function MobileMilestoneCard({
               {fmtRange(m)}
             </span>
             <DueBadge m={m} todayStr={todayStr} onDeadlineExtension={onDeadlineExtension} />
+            {noteEditor.editing && !expanded && <span style={CHIP_STYLE}>노트 편집중</span>}
             {pending && !completed && (
               <span
                 className="text-xs font-semibold px-2 inline-flex items-center"
@@ -103,7 +106,7 @@ export function MobileMilestoneCard({
       {expanded && (
         <MilestoneDetailPanel
           m={m} todayStr={todayStr} layout="one"
-          onIssueClick={onIssueClick} onDeadlineExtension={onDeadlineExtension} onNoteUpdate={onNoteUpdate}
+          onIssueClick={onIssueClick} onDeadlineExtension={onDeadlineExtension} noteEditor={noteEditor}
         />
       )}
     </div>
