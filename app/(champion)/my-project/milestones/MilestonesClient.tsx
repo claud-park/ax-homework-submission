@@ -56,6 +56,10 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
   // busyRef는 같은 틱 안의 연타까지 막고, busy state는 버튼 비활성 표시에 쓴다.
   const busyRef = useRef<Set<string>>(new Set())
   const [busy, setBusy] = useState<Set<string>>(new Set())
+  // 마일스톤별 단계 전환 순번. 되돌리기 토스트는 자기 순번이 최신일 때만 동작한다.
+  const transitionSeq = useRef<Map<string, number>>(new Map())
+  // 마일스톤별로 아직 떠 있을 수 있는 마지막 단계 전환 토스트 id.
+  const stageToast = useRef<Map<string, string | number>>(new Map())
 
   function applyUpdate(updated: Milestone, parentUpdated: Milestone | null) {
     setMilestones(prev => prev.map(m =>
@@ -87,12 +91,39 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
     }
   }
 
+  /** 단계 전환 성공 직후 호출: 순번을 올리고 이전 되돌리기 토스트를 닫는다. */
+  function beginTransition(id: string): number {
+    const seq = (transitionSeq.current.get(id) ?? 0) + 1
+    transitionSeq.current.set(id, seq)
+    const prev = stageToast.current.get(id)
+    if (prev !== undefined) {
+      toast.dismiss(prev)
+      stageToast.current.delete(id)
+    }
+    return seq
+  }
+
+  function showStageToast(id: string, msg: string, action: 'start' | 'complete', prevStage: Stage) {
+    const seq = beginTransition(id)
+    const tid = toast.success(msg, { duration: 6000, action: undoAction(id, action, prevStage, seq) })
+    stageToast.current.set(id, tid)
+  }
+
   function stageOf(id: string): Stage {
     const m = milestones.find(x => x.id === id)
     return m ? deriveStage(m) : 'not_started'
   }
 
-  async function undo(id: string, action: 'start' | 'complete', prevStage: Stage) {
+  async function undo(id: string, action: 'start' | 'complete', prevStage: Stage, seq: number) {
+    // 이 토스트 이후 같은 마일스톤에 다른 전환이 있었다면 그 변경을 되돌려 버리지 않는다.
+    if (transitionSeq.current.get(id) !== seq) {
+      toast.info('이미 다른 변경이 있어 되돌릴 수 없습니다.')
+      return
+    }
+    if (busyRef.current.has(id)) {
+      toast.info('처리 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
     // 시작 되돌리기는 진행 표시만 끄고, 완료 되돌리기는 완료 직전 단계(진행중/미시작)로 복원한다.
     // prevStage만으로는 '시작 후'와 '진행중에서 완료 후'를 구분할 수 없어(둘 다 이전 단계가 진행중일 수 있음)
     // 어떤 전환을 되돌리는지 action으로 명시한다.
@@ -100,14 +131,17 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
       ? { is_manual_progress: false }
       : { is_manual_completed: false, is_manual_progress: prevStage === 'in_progress' }
     try {
-      if (await patchStage(id, body)) toast.success('되돌렸습니다.')
+      if (await patchStage(id, body)) {
+        beginTransition(id) // 되돌린 토스트가 다시 실행되지 않도록 순번을 올린다.
+        toast.success('되돌렸습니다.')
+      }
     } catch (e: unknown) {
       stageError(e, '되돌리기에 실패했습니다: ')
     }
   }
 
-  function undoAction(id: string, action: 'start' | 'complete', prevStage: Stage) {
-    return { label: '되돌리기', onClick: () => { void undo(id, action, prevStage) } }
+  function undoAction(id: string, action: 'start' | 'complete', prevStage: Stage, seq: number) {
+    return { label: '되돌리기', onClick: () => { void undo(id, action, prevStage, seq) } }
   }
 
   async function handleStart(id: string) {
@@ -119,7 +153,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
       : { is_manual_progress: true, bottleneck_type: null, bottleneck_note: null, is_manual_completed: false }
     try {
       const updated = await patchStage(id, body)
-      if (updated) toast.success('진행중으로 표시했습니다.', { duration: 6000, action: undoAction(id, 'start', prevStage) })
+      if (updated) showStageToast(id, '진행중으로 표시했습니다.', 'start', prevStage)
     } catch (e: unknown) {
       stageError(e, '상태 변경에 실패했습니다: ')
     }
@@ -129,12 +163,13 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
     const prevStage = stageOf(id)
     try {
       const updated = await patchStage(id, { is_manual_completed: true, bottleneck_type: null, bottleneck_note: null })
-      if (updated) toast.success('완료로 표시했습니다.', { duration: 6000, action: undoAction(id, 'complete', prevStage) })
+      if (updated) showStageToast(id, '완료로 표시했습니다.', 'complete', prevStage)
     } catch (e: unknown) {
       stageError(e, '완료 처리에 실패했습니다: ')
     }
   }
 
+  // 이슈 보고·노트·기한 변경은 단계를 바꾸지 않으므로 전환 순번(transitionSeq)을 올리지 않는다.
   async function handleCheckinIssueReport(id: string, type: BottleneckType, note: string | null) {
     try {
       const { milestone: updated } = await apiFetch<PatchResult>(`/api/milestones/${id}`, {
