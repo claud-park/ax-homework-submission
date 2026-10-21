@@ -1,6 +1,7 @@
 import { waitUntil } from '@vercel/functions'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { processSessionAudio, SummaryParseError } from './processAudio'
+import { postRecapDraft } from '@/lib/recap/postDraft'
 
 /**
  * 세션 오디오 처리(STT→요약)를 응답 이후 백그라운드에서 실행한다.
@@ -22,8 +23,9 @@ export function runProcessingInBackground(
   audioPaths: string[],
   durationSec: number,
 ): void {
+  const processing = processSessionAudio(supabase, sessionId, audioPaths, durationSec)
   waitUntil(
-    processSessionAudio(supabase, sessionId, audioPaths, durationSec).catch(async (err: unknown) => {
+    processing.catch(async (err: unknown) => {
       if (!(err instanceof SummaryParseError)) {
         await supabase
           .from('check_up_sessions')
@@ -32,5 +34,15 @@ export function runProcessingInBackground(
       }
       console.error(`[session ${sessionId}] background processing failed:`, err)
     }),
+  )
+  // recap 초안은 별도 체인: 실패해도 위 .catch(status='error')로 번지지 않고 throw도 하지 않는다.
+  waitUntil(
+    processing
+      .then(async (result) => {
+        if (result.lowQuality) return
+        await postRecapDraft({ supabase }, sessionId)
+      })
+      // 처리 자체의 실패는 위 체인이 기록한다. 여기서는 unhandled rejection만 막는다.
+      .catch(() => {}),
   )
 }
