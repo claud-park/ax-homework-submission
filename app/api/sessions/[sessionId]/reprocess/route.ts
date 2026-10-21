@@ -44,6 +44,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     )
   }
 
+  // 업로드만 끝나고 /process 가 돌지 못한 세션(audio_file_path 비어 있음)을 복구하는 경우,
+  // /process 와 동일하게 경로를 저장해 완료 후 화면이 다운로드 영역으로 전환되게 한다.
+  // audio_file_path 가 이미 있으면(일반 재처리) 아무것도 바꾸지 않는다.
+  if (!session.audio_file_path) {
+    await supabase.from('check_up_sessions')
+      .update({ audio_file_path: audioPaths[0], audio_chunk_paths: audioPaths })
+      .eq('id', params.sessionId)
+  }
+
   // 재처리도 응답 후 백그라운드에서 실행.
   runProcessingInBackground(supabase, params.sessionId, audioPaths, session.recording_duration_sec ?? 0)
 

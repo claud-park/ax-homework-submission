@@ -89,10 +89,15 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
     }
   }, [session, sessionId])
 
-  async function refreshSessionMeta() {
+  async function refreshSessionMeta(syncAudioPath = false) {
     try {
       const data = await apiFetch<CheckUpSession>(`/api/sessions/${sessionId}`)
-      setSession(prev => prev ? { ...prev, updated_at: data.updated_at } : prev)
+      setSession(prev => prev ? {
+        ...prev,
+        updated_at: data.updated_at,
+        // 복구 재처리는 서버가 audio_file_path 를 저장하므로 반영해 녹음 패널을 다운로드 영역으로 전환한다.
+        ...(syncAudioPath ? { audio_file_path: data.audio_file_path, stored_audio_chunk_count: 0 } : {}),
+      } : prev)
     } catch { /* best-effort: stale updated_at만 갱신 실패, 치명적 아님 */ }
   }
 
@@ -162,7 +167,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       setNotes(final.notes ?? '')
       setActionItems(final.action_items ?? [])
       setSession(prev => prev ? { ...prev, processing_status: final.processing_status, notes: final.notes } : prev)
-      await refreshSessionMeta()
+      await refreshSessionMeta(true)
       const u = final.processing_usage
       if (u) {
         toast.success(`재처리 완료! Whisper $${u.stt.cost.toFixed(3)} · Claude $${u.claude.cost.toFixed(4)} · 합계 $${u.totalCost.toFixed(4)}`)
