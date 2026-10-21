@@ -31,6 +31,7 @@ interface Props {
   charterApproved: boolean
   charters: Pick<CharterSubmission, 'id' | 'title' | 'project_name' | 'admin_approved_at'>[]
   currentCharterId: string | null
+  todayStr: string
 }
 
 function errorText(e: unknown): string {
@@ -43,7 +44,7 @@ function stageError(e: unknown, fallback: string) {
   else toast.error(fallback + msg)
 }
 
-export function MilestonesClient({ initialMilestones, charterApproved: initialCharterApproved, charters, currentCharterId }: Props) {
+export function MilestonesClient({ initialMilestones, charterApproved: initialCharterApproved, charters, currentCharterId, todayStr }: Props) {
   const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones)
   const charterApproved = initialCharterApproved
   const [deadlineModal, setDeadlineModal] = useState<{ id: string; due_date: string; start_date: string; isReschedule: boolean } | null>(null)
@@ -197,11 +198,6 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
       return next
     })
   }
-
-  const todayStr = useMemo(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }, [])
 
   const published = useMemo(() => milestones.filter(m => m.publish_status === 'published'), [milestones])
   const grouped = useMemo(() => groupByParent(published), [published])

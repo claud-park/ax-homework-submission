@@ -25,12 +25,12 @@ const base: Milestone = {
 const charter = { id: 'c', title: '과제', project_name: '과제', admin_approved_at: '2026-01-01T00:00:00Z' } as any
 
 function renderClient(ms: Milestone[]) {
-  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" />)
+  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" todayStr="2026-06-01" />)
   return screen.getByTestId('milestones-desktop')
 }
 
 function renderMobile(ms: Milestone[]) {
-  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" />)
+  render(<MilestonesClient initialMilestones={ms} charterApproved charters={[charter]} currentCharterId="c" todayStr="2026-06-01" />)
   return screen.getByTestId('milestones-mobile')
 }
 
@@ -52,6 +52,7 @@ describe('MilestonesClient charter dropdown', () => {
         charterApproved={false}
         charters={charters}
         currentCharterId="a"
+        todayStr="2026-06-01"
       />
     )
 
@@ -113,6 +114,11 @@ describe('MilestonesClient status view', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('과제정의서 승인 후 진행할 수 있습니다.'))
     expect(toast.success).not.toHaveBeenCalled()
+  })
+
+  it('uses the server-provided todayStr for D-badges (no client Date)', () => {
+    const area = renderClient([{ ...base, due_date: '2026-06-03', status: 'in_progress' } as Milestone])
+    expect(within(area).getByText('D-2')).toBeInTheDocument()
   })
 
   it('filter chip 지연 hides non-delayed rows', () => {
