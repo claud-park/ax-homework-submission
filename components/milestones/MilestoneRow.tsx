@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { Milestone } from '@/lib/types'
 import { deriveStage, dueBadge, fmtRange, isIssuePending, isScheduleDelayed, type Stage } from '@/lib/milestone-view'
 import { StageStepper } from '@/components/milestones/StageStepper'
+import { useNoteEditor, type NoteEditor } from '@/components/milestones/useNoteEditor'
 import MilestoneActivityLogToggle from '@/components/milestones/MilestoneActivityLogToggle'
 
 export interface MilestoneRowProps {
@@ -36,7 +37,7 @@ const BADGE_STYLE: Record<'ok' | 'soon' | 'over' | 'muted', CSSProperties> = {
   muted: { color: 'var(--text-tertiary)', background: 'var(--surface-primary)' },
 }
 
-const CHIP_STYLE: CSSProperties = {
+export const CHIP_STYLE: CSSProperties = {
   fontSize: 11, background: 'var(--surface-primary)', color: 'var(--text-secondary)',
   borderRadius: 4, padding: '1px 6px', flexShrink: 0,
 }
@@ -81,18 +82,14 @@ export interface MilestoneDetailPanelProps {
   layout: 'two' | 'one'
   onIssueClick: (m: Milestone) => void
   onDeadlineExtension: (m: Milestone, isReschedule?: boolean) => void
-  onNoteUpdate: (id: string, note: string | null) => Promise<void>
+  noteEditor: NoteEditor
   onLogLoaded?: (count: number) => void
 }
 
 /** 펼침 패널(노트·관리자 답변·링크·작업 로그). 데스크톱은 2열, 모바일은 1열. */
 export function MilestoneDetailPanel({
-  m, todayStr, layout, onIssueClick, onDeadlineExtension, onNoteUpdate, onLogLoaded,
+  m, todayStr, layout, onIssueClick, onDeadlineExtension, noteEditor, onLogLoaded,
 }: MilestoneDetailPanelProps) {
-  const [noteEditing, setNoteEditing] = useState(false)
-  const [noteValue, setNoteValue] = useState('')
-  const [noteSaving, setNoteSaving] = useState(false)
-
   const stage = deriveStage(m)
   const completed = stage === 'completed'
   const canEditNote = stage === 'in_progress'
@@ -102,34 +99,9 @@ export function MilestoneDetailPanel({
   const deadlineReschedule = !!m.due_date && isReschedule
   const showIssueReport = isScheduleDelayed(m, todayStr) && !isIssuePending(m)
 
-  useEffect(() => {
-    setNoteEditing(false)
-    setNoteValue('')
-  }, [m.id])
-
-  function openNoteEdit() {
-    setNoteValue(m.note ?? '')
-    setNoteEditing(true)
-  }
-
-  async function handleNoteSave() {
-    const trimmed = noteValue.trim()
-    const next = trimmed === '' ? null : trimmed
-    if (next === (m.note ?? null)) { setNoteEditing(false); return }
-    setNoteSaving(true)
-    try {
-      await onNoteUpdate(m.id, next)
-      setNoteEditing(false)
-    } catch {
-      // keep the editor open with the draft; the parent surfaces the error
-    } finally {
-      setNoteSaving(false)
-    }
-  }
-
   function handleNoteKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSave() }
-    if (e.key === 'Escape') { setNoteEditing(false) }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); noteEditor.save() }
+    if (e.key === 'Escape') { noteEditor.cancel() }
   }
 
   return (
@@ -143,12 +115,12 @@ export function MilestoneDetailPanel({
     >
     <div className="flex flex-col gap-2 min-w-0">
       <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>진행 노트</span>
-      {noteEditing ? (
+      {canEditNote && noteEditor.editing ? (
         <div className="flex flex-col gap-1.5">
           <textarea
             autoFocus
-            value={noteValue}
-            onChange={e => setNoteValue(e.target.value)}
+            value={noteEditor.value}
+            onChange={e => noteEditor.setValue(e.target.value)}
             onKeyDown={handleNoteKeyDown}
             placeholder="진행 상황을 간단히 메모해주세요"
             rows={2}
@@ -161,16 +133,16 @@ export function MilestoneDetailPanel({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={handleNoteSave}
-              disabled={noteSaving}
+              onClick={noteEditor.save}
+              disabled={noteEditor.saving}
               className="text-xs px-3 py-1 rounded-md font-semibold"
-              style={{ background: 'var(--blue-600)', color: '#fff', opacity: noteSaving ? 0.7 : 1 }}
+              style={{ background: 'var(--blue-600)', color: 'var(--text-inverse)', opacity: noteEditor.saving ? 0.7 : 1 }}
             >
               저장
             </button>
             <button
               type="button"
-              onClick={() => setNoteEditing(false)}
+              onClick={noteEditor.cancel}
               className="text-xs px-3 py-1 rounded-md"
               style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
@@ -217,8 +189,8 @@ export function MilestoneDetailPanel({
       )}
 
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        {canEditNote && !noteEditing && (
-          <button type="button" style={LINK_STYLE} onClick={openNoteEdit}>노트 편집</button>
+        {canEditNote && !noteEditor.editing && (
+          <button type="button" style={LINK_STYLE} onClick={noteEditor.open}>노트 편집</button>
         )}
         {!completed && (
           <button type="button" style={LINK_STYLE} onClick={() => onDeadlineExtension(m, deadlineReschedule)}>
@@ -245,6 +217,7 @@ export function MilestoneRow({
 }: MilestoneRowProps) {
   const [expanded, setExpanded] = useState(false)
   const [logCount, setLogCount] = useState<number | null>(null)
+  const noteEditor = useNoteEditor(m, onNoteUpdate)
 
   const stage = deriveStage(m)
   const completed = stage === 'completed'
@@ -284,6 +257,7 @@ export function MilestoneRow({
           </span>
           {m.note && <span style={CHIP_STYLE}>노트</span>}
           {logCount !== null && <span style={CHIP_STYLE}>로그 {logCount}</span>}
+          {noteEditor.editing && !expanded && stage === 'in_progress' && <span style={CHIP_STYLE}>노트 편집중</span>}
         </div>
 
         <div className="flex items-center gap-2">
@@ -345,7 +319,7 @@ export function MilestoneRow({
         <MilestoneDetailPanel
           m={m} todayStr={todayStr} layout="two"
           onIssueClick={onIssueClick} onDeadlineExtension={onDeadlineExtension}
-          onNoteUpdate={onNoteUpdate} onLogLoaded={setLogCount}
+          noteEditor={noteEditor} onLogLoaded={setLogCount}
         />
       )}
     </div>

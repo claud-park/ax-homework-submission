@@ -2,10 +2,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { MilestoneActivityLog } from '@/lib/types'
+import { kstTodayStr } from '@/lib/nudge/overdue'
 
 function relativeDate(dateStr: string): string {
-  const today = new Date()
-  const todayLocal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  // D-배지와 같은 기준(KST)으로 오늘을 잡는다.
+  const todayLocal = kstTodayStr()
   if (dateStr >= todayLocal) return '오늘'
   const [y, m, d] = dateStr.split('-').map(Number)
   const [ty, tm, td] = todayLocal.split('-').map(Number)

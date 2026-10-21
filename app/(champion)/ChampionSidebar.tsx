@@ -9,6 +9,7 @@ import { Users, FileText, LayoutList, LogOut, Menu, X, Calendar, Video, Smartpho
 import { BottomTabBar, type BottomTab } from '@/components/BottomTabBar'
 import type { Milestone } from '@/lib/types'
 import { groupByParent, isScheduleDelayed } from '@/lib/milestone-view'
+import { kstTodayStr } from '@/lib/nudge/overdue'
 
 const NAV = [
   { icon: Users,      label: '전체 현황',        href: '/',                      match: (p: string) => p === '/' || p.startsWith('/champions') },
@@ -37,8 +38,7 @@ export function ChampionSidebar() {
   const [hasDelayed, setHasDelayed] = useState(false)
 
   useEffect(() => {
-    const d = new Date()
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const today = kstTodayStr()
     apiFetch<Milestone[]>('/api/milestones')
       .then(milestones => {
         // 마일스톤 현황 페이지의 지연 집계와 같은 규칙(그룹 헤더 제외, 게시된 항목만)
