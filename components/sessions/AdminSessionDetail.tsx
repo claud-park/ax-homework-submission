@@ -43,6 +43,9 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   const [deleting, setDeleting] = useState(false)
 
   const [reprocessing, setReprocessing] = useState(false)
+  // 이 기기에 전체 녹음 보관본이 있으면 서버의 일부 청크 복구보다 보관본을 우선한다.
+  // RecordingPanel이 보관본 조회를 마치고 알려 주기 전까지는 true로 두어 복구 배너가 깜빡이지 않게 한다.
+  const [hasLocalCopy, setHasLocalCopy] = useState(true)
 
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -329,6 +332,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       {!session.audio_file_path
         && (session.stored_audio_chunk_count ?? 0) > 0
         && !reprocessing
+        && !hasLocalCopy
         && session.processing_status !== 'transcribing'
         && session.processing_status !== 'summarizing'
         && session.processing_status !== 'done'
@@ -381,7 +385,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
 
       {/* Recording panel (new session) OR downloads (already-recorded session) */}
       {!session.audio_file_path ? (
-        <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} />
+        <RecordingPanel sessionId={sessionId} onProcessed={handleProcessed} onRestorableChange={setHasLocalCopy} />
       ) : (
         <div
           className="rounded-xl border p-3 mb-4"

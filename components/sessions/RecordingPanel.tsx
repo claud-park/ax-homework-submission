@@ -22,6 +22,8 @@ interface UsageSummary {
 interface Props {
   sessionId: string
   onProcessed: (notes: string, actionItems: SessionActionItem[]) => void
+  /** 이 기기에 보관된 녹음(복원 대기 또는 진행 중)이 있는지. 마운트 시 보관본 조회가 끝나면 처음 호출된다. */
+  onRestorableChange?: (hasLocalCopy: boolean) => void
 }
 
 type Phase = 'idle' | 'recording' | 'uploading' | 'transcribing' | 'summarizing' | 'done' | 'error'
@@ -57,7 +59,7 @@ function formatTime(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function RecordingPanel({ sessionId, onProcessed }: Props) {
+export function RecordingPanel({ sessionId, onProcessed, onRestorableChange }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)      // recording elapsed seconds
   const [progress, setProgress] = useState(0)    // 0-100
@@ -90,11 +92,22 @@ export function RecordingPanel({ sessionId, onProcessed }: Props) {
   // 현재 lastJob의 녹음이 IndexedDB에 보관됐는지. 보관 실패 시 오류 화면에서도 이탈 경고를 유지한다.
   const localCopySavedRef = useRef(false)
 
+  const [restoreChecked, setRestoreChecked] = useState(false)
+  // 보관본 조회가 끝난 뒤, 복원 대기 중이거나 녹음/업로드/오류 진행 중이면(= 로컬 보관본이 있으면) 부모에 알린다.
+  const hasLocalCopy = !!restorable || phase !== 'idle'
+  const onRestorableChangeRef = useRef(onRestorableChange)
+  onRestorableChangeRef.current = onRestorableChange
+  useEffect(() => {
+    if (restoreChecked) onRestorableChangeRef.current?.(hasLocalCopy)
+  }, [restoreChecked, hasLocalCopy])
+
   // 마운트 시 업로드하지 못한 녹음이 남아 있으면 복원 배너를 띄운다. 실패(null)는 무시.
   useEffect(() => {
     let cancelled = false
     void loadRecording(sessionId).then(rec => {
-      if (!cancelled && rec) setRestorable(rec)
+      if (cancelled) return
+      if (rec) setRestorable(rec)
+      setRestoreChecked(true)
     })
     return () => { cancelled = true }
   }, [sessionId])
