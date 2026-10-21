@@ -1,5 +1,6 @@
 'use client'
 import { useId, type CSSProperties } from 'react'
+import { toast } from 'sonner'
 import type { Stage } from '@/lib/milestone-view'
 
 export interface StageStepperProps {
@@ -81,13 +82,16 @@ export function StageStepper({
         </span>
       )}
       {segments.map((seg, i) => {
-        const clickable = !!seg.onClick && !disabled && !busy
+        const actionable = !!seg.onClick && !busy
+        const blocked = actionable && disabled // 과제정의서 미승인 등: 누르면 이유를 알려준다
+        const clickable = actionable && !disabled
         return (
           <button
             key={i}
             type="button"
-            disabled={!clickable}
-            onClick={seg.onClick}
+            disabled={!clickable && !blocked}
+            aria-disabled={blocked ? true : undefined}
+            onClick={blocked ? () => toast.info(disabledReason ?? '지금은 진행할 수 없습니다.') : seg.onClick}
             aria-current={seg.current ? 'step' : undefined}
             aria-describedby={showReason ? reasonId : undefined}
             style={{
@@ -99,7 +103,8 @@ export function StageStepper({
               borderRadius: i === 0 ? '7px 0 0 7px' : i === 2 ? '0 7px 7px 0' : 0,
               outlineOffset: -2,
               borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
-              cursor: clickable ? 'pointer' : 'default',
+              cursor: clickable ? 'pointer' : blocked ? 'not-allowed' : 'default',
+              opacity: blocked ? 0.5 : 1,
               transition: 'background 0.15s, color 0.15s',
               ...TONE_STYLE[seg.tone],
             }}

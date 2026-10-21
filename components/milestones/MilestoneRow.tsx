@@ -234,7 +234,7 @@ export function MilestoneRow({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '4px minmax(0,1fr) 168px 256px 32px',
+          gridTemplateColumns: '4px 32px minmax(0,1fr) 168px 256px',
           columnGap: 12,
           alignItems: 'center',
           minHeight: 46,
@@ -243,6 +243,20 @@ export function MilestoneRow({
         }}
       >
         <span style={{ width: 4, height: 26, borderRadius: 2, background: railColor }} />
+
+        <button
+          type="button"
+          aria-label={expanded ? '상세 접기' : '상세 펼치기'}
+          aria-expanded={expanded}
+          onClick={() => setExpanded(e => !e)}
+          className="inline-flex items-center justify-center"
+          style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+        >
+          <ChevronDown
+            size={16}
+            style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+          />
+        </button>
 
         <div className="flex items-center gap-2 min-w-0">
           <span
@@ -299,20 +313,6 @@ export function MilestoneRow({
             onComplete={() => onComplete(m.id)}
           />
         </div>
-
-        <button
-          type="button"
-          aria-label={expanded ? '상세 접기' : '상세 펼치기'}
-          aria-expanded={expanded}
-          onClick={() => setExpanded(e => !e)}
-          className="inline-flex items-center justify-center"
-          style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
-        >
-          <ChevronDown
-            size={16}
-            style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
-          />
-        </button>
       </div>
 
       {expanded && (

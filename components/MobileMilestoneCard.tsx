@@ -33,6 +33,19 @@ export function MobileMilestoneCard({
 
         <div className="flex flex-col" style={{ gap: 8, padding: '10px 12px' }}>
           <div className="flex items-start gap-2">
+            <button
+              type="button"
+              aria-label={expanded ? '상세 접기' : '상세 펼치기'}
+              aria-expanded={expanded}
+              onClick={() => setExpanded(e => !e)}
+              className="inline-flex items-center justify-center flex-shrink-0"
+              style={{ width: 44, height: 44, margin: '-8px 0 -8px -10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+            >
+              <ChevronDown
+                size={16}
+                style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+              />
+            </button>
             <span
               className="flex-1 min-w-0"
               style={{
@@ -43,19 +56,6 @@ export function MobileMilestoneCard({
             >
               {m.title}
             </span>
-            <button
-              type="button"
-              aria-label={expanded ? '상세 접기' : '상세 펼치기'}
-              aria-expanded={expanded}
-              onClick={() => setExpanded(e => !e)}
-              className="inline-flex items-center justify-center flex-shrink-0"
-              style={{ width: 44, height: 44, margin: '-8px -10px -8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
-            >
-              <ChevronDown
-                size={16}
-                style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
-              />
-            </button>
           </div>
 
           <div className="flex items-center flex-wrap gap-2">
