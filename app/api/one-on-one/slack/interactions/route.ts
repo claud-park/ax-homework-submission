@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     body,
     timestamp,
     signature,
-    secret: process.env.SLACK_SIGNING_SECRET!,
+    secret: process.env.SLACK_SIGNING_SECRET ?? '',
   })) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
