@@ -9,6 +9,7 @@ import type { ProcessUsage } from '@/lib/audio-pipeline/types'
 import type { SessionActionItem } from '@/lib/types'
 import { assessTranscript } from '@/lib/audio/quality'
 import { getSeasonIdForCheckUpSession } from '@/lib/data/season'
+import { recordProcessingError, tagProcessingStage } from './processingError'
 
 const BUCKET = 'check-up-sessions'
 
@@ -91,12 +92,19 @@ export async function processSessionAudio(
 ): Promise<ProcessResult> {
   await supabase.from('check_up_sessions')
     .update({ processing_status: 'transcribing' }).eq('id', sessionId)
+  // 이전 실패 원인 코드 정리(best-effort, 별도 UPDATE).
+  await recordProcessingError(supabase, sessionId, null)
 
   // 청크를 인덱스 순서대로 전사 후 join
   const parts: string[] = []
   for (const path of audioPaths) {
     const buf = await downloadSessionAudio(supabase, path)
-    parts.push(await transcribeAudio(buf, path))
+    try {
+      parts.push(await transcribeAudio(buf, path))
+    } catch (err) {
+      tagProcessingStage(err, 'stt') // 분류용 표시만 하고 그대로 다시 던진다
+      throw err
+    }
   }
   const transcript = parts.join(' ').trim()
 
@@ -114,6 +122,9 @@ export async function processSessionAudio(
         .from('check_up_sessions')
         .update({ processing_status: 'error', notes: err.rawText, updated_at: new Date().toISOString() })
         .eq('id', sessionId)
+      await recordProcessingError(supabase, sessionId, 'summary_parse')
+    } else {
+      tagProcessingStage(err, 'summary')
     }
     throw err
   }

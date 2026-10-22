@@ -8,7 +8,10 @@ vi.mock('@/lib/audio-pipeline/summarize', () => ({
 }))
 
 import { transcribeAudio } from '@/lib/audio-pipeline/transcribe'
+import { summarizeTranscript } from '@/lib/audio-pipeline/summarize'
+import { SummaryParseError } from '@/lib/audio-pipeline/errors'
 import { processSessionAudio } from '@/lib/sessions/processAudio'
+import { classifyProcessingError } from '@/lib/sessions/processingError'
 
 function fakeSupabase() {
   const updates: any[] = []
@@ -48,5 +51,42 @@ describe('processSessionAudio (chunked)', () => {
     const res = await processSessionAudio(client, 's1', ['sessions/s1/chunk_000.wav'], 1500)
     expect(res.lowQuality).toBe(true)
     expect(updates.some(u => u.vals.processing_status === 'low_quality')).toBe(true)
+  })
+
+  const causeWrites = (updates: any[]) => updates.filter(u => 'processing_error' in u.vals).map(u => u.vals)
+
+  it('clears processing_error at start with a separate update (not merged into status updates)', async () => {
+    ;(transcribeAudio as any).mockResolvedValue('정상적인 한국어 문장 여러개 다양한 내용')
+    const { client, updates } = fakeSupabase()
+    await processSessionAudio(client, 's1', ['sessions/s1/chunk_000.wav'], 10)
+    expect(causeWrites(updates)).toEqual([{ processing_error: null }])
+    expect(updates.filter(u => u.vals.processing_status === 'transcribing')).toHaveLength(1)
+    expect(updates[0].vals).toEqual({ processing_status: 'transcribing' })
+  })
+
+  it('SummaryParseError: keeps status=error write and records summary_parse separately', async () => {
+    ;(transcribeAudio as any).mockResolvedValue('정상적인 한국어 문장 여러개 다양한 내용')
+    ;(summarizeTranscript as any).mockRejectedValueOnce(new SummaryParseError('bad', 'raw text'))
+    const { client, updates } = fakeSupabase()
+    await expect(processSessionAudio(client, 's1', ['sessions/s1/chunk_000.wav'], 10)).rejects.toBeInstanceOf(SummaryParseError)
+    const errWrites = updates.filter(u => u.vals.processing_status === 'error')
+    expect(errWrites).toHaveLength(1)
+    expect(Object.keys(errWrites[0].vals).sort()).toEqual(['notes', 'processing_status', 'updated_at'])
+    expect(causeWrites(updates)).toEqual([{ processing_error: null }, { processing_error: 'summary_parse' }])
+  })
+
+  it('tags the stage so ambiguous errors classify per call site', async () => {
+    const stt = { status: 401 }
+    ;(transcribeAudio as any).mockRejectedValueOnce(stt)
+    const a = fakeSupabase()
+    await expect(processSessionAudio(a.client, 's1', ['sessions/s1/chunk_000.wav'], 10)).rejects.toBe(stt)
+    expect(classifyProcessingError(stt)).toBe('stt_auth')
+
+    const sum = { status: 401 }
+    ;(transcribeAudio as any).mockResolvedValue('정상적인 한국어 문장 여러개 다양한 내용')
+    ;(summarizeTranscript as any).mockRejectedValueOnce(sum)
+    const b = fakeSupabase()
+    await expect(processSessionAudio(b.client, 's1', ['sessions/s1/chunk_000.wav'], 10)).rejects.toBe(sum)
+    expect(classifyProcessingError(sum)).toBe('summary_auth')
   })
 })

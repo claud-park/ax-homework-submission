@@ -2,6 +2,7 @@ import { waitUntil } from '@vercel/functions'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { processSessionAudio, SummaryParseError } from './processAudio'
 import { postRecapDraft } from '@/lib/recap/postDraft'
+import { classifyProcessingError, recordProcessingError } from './processingError'
 
 /**
  * 세션 오디오 처리(STT→요약)를 응답 이후 백그라운드에서 실행한다.
@@ -25,15 +26,23 @@ export function runProcessingInBackground(
 ): void {
   const processing = processSessionAudio(supabase, sessionId, audioPaths, durationSec)
   waitUntil(
-    processing.catch(async (err: unknown) => {
-      if (!(err instanceof SummaryParseError)) {
-        await supabase
-          .from('check_up_sessions')
-          .update({ processing_status: 'error', updated_at: new Date().toISOString() })
-          .eq('id', sessionId)
-      }
-      console.error(`[session ${sessionId}] background processing failed:`, err)
-    }),
+    processing.then(
+      // 성공(done/low_quality): 이전 실패 원인 코드를 지운다(best-effort, 별도 UPDATE, throw 안 함).
+      async () => {
+        await recordProcessingError(supabase, sessionId, null)
+      },
+      async (err: unknown) => {
+        if (!(err instanceof SummaryParseError)) {
+          await supabase
+            .from('check_up_sessions')
+            .update({ processing_status: 'error', updated_at: new Date().toISOString() })
+            .eq('id', sessionId)
+          // 원인 코드는 status 업데이트와 분리된 best-effort UPDATE. (SummaryParseError 는 processAudio 가 기록)
+          await recordProcessingError(supabase, sessionId, classifyProcessingError(err))
+        }
+        console.error(`[session ${sessionId}] background processing failed:`, err)
+      },
+    ),
   )
   // recap 초안은 별도 체인: 실패해도 위 .catch(status='error')로 번지지 않고 throw도 하지 않는다.
   waitUntil(
