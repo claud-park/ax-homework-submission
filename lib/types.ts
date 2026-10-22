@@ -281,6 +281,10 @@ export interface CheckUpSession {
   processing_started_at?: string | null
   processing_usage?: ProcessUsage | null
   raw_transcript: string | null
+  recap_slack_channel?: string | null
+  recap_slack_ts?: string | null
+  recap_sent_at?: string | null
+  recap_sent_by?: string | null
   created_at: string
   updated_at: string
   action_items?: SessionActionItem[]
