@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Trash2, Send, RefreshCw, Download, Pencil } from 'lucide-react'
 import { apiFetch, getAuthToken } from '@/lib/api-client'
 import { processingErrorMessage } from '@/lib/sessions/processingErrorMessage'
+import { recapDraftErrorMessage, recapRedraftReasonMessage } from '@/lib/recap/draftErrorMessage'
 import { pollProcessing } from '@/lib/sessions/pollProcessing'
 import { deleteRecording } from '@/lib/audio/localRecordingStore'
 import { toast } from 'sonner'
@@ -44,6 +45,8 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   const [deleting, setDeleting] = useState(false)
 
   const [reprocessing, setReprocessing] = useState(false)
+  const [redrafting, setRedrafting] = useState(false)
+  const redraftingRef = useRef(false)
   // 이 기기에 전체 녹음 보관본이 있으면 서버의 일부 청크 복구보다 보관본을 우선한다.
   // RecordingPanel이 보관본 조회를 마치고 알려 주기 전까지는 true로 두어 복구 배너가 깜빡이지 않게 한다.
   const [hasLocalCopy, setHasLocalCopy] = useState(true)
@@ -99,10 +102,37 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       setSession(prev => prev ? {
         ...prev,
         updated_at: data.updated_at,
+        recap_slack_ts: data.recap_slack_ts,
+        recap_slack_channel: data.recap_slack_channel,
+        recap_sent_at: data.recap_sent_at,
+        recap_sent_by: data.recap_sent_by,
+        recap_draft_error: data.recap_draft_error,
         // 복구 재처리는 서버가 audio_file_path 를 저장하므로 반영해 녹음 패널을 다운로드 영역으로 전환한다.
         ...(syncAudioPath ? { audio_file_path: data.audio_file_path, stored_audio_chunk_count: 0 } : {}),
       } : prev)
     } catch { /* best-effort: stale updated_at만 갱신 실패, 치명적 아님 */ }
+  }
+
+  async function redraftRecap() {
+    if (redraftingRef.current) return
+    redraftingRef.current = true
+    setRedrafting(true)
+    try {
+      // 서버는 실패(ok:false)도 HTTP 200 으로 돌려주므로 본문의 ok 를 읽는다.
+      const res = await apiFetch<{ ok: boolean; reason?: string; errorCode?: string }>(
+        `/api/sessions/${sessionId}/recap-draft`,
+        { method: 'POST' },
+      )
+      if (res.ok) toast.success('recap 초안을 Slack에 올렸어요')
+      else toast.error(recapRedraftReasonMessage(res.reason, res.errorCode))
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : 'recap 초안을 Slack에 올리지 못했어요.')
+    } finally {
+      try { await refreshSessionMeta() } finally {
+        redraftingRef.current = false
+        setRedrafting(false)
+      }
+    }
   }
 
   async function deleteSession() {
@@ -328,6 +358,43 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
             <RefreshCw className={`h-3 w-3 ${reprocessing ? 'animate-spin' : ''}`} />
             {reprocessing ? '처리 중...' : '재처리'}
           </button>
+        </div>
+      )}
+
+      {/* Recap draft banner / re-post button — done, not yet sent to the champion */}
+      {session.processing_status === 'done' && session.recap_draft_error && (
+        <div
+          className="rounded-xl border p-3 mb-4 flex items-center justify-between gap-3"
+          style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
+        >
+          <div>
+            <p className="text-xs font-semibold" style={{ color: 'var(--error)' }}>recap 초안이 Slack에 올라가지 않았어요</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{recapDraftErrorMessage(session.recap_draft_error) ?? 'recap 초안을 Slack에 올리지 못했어요'}</p>
+          </div>
+          {!session.recap_sent_at && (
+            <button
+              onClick={redraftRecap}
+              disabled={redrafting}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-40"
+              style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+            >
+              <RefreshCw className={`h-3 w-3 ${redrafting ? 'animate-spin' : ''}`} />
+              {redrafting ? '올리는 중...' : 'recap 초안 다시 올리기'}
+            </button>
+          )}
+        </div>
+      )}
+      {session.processing_status === 'done' && !session.recap_sent_at && !session.recap_slack_ts && !session.recap_draft_error && (
+        <div className="mb-4 flex justify-end">
+  <button
+    onClick={redraftRecap}
+    disabled={redrafting}
+    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-40"
+    style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
+  >
+    <RefreshCw className={`h-3 w-3 ${redrafting ? 'animate-spin' : ''}`} />
+    {redrafting ? '올리는 중...' : 'recap 초안 다시 올리기'}
+  </button>
         </div>
       )}
 
