@@ -15,7 +15,7 @@ const season: Season = {
 function booking(over: Partial<OverviewBooking>): OverviewBooking {
   return {
     id: 'b1', champion_user_id: 'u1', slot_start: '2026-10-25T05:00:00Z', slot_end: '2026-10-25T05:30:00Z',
-    status: 'confirmed', confirmed_by: 'admin1', created_at: '2026-10-20T01:00:00Z', updated_at: '2026-10-21T01:00:00Z',
+    status: 'confirmed', confirmed_by: 'claud', created_at: '2026-10-20T01:00:00Z', updated_at: '2026-10-21T01:00:00Z',
     ...over,
   }
 }
@@ -54,7 +54,7 @@ function renderClient(over: Partial<React.ComponentProps<typeof OneOnOneOverview
   return render(
     <OneOnOneOverviewClient
       seasons={[season]} season={season} rows={rows} startDateMissing={false}
-      adminNames={{ admin1: '관리자A' }} {...over}
+      {...over}
     />,
   )
 }
@@ -75,7 +75,7 @@ describe('OneOnOneOverviewClient', () => {
   it('shows KST next meeting with confirming admin', () => {
     renderClient()
     expect(screen.getByText(/14:00/)).toBeTruthy()
-    expect(screen.getByText(/관리자A/)).toBeTruthy()
+    expect(screen.getByText(/claud 확정/)).toBeTruthy()
   })
 
   it('expands a row to show the timeline and champion link', () => {

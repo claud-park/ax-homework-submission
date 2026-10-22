@@ -12,8 +12,6 @@ interface Props {
   season: Season | null
   rows: OverviewRow[]
   startDateMissing: boolean
-  /** 확정 어드민 user id → 이름 */
-  adminNames?: Record<string, string>
 }
 
 const CHIPS: { key: OverviewChip; label: string }[] = [
@@ -58,7 +56,7 @@ function describeEvent(e: TimelineEvent): { label: string; detail: string } {
   }
 }
 
-export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing, adminNames = {} }: Props) {
+export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing }: Props) {
   const router = useRouter()
   const [chip, setChip] = useState<OverviewChip>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -184,7 +182,7 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
                                 <>
                                   {fmtDateTime(next.slot_start)}
                                   {next.confirmed_by && (
-                                    <span style={{ color: 'var(--text-secondary)' }}> · {adminNames[next.confirmed_by] ?? '어드민'} 확정</span>
+                                    <span style={{ color: 'var(--text-secondary)' }}> · {next.confirmed_by} 확정</span>
                                   )}
                                 </>
                               ) : '—'}
