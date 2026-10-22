@@ -4,8 +4,9 @@ import { postRecapDraft } from '@/lib/recap/postDraft'
 
 type Row = Record<string, unknown>
 
-function makeSupabase(opts: { session?: Row | null; user?: Row; items?: Row[]; updateError?: boolean; log?: string[] }) {
+function makeSupabase(opts: { session?: Row | null; user?: Row; items?: Row[]; updateError?: boolean; log?: string[]; conditionalRows?: number; readError?: { code?: string; message: string } }) {
   const updates: Row[] = []
+  const filters: string[][] = []
   const session =
     opts.session === undefined
       ? {
@@ -27,17 +28,45 @@ function makeSupabase(opts: { session?: Row | null; user?: Row; items?: Row[]; u
       q.eq = () => q
       q.order = () => Promise.resolve({ data: items, error: null })
       q.single = () =>
-        Promise.resolve({ data: table === 'users' ? user : session, error: session || table === 'users' ? null : { message: 'x' } })
+        opts.readError && table === 'check_up_sessions'
+          ? Promise.resolve({ data: null, error: opts.readError })
+          : Promise.resolve({
+              data: table === 'users' ? user : session,
+              error: session || table === 'users' ? null : { code: 'PGRST116', message: 'no rows' },
+            })
       q.maybeSingle = q.single
       q.update = (patch: Row) => {
         updates.push({ table, ...patch })
+        filters.push([])
+        const mine = filters[filters.length - 1]
         opts.log?.push('update')
-        return { eq: () => Promise.resolve({ error: opts.updateError ? { message: 'db down' } : null }) }
+        const error = opts.updateError ? { message: 'db down' } : null
+        let selected = false
+        const chain: Record<string, unknown> = {}
+        chain.eq = (c: string) => {
+          mine.push(`${c} =`)
+          return chain
+        }
+        chain.is = (c: string, v: unknown) => {
+          mine.push(`${c} IS ${v}`)
+          return chain
+        }
+        chain.select = () => {
+          selected = true
+          return chain
+        }
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          resolve(
+            selected
+              ? { data: Array.from({ length: opts.conditionalRows ?? 1 }, () => ({ id: 's1' })), error }
+              : { error },
+          )
+        return chain
       }
       return q
     },
   }
-  return { client: client as unknown as SupabaseClient, updates }
+  return { client: client as unknown as SupabaseClient, updates, filters }
 }
 
 const env = { channelId: 'C_CFG', token: 'xoxb-test', baseUrl: 'https://app.test' }
@@ -259,5 +288,58 @@ describe('postRecapDraft', () => {
     const r = await postRecapDraft({ supabase: client, slackClient: { chat: { postMessage } } as never, env }, 's1')
     expect(r).toEqual({ posted: false, reason: 'slack_error', errorCode: 'unknown' })
     expect(updates).toEqual([{ table: 'check_up_sessions', recap_draft_error: 'unknown' }])
+  })
+
+  it('manual path updates only channel/ts, guarded by recap_sent_at IS NULL', async () => {
+    const { client, updates, filters } = makeSupabase({})
+    const postMessage = vi.fn().mockResolvedValue({ ok: true, channel: 'C9', ts: '9.0' })
+    const r = await postRecapDraft(
+      { supabase: client, slackClient: { chat: { postMessage } } as never, env, refuseIfSent: true },
+      's1',
+    )
+    expect(r).toEqual({ posted: true })
+    expect(updates[0]).toEqual({ table: 'check_up_sessions', recap_slack_channel: 'C9', recap_slack_ts: '9.0' })
+    expect(filters[0]).toContain('recap_sent_at IS null')
+    expect(updates.some((u) => 'recap_sent_at' in u || 'recap_sent_by' in u)).toBe(false)
+    expect(updates[1]).toEqual({ table: 'check_up_sessions', recap_draft_error: null })
+  })
+
+  it('manual path returns already_sent when a concurrent send claimed (0 rows), without touching error or sent fields', async () => {
+    const { client, updates } = makeSupabase({ conditionalRows: 0 })
+    const postMessage = vi.fn().mockResolvedValue({ ok: true, channel: 'C9', ts: '9.0' })
+    const r = await postRecapDraft(
+      { supabase: client, slackClient: { chat: { postMessage } } as never, env, refuseIfSent: true },
+      's1',
+    )
+    expect(r).toEqual({ posted: false, reason: 'already_sent' })
+    expect(updates).toHaveLength(1)
+    expect(updates.some((u) => 'recap_draft_error' in u || 'recap_sent_at' in u)).toBe(false)
+  })
+
+  it('automatic path still does one combined update including the reset', async () => {
+    const { client, updates, filters } = makeSupabase({})
+    const postMessage = vi.fn().mockResolvedValue({ ok: true, channel: 'C1', ts: '1.0' })
+    await postRecapDraft({ supabase: client, slackClient: { chat: { postMessage } } as never, env }, 's1')
+    expect(updates[0]).toEqual({
+      table: 'check_up_sessions',
+      recap_slack_channel: 'C1',
+      recap_slack_ts: '1.0',
+      recap_sent_at: null,
+      recap_sent_by: null,
+    })
+    expect(filters[0]).not.toContain('recap_sent_at IS null')
+  })
+
+  it('reports db_error (not not_found) for a session read error other than a missing row', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const postMessage = vi.fn()
+    for (const readError of [{ code: '22P02', message: 'invalid uuid' }, { message: 'fetch failed' }]) {
+      const { client, updates } = makeSupabase({ session: null, readError })
+      const r = await postRecapDraft({ supabase: client, slackClient: { chat: { postMessage } } as never, env }, 's1')
+      expect(r).toEqual({ posted: false, reason: 'db_error' })
+      expect(updates).toEqual([])
+    }
+    expect(postMessage).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

@@ -57,11 +57,15 @@ export async function postRecapDraft(deps: PostRecapDraftDeps, sessionId: string
     const { supabase } = deps
     const slackClient = deps.slackClient ?? recapSlack
 
-    const { data: session } = await supabase
+    const { data: session, error: sessionError } = await supabase
       .from('check_up_sessions')
       .select('id, champion_user_id, title, session_date, notes, processing_status, recap_sent_at')
       .eq('id', sessionId)
       .single()
+    if (sessionError && !session && sessionError.code !== 'PGRST116') {
+      console.error(`[session ${sessionId}] recap session read failed:`, sessionError.message)
+      return { posted: false, reason: 'db_error' }
+    }
     if (!session) return { posted: false, reason: 'not_found' }
     if (session.processing_status !== 'done') return { posted: false, reason: 'not_done' }
     if (deps.refuseIfSent && session.recap_sent_at) return { posted: false, reason: 'already_sent' }
@@ -117,20 +121,37 @@ export async function postRecapDraft(deps: PostRecapDraftDeps, sessionId: string
       await recordDraftError(supabase, sessionId, 'unknown')
       return { posted: false, reason: 'slack_error', errorCode: 'unknown' }
     }
-    // 게시 성공 후에만 한 번에 갱신: 새 위치 저장 + 발송 상태 초기화.
-    // 실패 경로에서는 recap_sent_at/by 를 건드리지 않아 "이미 발송됨" 정보가 보존된다.
-    const { error } = await supabase
-      .from('check_up_sessions')
-      .update({
-        recap_slack_channel: res.channel,
-        recap_slack_ts: res.ts,
-        recap_sent_at: null,
-        recap_sent_by: null,
-      })
-      .eq('id', sessionId)
-    if (error) {
-      console.error(`[session ${sessionId}] recap draft posted but state update failed:`, error.message)
-      return { posted: false, reason: 'db_error' }
+    if (deps.refuseIfSent) {
+      // 수동 경로: 게시 중에 기존 초안의 Send 가 claim(recap_sent_at)했을 수 있으므로
+      // recap_sent_at IS NULL 조건으로만 새 위치를 저장하고, 발송 필드는 건드리지 않는다.
+      // 0행이면 동시 발송이 있었던 것: 새 초안의 ts 는 저장되지 않아 그 Send 는 stale_draft 가 된다.
+      const { data: updated, error } = await supabase
+        .from('check_up_sessions')
+        .update({ recap_slack_channel: res.channel, recap_slack_ts: res.ts })
+        .eq('id', sessionId)
+        .is('recap_sent_at', null)
+        .select('id')
+      if (error) {
+        console.error(`[session ${sessionId}] recap draft posted but state update failed:`, error.message)
+        return { posted: false, reason: 'db_error' }
+      }
+      if (!updated || updated.length === 0) return { posted: false, reason: 'already_sent' }
+    } else {
+      // 게시 성공 후에만 한 번에 갱신: 새 위치 저장 + 발송 상태 초기화.
+      // 실패 경로에서는 recap_sent_at/by 를 건드리지 않아 "이미 발송됨" 정보가 보존된다.
+      const { error } = await supabase
+        .from('check_up_sessions')
+        .update({
+          recap_slack_channel: res.channel,
+          recap_slack_ts: res.ts,
+          recap_sent_at: null,
+          recap_sent_by: null,
+        })
+        .eq('id', sessionId)
+      if (error) {
+        console.error(`[session ${sessionId}] recap draft posted but state update failed:`, error.message)
+        return { posted: false, reason: 'db_error' }
+      }
     }
     await recordDraftError(supabase, sessionId, null)
     return { posted: true }
