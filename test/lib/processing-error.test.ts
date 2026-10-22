@@ -84,6 +84,18 @@ describe('classifyProcessingError', () => {
     tagProcessingStage(e, 'summary')
     expect(classifyProcessingError(e)).toBe('summary_auth')
   })
+  it('stage tag on the outer RetryError is honored for an ambiguous inner error', () => {
+    const inner = Object.assign(new Error('weird'), { status: 401 })
+    const e = new RetryError({ message: 'Failed after 3 attempts', reason: 'maxRetriesExceeded', errors: [inner] })
+    expect(classifyProcessingError(e)).toBe('unknown')
+    tagProcessingStage(e, 'summary')
+    expect(classifyProcessingError(e)).toBe('summary_auth')
+  })
+  it('abort errors -> upstream_unavailable', () => {
+    expect(classifyProcessingError(new DOMException('This operation was aborted', 'AbortError'))).toBe('upstream_unavailable')
+    expect(classifyProcessingError(new Error('The operation was aborted'))).toBe('upstream_unavailable')
+    expect(classifyProcessingError(Object.assign(new Error('x'), { name: 'AbortError' }))).toBe('upstream_unavailable')
+  })
   it('SummaryParseError -> summary_parse', () => {
     expect(classifyProcessingError(new SummaryParseError('x', 'raw'))).toBe('summary_parse')
   })

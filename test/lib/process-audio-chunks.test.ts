@@ -73,6 +73,9 @@ describe('processSessionAudio (chunked)', () => {
     expect(errWrites).toHaveLength(1)
     expect(Object.keys(errWrites[0].vals).sort()).toEqual(['notes', 'processing_status', 'updated_at'])
     expect(causeWrites(updates)).toEqual([{ processing_error: null }, { processing_error: 'summary_parse' }])
+    // summary_parse 기록이 status=error 보다 먼저
+    expect(updates.findIndex(u => u.vals.processing_error === 'summary_parse'))
+      .toBeLessThan(updates.findIndex(u => u.vals.processing_status === 'error'))
   })
 
   it('tags the stage so ambiguous errors classify per call site', async () => {

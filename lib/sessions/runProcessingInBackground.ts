@@ -33,12 +33,14 @@ export function runProcessingInBackground(
       },
       async (err: unknown) => {
         if (!(err instanceof SummaryParseError)) {
+          // 원인 코드를 먼저 기록한다: 클라이언트는 status=error 를 보면 폴링을 멈추므로,
+          // 그 시점에 원인이 이미 있어야 한다. 별도 best-effort UPDATE(throw 안 함).
+          // (SummaryParseError 는 processAudio 가 기록)
+          await recordProcessingError(supabase, sessionId, classifyProcessingError(err))
           await supabase
             .from('check_up_sessions')
             .update({ processing_status: 'error', updated_at: new Date().toISOString() })
             .eq('id', sessionId)
-          // 원인 코드는 status 업데이트와 분리된 best-effort UPDATE. (SummaryParseError 는 processAudio 가 기록)
-          await recordProcessingError(supabase, sessionId, classifyProcessingError(err))
         }
         console.error(`[session ${sessionId}] background processing failed:`, err)
       },

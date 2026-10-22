@@ -81,8 +81,9 @@ describe('runProcessingInBackground', () => {
     await flush()
     expect(statusUpdates(updates)).toHaveLength(1)
     expect(causeUpdates(updates)).toEqual([{ processing_error: 'stt_quota' }])
-    // status 업데이트가 먼저, 원인 기록이 그 다음
-    expect(updates.indexOf(statusUpdates(updates)[0])).toBeLessThan(updates.indexOf(causeUpdates(updates)[0]))
+    // 원인 기록이 먼저, status=error 가 그 다음(폴링이 error 에서 멈추므로)
+    expect(updates.indexOf(causeUpdates(updates)[0])).toBeLessThan(updates.indexOf(statusUpdates(updates)[0]))
+    expect(statusUpdates(updates)[0]).toEqual({ processing_status: 'error', updated_at: expect.any(String) })
   })
 
   it('records unknown for unclassifiable errors and never stores the raw message', async () => {

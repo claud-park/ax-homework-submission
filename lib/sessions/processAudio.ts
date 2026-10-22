@@ -118,11 +118,12 @@ export async function processSessionAudio(
     summary = await summarizeTranscript(transcript)
   } catch (err) {
     if (err instanceof SummaryParseError) {
+      // status=error 가 보이기 전에 원인 코드를 먼저 기록한다(폴링이 error 에서 멈추므로).
+      await recordProcessingError(supabase, sessionId, 'summary_parse')
       await supabase
         .from('check_up_sessions')
         .update({ processing_status: 'error', notes: err.rawText, updated_at: new Date().toISOString() })
         .eq('id', sessionId)
-      await recordProcessingError(supabase, sessionId, 'summary_parse')
     } else {
       tagProcessingStage(err, 'summary')
     }

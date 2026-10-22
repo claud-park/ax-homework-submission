@@ -44,7 +44,7 @@ const asRec = (v: unknown): Rec | undefined => (typeof v === 'object' && v !== n
 const asStr = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 const QUOTA_RE = /insufficient_quota|exceeded your current quota|no credits remaining|credit balance is too low/i
-const NETWORK_RE = /ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EPIPE|UND_ERR|fetch failed|socket hang up|timed? ?out|connection error|cannot connect to api|network/i
+const NETWORK_RE = /ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EPIPE|UND_ERR|fetch failed|socket hang up|abort(ed)?|timed? ?out|connection error|cannot connect to api|network/i
 const ANTHROPIC_RE = /anthropic|credit balance is too low/i
 const OPENAI_RE = /openai|insufficient_quota|exceeded your current quota|no credits remaining/i
 
@@ -67,6 +67,7 @@ function numStatus(r: Rec): number | undefined {
 
 function classify(raw: unknown, stageArg?: ProcessingStage): ProcessingErrorCode {
   if (raw instanceof SummaryParseError) return 'summary_parse'
+  const rawObj = asRec(raw)
   const err = unwrap(raw)
   if (err instanceof SummaryParseError) return 'summary_parse'
 
@@ -80,11 +81,12 @@ function classify(raw: unknown, stageArg?: ProcessingStage): ProcessingErrorCode
   const cause = asRec(r?.cause)
   const status = r ? numStatus(r) : undefined
   const codes = [r?.code, nested?.code, dataErr?.code, nested?.type, dataErr?.type, r?.type].map(asStr)
-  const text = [message, asStr(nested?.message), asStr(dataErr?.message), asStr(r?.responseBody).slice(0, 2000), ...codes].join(' ')
+  const text = [message, asStr(r?.name), asStr(nested?.message), asStr(dataErr?.message), asStr(r?.responseBody).slice(0, 2000), ...codes].join(' ')
   const url = asStr(r?.url)
 
   const stage =
     stageArg ??
+    (rawObj ? stageTags.get(rawObj) : undefined) ??
     (r ? stageTags.get(r) : undefined) ??
     inferStage(r, text, url)
 
