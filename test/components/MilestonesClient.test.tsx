@@ -261,6 +261,37 @@ describe('MilestonesClient status view', () => {
     expect(toast.success).toHaveBeenCalledTimes(2)
   })
 
+  it('unmount dismisses the pending undo toast', async () => {
+    const m = { ...base, status: 'not_started', is_manual_progress: false } as Milestone
+    reflectPatches(m)
+    ;(toast.success as Mock).mockReturnValueOnce('t1')
+    const { unmount } = render(<MilestonesClient initialMilestones={[m]} charterApproved charters={[charter]} currentCharterId="c" todayStr="2026-06-01" />)
+    fireEvent.click(within(screen.getByTestId('milestones-desktop')).getByRole('button', { name: '시작' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
+    expect(toast.dismiss).not.toHaveBeenCalled()
+    unmount()
+    expect(toast.dismiss).toHaveBeenCalledWith('t1')
+  })
+
+  it('a child change that updates the parent invalidates the parent\'s stale undo', async () => {
+    const parent = { ...base, id: 'p', title: '상위 단계', status: 'in_progress', is_manual_progress: true } as Milestone
+    const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p', status: 'not_started', is_manual_progress: false } as Milestone
+    const desktop = renderClient([parent, child])
+    mockApiFetch.mockResolvedValueOnce({ milestone: { ...parent, is_manual_completed: true }, parentUpdated: null })
+    fireEvent.click(within(desktop).getByRole('button', { name: '완료로' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
+    const parentUndo = (toast.success as Mock).mock.calls[0][1]
+
+    mockApiFetch.mockResolvedValueOnce({ milestone: { ...child, is_manual_progress: true, status: 'in_progress' }, parentUpdated: { ...parent, is_manual_completed: true } })
+    fireEvent.click(within(desktop).getAllByRole('button', { name: /시작/ }).find(b => !(b as HTMLButtonElement).disabled)!)
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2))
+
+    const before = mockApiFetch.mock.calls.length
+    parentUndo.action.onClick()
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('이미 다른 변경이 있어 되돌릴 수 없습니다.'))
+    expect(mockApiFetch.mock.calls.length).toBe(before)
+  })
+
   it('undo while the same milestone is busy shows an info toast and sends nothing', async () => {
     const m = { ...base, status: 'not_started', is_manual_progress: false } as Milestone
     reflectPatches(m)

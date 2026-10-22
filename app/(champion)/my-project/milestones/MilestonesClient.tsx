@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import type { Milestone } from '@/lib/types'
 import DatePicker from '@/components/DatePicker'
@@ -61,7 +61,15 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
   // 마일스톤별로 아직 떠 있을 수 있는 마지막 단계 전환 토스트 id.
   const stageToast = useRef<Map<string, string | number>>(new Map())
 
+  // 페이지를 떠나면 남아 있는 되돌리기 토스트를 닫는다(언마운트된 상태를 되돌리지 않도록).
+  useEffect(() => {
+    const toasts = stageToast.current
+    return () => { toasts.forEach(tid => toast.dismiss(tid)); toasts.clear() }
+  }, [])
+
   function applyUpdate(updated: Milestone, parentUpdated: Milestone | null) {
+    // 부모 일정이 서버에서 재계산되면 부모에 걸린 오래된 되돌리기 토스트는 무효가 된다.
+    if (parentUpdated) transitionSeq.current.set(parentUpdated.id, (transitionSeq.current.get(parentUpdated.id) ?? 0) + 1)
     setMilestones(prev => prev.map(m =>
       m.id === updated.id ? updated
         : parentUpdated && m.id === parentUpdated.id ? parentUpdated
