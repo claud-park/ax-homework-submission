@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Trash2, Send, RefreshCw, Download, Pencil } from 'lucide-react'
 import { apiFetch, getAuthToken } from '@/lib/api-client'
+import { processingErrorMessage } from '@/lib/sessions/processingErrorMessage'
 import { pollProcessing } from '@/lib/sessions/pollProcessing'
 import { deleteRecording } from '@/lib/audio/localRecordingStore'
 import { toast } from 'sonner'
@@ -156,6 +157,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
   async function reprocess() {
     setReprocessing(true)
     setSession(prev => prev ? { ...prev, processing_status: 'transcribing' } : prev)
+    let failedCause: string | null = null
     try {
       // 202: 서버가 백그라운드에서 재처리. 상태를 폴링해 완료를 기다린다.
       await apiFetch(`/api/sessions/${sessionId}/reprocess`, { method: 'POST' })
@@ -165,7 +167,8 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         status => setSession(prev => prev ? { ...prev, processing_status: status } : prev),
       )
       if (final.processing_status === 'error') {
-        throw new Error('재처리에 실패했어요. 잠시 후 다시 시도하세요.')
+        failedCause = final.processing_error ?? null
+        throw new Error(processingErrorMessage(final.processing_error) ?? '재처리에 실패했어요. 잠시 후 다시 시도하세요.')
       }
       setNotes(final.notes ?? '')
       setActionItems(final.action_items ?? [])
@@ -181,7 +184,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
     } catch (e) {
       const msg = e instanceof Error ? e.message : '재처리 실패'
       toast.error(msg)
-      setSession(prev => prev ? { ...prev, processing_status: 'error' } : prev)
+      setSession(prev => prev ? { ...prev, processing_status: 'error', processing_error: failedCause } : prev)
     } finally {
       setReprocessing(false)
     }
@@ -314,7 +317,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         >
           <div>
             <p className="text-xs font-semibold" style={{ color: 'var(--error)' }}>이전 처리 실패</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>저장된 오디오로 재처리할 수 있습니다.</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{processingErrorMessage(session.processing_error) ?? '저장된 오디오로 재처리할 수 있습니다.'}</p>
           </div>
           <button
             onClick={reprocess}
