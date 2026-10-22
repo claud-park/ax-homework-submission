@@ -11,18 +11,26 @@ vi.mock('@/lib/recap/postDraft', () => ({ postRecapDraft: (...a: unknown[]) => p
 
 import { runProcessingInBackground } from '@/lib/sessions/runProcessingInBackground'
 
-function makeSupabase() {
+function makeSupabase(opts: { failProcessingError?: boolean } = {}) {
   const updates: Record<string, unknown>[] = []
   const supabase = {
     from: () => ({
       update: (patch: Record<string, unknown>) => {
         updates.push(patch)
-        return { eq: () => Promise.resolve({ error: null }) }
+        const isCause = Object.keys(patch).join() === 'processing_error'
+        return {
+          eq: () =>
+            Promise.resolve({
+              error: isCause && opts.failProcessingError ? { message: 'column processing_error does not exist' } : null,
+            }),
+        }
       },
     }),
   }
   return { supabase: supabase as never, updates }
 }
+const statusUpdates = (u: Record<string, unknown>[]) => u.filter((p) => 'processing_status' in p)
+const causeUpdates = (u: Record<string, unknown>[]) => u.filter((p) => 'processing_error' in p)
 const flush = () => new Promise((r) => setTimeout(r, 0))
 
 beforeEach(() => {
@@ -53,7 +61,7 @@ describe('runProcessingInBackground', () => {
     postRecapDraft.mockRejectedValue(new Error('slack down'))
     runProcessingInBackground(supabase, 's1', ['a'], 10)
     await flush()
-    expect(updates).toEqual([])
+    expect(statusUpdates(updates)).toEqual([])
   })
 
   it('sets status=error and skips the draft when processing rejects', async () => {
@@ -61,8 +69,65 @@ describe('runProcessingInBackground', () => {
     processSessionAudio.mockRejectedValue(new Error('stt failed'))
     runProcessingInBackground(supabase, 's1', ['a'], 10)
     await flush()
-    expect(updates).toHaveLength(1)
-    expect(updates[0]).toMatchObject({ processing_status: 'error' })
+    expect(statusUpdates(updates)).toHaveLength(1)
+    expect(statusUpdates(updates)[0]).toMatchObject({ processing_status: 'error' })
     expect(postRecapDraft).not.toHaveBeenCalled()
+  })
+
+  it('records the classified code in a separate update (payload is only processing_error)', async () => {
+    const { supabase, updates } = makeSupabase()
+    processSessionAudio.mockRejectedValue(new Error('429 You have no credits remaining. Add credits.'))
+    runProcessingInBackground(supabase, 's1', ['a'], 10)
+    await flush()
+    expect(statusUpdates(updates)).toHaveLength(1)
+    expect(causeUpdates(updates)).toEqual([{ processing_error: 'stt_quota' }])
+    // 원인 기록이 먼저, status=error 가 그 다음(폴링이 error 에서 멈추므로)
+    expect(updates.indexOf(causeUpdates(updates)[0])).toBeLessThan(updates.indexOf(statusUpdates(updates)[0]))
+    expect(statusUpdates(updates)[0]).toEqual({ processing_status: 'error', updated_at: expect.any(String) })
+  })
+
+  it('records unknown for unclassifiable errors and never stores the raw message', async () => {
+    const { supabase, updates } = makeSupabase()
+    processSessionAudio.mockRejectedValue(new Error('secret sk-abc123 leaked'))
+    runProcessingInBackground(supabase, 's1', ['a'], 10)
+    await flush()
+    expect(causeUpdates(updates)).toEqual([{ processing_error: 'unknown' }])
+    expect(JSON.stringify(updates)).not.toContain('sk-abc123')
+  })
+
+  it('does not record a second code for SummaryParseError (processAudio already did) and writes no status', async () => {
+    const { supabase, updates } = makeSupabase()
+    const { SummaryParseError } = await import('@/lib/sessions/processAudio')
+    processSessionAudio.mockRejectedValue(new (SummaryParseError as new (m: string, r: string) => Error)('bad', 'raw'))
+    runProcessingInBackground(supabase, 's1', ['a'], 10)
+    await flush()
+    expect(updates).toEqual([])
+  })
+
+  it('a failing processing_error write does not change the status update and does not throw', async () => {
+    const { supabase, updates } = makeSupabase({ failProcessingError: true })
+    processSessionAudio.mockRejectedValue(new Error('429 You have no credits remaining'))
+    runProcessingInBackground(supabase, 's1', ['a'], 10)
+    await flush()
+    expect(statusUpdates(updates)).toHaveLength(1)
+    expect(statusUpdates(updates)[0]).toMatchObject({ processing_status: 'error' })
+    expect(causeUpdates(updates)).toEqual([{ processing_error: 'stt_quota' }])
+  })
+
+  it.each([false, true])('clears processing_error on success (lowQuality=%s) via a separate update', async (lowQuality) => {
+    const { supabase, updates } = makeSupabase()
+    processSessionAudio.mockResolvedValue({ lowQuality })
+    runProcessingInBackground(supabase, 's1', ['a'], 10)
+    await flush()
+    expect(updates).toEqual([{ processing_error: null }])
+  })
+
+  it('success-path clear failure is swallowed and does not trigger status=error', async () => {
+    const { supabase, updates } = makeSupabase({ failProcessingError: true })
+    processSessionAudio.mockResolvedValue({ lowQuality: false })
+    runProcessingInBackground(supabase, 's1', ['a'], 10)
+    await flush()
+    expect(statusUpdates(updates)).toEqual([])
+    expect(postRecapDraft).toHaveBeenCalledTimes(1)
   })
 })

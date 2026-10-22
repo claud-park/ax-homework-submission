@@ -280,6 +280,8 @@ export interface CheckUpSession {
   processing_status: SessionProcessingStatus
   processing_started_at?: string | null
   processing_usage?: ProcessUsage | null
+  /** 처리 실패 원인 코드(ProcessingErrorCode). 마이그레이션 전 DB에는 컬럼이 없을 수 있다. */
+  processing_error?: string | null
   raw_transcript: string | null
   recap_slack_channel?: string | null
   recap_slack_ts?: string | null

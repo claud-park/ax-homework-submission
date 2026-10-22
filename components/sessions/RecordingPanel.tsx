@@ -1,4 +1,5 @@
 'use client'
+import { processingErrorMessage } from '@/lib/sessions/processingErrorMessage'
 import { useEffect, useRef, useState } from 'react'
 import { Mic, Square, RefreshCw, Upload } from 'lucide-react'
 import { toast } from 'sonner'
@@ -351,8 +352,10 @@ export function RecordingPanel({ sessionId, onProcessed, onRestorableChange }: P
       setConnectionLost(false)
 
       if (final.processing_status === 'error') {
-        // 메시지를 비워 classifyFailure가 server 기본 문구를 쓰게 한다. 로컬 복사본은 남겨 둔다.
-        throw new HttpError(500, '')
+        // 원인 코드가 있으면 그 문구를 그대로 보여 주고(classifyFailure의 server 분기),
+        // 없으면 메시지를 비워 기본 문구를 쓴다. 로컬 복사본은 어느 쪽이든 남겨 둔다.
+        const cause = processingErrorMessage(final.processing_error)
+        throw cause ? new Error(cause) : new HttpError(500, '')
       }
 
       // 서버에 반영 완료 → 이 기기의 보관본은 더 이상 필요 없다.
