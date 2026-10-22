@@ -26,14 +26,24 @@ function fail(step: string, message: string): never {
  * getCurrentSeasonUserIds는 closed 시즌에 []를 돌려주므로 쓰지 않고 enrollments를 직접 읽는다.
  * 쿼리 수는 챔피언 수와 무관하다(seasons → enrollments → users/sessions/bookings 병렬 bulk `in`).
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** YYYY-MM-DD의 전날(달력 계산, 타임존 무관). */
+function dayBefore(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
+}
+
 export async function fetchOneOnOneOverview(
   supabase: SupabaseClient,
   seasonId?: string,
   now: Date = new Date(),
 ): Promise<OneOnOneOverviewResult> {
+  // UUID가 아닌 값(?season=abc)은 Postgres 22P02를 내므로 현재 시즌으로 되돌린다.
+  const validSeasonId = seasonId && UUID_RE.test(seasonId) ? seasonId : undefined
   const seasonQuery = supabase.from('seasons').select('*')
-  const { data: seasonData, error: seasonErr } = await (seasonId
-    ? seasonQuery.eq('id', seasonId)
+  const { data: seasonData, error: seasonErr } = await (validSeasonId
+    ? seasonQuery.eq('id', validSeasonId)
     : seasonQuery.eq('is_current', true)
   ).maybeSingle()
   if (seasonErr) fail('season', seasonErr.message)
@@ -41,6 +51,18 @@ export async function fetchOneOnOneOverview(
   if (!season) return { season: null, rows: [], startDateMissing: false }
 
   const startDateMissing = !season.start_date
+
+  // 예약은 날짜 구간으로 시즌을 가른다. end_date가 비어 있으면(1기 백필 등) 다음 시즌 시작 전날까지로 본다.
+  let endDate = season.end_date
+  if (!endDate && season.start_date) {
+    const { data: all, error: allErr } = await supabase.from('seasons').select('start_date')
+    if (allErr) fail('seasons', allErr.message)
+    const later = ((all ?? []) as { start_date: string | null }[])
+      .map((x) => x.start_date)
+      .filter((d): d is string => !!d && d > season.start_date!)
+      .sort()[0]
+    if (later) endDate = dayBefore(later)
+  }
 
   const { data: enrollments, error: enrollErr } = await supabase
     .from('season_enrollments')
@@ -79,7 +101,7 @@ export async function fetchOneOnOneOverview(
     sessions: (sessionsRes.data ?? []) as OverviewSession[],
     bookings: (bookingsRes.data ?? []) as OverviewBooking[],
     now,
-    seasonWindow: { startDate: season.start_date, endDate: season.end_date },
+    seasonWindow: { startDate: season.start_date, endDate },
   })
   return { season, rows, startDateMissing }
 }

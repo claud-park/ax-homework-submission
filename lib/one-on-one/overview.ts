@@ -172,6 +172,7 @@ function buildTimeline(bookings: OverviewBooking[], sessions: NumberedSession[])
 export function buildOneOnOneOverview(input: BuildOverviewInput): OverviewRow[] {
   const { champions, sessions, bookings, now, seasonWindow } = input
   const nowMs = now.getTime()
+  const todayKst = kstDateOf(now.toISOString())
   const championIds = new Set(champions.map((c) => c.userId))
 
   const sessionsByUser = groupBy(
@@ -207,7 +208,8 @@ export function buildOneOnOneOverview(input: BuildOverviewInput): OverviewRow[] 
         cancelledCount += 1
       } else if (slotMs > nowMs) {
         if (!nextBooking || slotMs < new Date(nextBooking.slot_start).getTime()) nextBooking = b
-      } else if (!sessionDates.has(kstDateOf(b.slot_start))) {
+      } else if (kstDateOf(b.slot_start) < todayKst && !sessionDates.has(kstDateOf(b.slot_start))) {
+        // 당일 미팅은 세션 기록이 늦게 올라올 수 있어 다음 날부터 누락 의심으로 본다.
         missingRecord = true
       }
     }

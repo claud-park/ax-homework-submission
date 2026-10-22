@@ -288,3 +288,25 @@ describe('sortRows', () => {
     expect(input.map((r) => r.userId)).toEqual(['a', 'b', 'c', 'd', 'e'])
   })
 })
+
+describe('missingRecord: 당일 미팅은 다음 날부터', () => {
+  it('같은 KST 날짜의 지난 confirmed는 아직 누락으로 보지 않는다', () => {
+    const now = new Date('2026-10-22T08:00:00Z') // KST 10-22 17:00
+    const rows = buildOneOnOneOverview({
+      champions: [{ userId: 'u1', name: 'a', department: 'd' }],
+      sessions: [],
+      bookings: [{ id: 'b', champion_user_id: 'u1', slot_start: '2026-10-22T02:00:00Z', slot_end: '2026-10-22T02:30:00Z', status: 'confirmed', confirmed_by: 'claud', created_at: '2026-10-20T00:00:00Z', updated_at: '2026-10-21T00:00:00Z' }],
+      now,
+      seasonWindow: { startDate: '2026-10-01', endDate: null },
+    })
+    expect(rows[0].flags.missingRecord).toBe(false)
+    const later = buildOneOnOneOverview({
+      champions: [{ userId: 'u1', name: 'a', department: 'd' }],
+      sessions: [],
+      bookings: [{ id: 'b', champion_user_id: 'u1', slot_start: '2026-10-22T02:00:00Z', slot_end: '2026-10-22T02:30:00Z', status: 'confirmed', confirmed_by: 'claud', created_at: '2026-10-20T00:00:00Z', updated_at: '2026-10-21T00:00:00Z' }],
+      now: new Date('2026-10-23T01:00:00Z'),
+      seasonWindow: { startDate: '2026-10-01', endDate: null },
+    })
+    expect(later[0].flags.missingRecord).toBe(true)
+  })
+})

@@ -100,12 +100,15 @@ describe('fetchOneOnOneOverview', () => {
 
   it('seasonId를 주면 그 시즌을 조회하고, start_date null이면 startDateMissing', async () => {
     const tables = baseTables(1)
-    tables.season_enrollments.push(enrollment('u1', { season_id: 's1' }))
+    const S1 = '11111111-1111-4111-8111-111111111111'
+    tables.seasons = [season2, { ...season1, id: S1 }]
+    tables.season_enrollments.push(enrollment('u1', { season_id: S1 }))
+    tables.check_up_sessions = tables.check_up_sessions.map((r) => (r.season_id === 's1' ? { ...r, season_id: S1 } : r))
     const { supabase, calls } = createSupabaseMock(tables)
-    const result = await fetchOneOnOneOverview(supabase, 's1', NOW)
-    expect(result.season?.id).toBe('s1')
+    const result = await fetchOneOnOneOverview(supabase, S1, NOW)
+    expect(result.season?.id).toBe(S1)
     expect(result.startDateMissing).toBe(true)
-    expect(calls[0].filters).toContainEqual({ op: 'eq', field: 'id', value: 's1' })
+    expect(calls[0].filters).toContainEqual({ op: 'eq', field: 'id', value: S1 })
     // closed 시즌이라도 명단은 보인다
     expect(result.rows.map((r) => r.userId)).toEqual(['u1'])
     expect(result.rows[0].lastSession?.id).toBe('cs-old')
@@ -118,13 +121,34 @@ describe('fetchOneOnOneOverview', () => {
     const result = await fetchOneOnOneOverview(b.supabase, undefined, NOW)
     expect(result.rows).toHaveLength(25)
     expect(b.calls.length).toBe(a.calls.length)
-    expect(b.calls.length).toBe(5)
+    expect(b.calls.length).toBe(6) // seasons, 종료일 보정용 seasons, enrollments, users, sessions, bookings
   })
 
   it('챔피언이 없으면 후속 쿼리 없이 빈 행', async () => {
     const { supabase, calls } = createSupabaseMock({ seasons: [season2], season_enrollments: [] })
     const result = await fetchOneOnOneOverview(supabase, undefined, NOW)
     expect(result.rows).toEqual([])
-    expect(calls.map((c) => c.table)).toEqual(['seasons', 'season_enrollments'])
+    expect(calls.map((c) => c.table)).toEqual(['seasons', 'seasons', 'season_enrollments'])
+  })
+
+  it('end_date가 없으면 다음 시즌 시작 전날까지로 예약을 자른다', async () => {
+    const S1 = '11111111-1111-4111-8111-111111111111'
+    const tables = baseTables(1)
+    tables.seasons = [season2, { ...season1, id: S1, start_date: '2026-03-01' }]
+    tables.season_enrollments.push(enrollment('u1', { season_id: S1 }))
+    tables.one_on_one_bookings = [
+      { id: 'b-s1', champion_user_id: 'u1', slot_start: '2026-06-10T05:00:00Z', slot_end: '2026-06-10T05:30:00Z', status: 'confirmed', confirmed_by: 'claud', created_at: '2026-06-01T00:00:00Z', updated_at: '2026-06-02T00:00:00Z' },
+      { id: 'b-s2', champion_user_id: 'u1', slot_start: '2026-10-30T05:00:00Z', slot_end: '2026-10-30T05:30:00Z', status: 'confirmed', confirmed_by: 'claud', created_at: '2026-10-20T00:00:00Z', updated_at: '2026-10-21T00:00:00Z' },
+    ]
+    const { supabase } = createSupabaseMock(tables)
+    const result = await fetchOneOnOneOverview(supabase, S1, NOW)
+    const ids = result.rows[0].timeline.filter((e) => e.kind === 'booking_requested').map((e) => (e as { bookingId: string }).bookingId)
+    expect(ids).toEqual(['b-s1'])
+  })
+
+  it('UUID가 아닌 season 값은 현재 시즌으로 대체한다', async () => {
+    const { supabase } = createSupabaseMock(baseTables(1))
+    const result = await fetchOneOnOneOverview(supabase, 'abc', NOW)
+    expect(result.season?.id).toBe('s2')
   })
 })
