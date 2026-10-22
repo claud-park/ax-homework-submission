@@ -6,12 +6,20 @@ import { buildNoteUrl, resolveBaseUrl } from './noteUrl'
 
 export interface SendRecapDeps {
   supabase: SupabaseClient
-  slackClient?: Pick<WebClient, 'chat' | 'users'>
+  slackClient?: Pick<WebClient, 'chat' | 'users'> & Partial<Pick<WebClient, 'conversations'>>
   baseUrl?: string
+  /** 그룹 DM에 함께 넣을 어드민 Slack user id. 기본은 ADMIN_SLACK_CLAUD + ADMIN_SLACK_JENNIFER. 비면 1:1 DM. */
+  adminSlackIds?: string[]
+}
+
+function defaultAdminSlackIds(): string[] {
+  return [process.env.ADMIN_SLACK_CLAUD, process.env.ADMIN_SLACK_JENNIFER]
+    .map((v) => (v ?? '').trim())
+    .filter((v) => /^[UW][A-Z0-9]+$/.test(v))
 }
 
 export type SendRecapResult =
-  | { ok: true; championName: string; sentAt: Date; slackUserId: string }
+  | { ok: true; championName: string; sentAt: Date; slackUserId: string; destination: 'group' | 'dm' }
   | {
       ok: false
       reason: 'not_found' | 'not_done' | 'already_sent' | 'no_slack_user' | 'dm_failed' | 'stale_draft'
@@ -154,14 +162,32 @@ export async function sendRecapToChampion(
             noteUrl,
           })
 
+    // 어드민(claud, jennifer)+챔피언이 함께 있는 그룹 DM으로 보낸다. 열기에 실패하면(권한 미부여 등) 챔피언 1:1 DM으로 폴백.
+    let channel = slackUserId
+    let destination: 'group' | 'dm' = 'dm'
+    const adminIds = (deps.adminSlackIds ?? defaultAdminSlackIds()).filter((id) => id !== slackUserId)
+    if (adminIds.length > 0 && slack.conversations) {
+      try {
+        const users = Array.from(new Set([...adminIds, slackUserId])).join(',')
+        const opened = await slack.conversations.open({ users })
+        if (opened.channel?.id) {
+          channel = opened.channel.id
+          destination = 'group'
+        }
+      } catch (err) {
+        const e = err as { data?: { error?: string }; message?: string }
+        console.error(`[session ${sessionId}] recap group DM open failed, falling back to 1:1 DM:`, e?.data?.error ?? e?.message ?? 'unknown')
+      }
+    }
+
     try {
-      await slack.chat.postMessage({ channel: slackUserId, text, unfurl_links: false, unfurl_media: false })
+      await slack.chat.postMessage({ channel, text, unfurl_links: false, unfurl_media: false })
     } catch (err) {
       logDmFailure(sessionId, err)
       await rollback()
       return { ok: false, reason: 'dm_failed' }
     }
-    return { ok: true, championName, sentAt: now, slackUserId }
+    return { ok: true, championName, sentAt: now, slackUserId, destination }
   } catch (err) {
     console.error(`[session ${sessionId}] recap send failed:`, err instanceof Error ? err.message : 'unknown error')
     try {

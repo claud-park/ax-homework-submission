@@ -185,9 +185,11 @@ export function buildSentBlocks(input: {
   sentAt: Date
   /** 실제 DM을 받은 Slack 사용자 id. 어디로 갔는지 보이도록 멘션 표기한다(수정 메시지라 알림은 가지 않는다). */
   recipientSlackId?: string
+  /** 'group'이면 어드민+챔피언 그룹 DM, 아니면 챔피언 1:1 DM. */
+  destination?: 'group' | 'dm'
 }): KnownBlock[] {
-  const { championName, sentByLabel, sentAt, recipientSlackId } = input
-  const dest = recipientSlackId && /^[UW][A-Z0-9]+$/.test(recipientSlackId) ? ` · 수신: <@${recipientSlackId}> (Slack DM)` : ''
+  const { championName, sentByLabel, sentAt, recipientSlackId, destination } = input
+  const dest = recipientSlackId && /^[UW][A-Z0-9]+$/.test(recipientSlackId) ? ` · 수신: <@${recipientSlackId}> (${destination === 'group' ? '그룹 DM' : 'Slack DM'})` : ''
   return [
     {
       type: 'context',

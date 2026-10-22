@@ -62,7 +62,7 @@ function makeSupabase(opts: { session?: Row | null; claimError?: boolean; sessio
   return { client: client as unknown as SupabaseClient, session, writes }
 }
 
-function makeSlack(opts: { lookup?: 'ok' | 'notfound' | 'throw' | 'nouser'; post?: 'ok' | 'fail' } = {}) {
+function makeSlack(opts: { lookup?: 'ok' | 'notfound' | 'throw' | 'nouser'; post?: 'ok' | 'fail'; open?: 'ok' | 'fail' | 'none' } = {}) {
   const lookupByEmail = vi.fn(async (_a: { email: string }) => {
     if (opts.lookup === 'notfound') throw Object.assign(new Error('users_not_found'), { data: { error: 'users_not_found' } })
     if (opts.lookup === 'nouser') return { ok: true }
@@ -73,11 +73,16 @@ function makeSlack(opts: { lookup?: 'ok' | 'notfound' | 'throw' | 'nouser'; post
     if (opts.post === 'fail') throw new Error('channel_not_found')
     return { ok: true }
   })
-  const slack: { chat: { postMessage: (a: { channel: string; text: string }) => Promise<unknown> }; users: unknown } = {
+  const open = vi.fn(async (_a: { users: string }) => {
+    if (opts.open === 'fail') throw Object.assign(new Error('missing_scope'), { data: { error: 'missing_scope' } })
+    return { ok: true, channel: { id: 'G_GROUP' } }
+  })
+  const slack: { chat: { postMessage: (a: { channel: string; text: string }) => Promise<unknown> }; users: unknown; conversations?: unknown } = {
     chat: { postMessage },
     users: { lookupByEmail },
+    ...(opts.open === undefined || opts.open === 'none' ? {} : { conversations: { open } }),
   }
-  return { slack: slack as never, chat: slack.chat, postMessage, lookupByEmail }
+  return { slack: slack as never, chat: slack.chat, postMessage, lookupByEmail, open }
 }
 
 const baseUrl = 'https://app.test'
@@ -327,5 +332,45 @@ describe('sendRecapToChampion', () => {
     await run(Object.assign(new Error('x'), { code: 'slack_webapi_request_error' }))
     expect(spy.mock.calls.at(-1)?.[0]).toContain('DM outcome may be unknown (possible delivery) for session s1, claim rolled back')
     spy.mockRestore()
+  })
+
+  describe('group DM (claud + jennifer + champion)', () => {
+    const adminSlackIds = ['U_CLAUD', 'U_JEN']
+
+    it('opens one group DM with admins + champion and posts there', async () => {
+      const { client } = makeSupabase()
+      const { slack, postMessage, open } = makeSlack({ open: 'ok' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(open).toHaveBeenCalledTimes(1)
+      const users = open.mock.calls[0][0].users.split(',').sort()
+      expect(users).toEqual(['U_CHAMP', 'U_CLAUD', 'U_JEN'])
+      expect(postMessage.mock.calls[0][0].channel).toBe('G_GROUP')
+      expect(res.ok && res.destination).toBe('group')
+    })
+
+    it('falls back to the champion 1:1 DM when opening the group fails', async () => {
+      const { client } = makeSupabase()
+      const { slack, postMessage } = makeSlack({ open: 'fail' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage.mock.calls[0][0].channel).toBe('U_CHAMP')
+      expect(res.ok && res.destination).toBe('dm')
+    })
+
+    it('uses 1:1 DM when no admin ids are configured', async () => {
+      const { client } = makeSupabase()
+      const { slack, postMessage, open } = makeSlack({ open: 'ok' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds: [] }, { sessionId: 's1', adminId: 'a1' })
+      expect(open).not.toHaveBeenCalled()
+      expect(postMessage.mock.calls[0][0].channel).toBe('U_CHAMP')
+      expect(res.ok && res.destination).toBe('dm')
+    })
+
+    it('rolls back the claim when posting to the group fails', async () => {
+      const { client, session } = makeSupabase()
+      const { slack } = makeSlack({ open: 'ok', post: 'fail' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(res).toEqual({ ok: false, reason: 'dm_failed' })
+      expect(session?.recap_sent_at ?? null).toBeNull()
+    })
   })
 })
