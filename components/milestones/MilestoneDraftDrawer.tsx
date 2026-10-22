@@ -134,7 +134,7 @@ export default function MilestoneDraftDrawer({
       className="text-xs px-3 py-1.5 rounded-full font-semibold"
       style={{
         background: tab === t ? 'var(--blue-600)' : 'transparent',
-        color: tab === t ? '#fff' : 'var(--text-secondary)',
+        color: tab === t ? 'var(--text-inverse)' : 'var(--text-secondary)',
         border: tab === t ? 'none' : '1px solid var(--border)',
       }}>{label}</button>
   )
@@ -170,7 +170,7 @@ export default function MilestoneDraftDrawer({
               </label>
               <button type="button" onClick={handleGenerate} disabled={generating}
                 className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50 self-start flex items-center gap-1.5"
-                style={{ background: 'var(--blue-600)', color: '#fff' }}>
+                style={{ background: 'var(--blue-600)', color: 'var(--text-inverse)' }}>
                 {generating ? (<><Spinner size="sm" className="text-white" /> 생성 중…</>) : '✨ 생성'}
               </button>
             </div>
@@ -224,7 +224,7 @@ export default function MilestoneDraftDrawer({
               />
               <button type="button" onClick={handleRefine} disabled={refining || !instruction.trim()}
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1.5 shrink-0"
-                style={{ background: 'var(--blue-600)', color: '#fff' }}>
+                style={{ background: 'var(--blue-600)', color: 'var(--text-inverse)' }}>
                 {refining ? (<><Spinner size="sm" className="text-white" /> 수정 중…</>) : '수정 ▸'}
               </button>
             </div>
@@ -248,7 +248,7 @@ export default function MilestoneDraftDrawer({
             style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>취소</button>
           <button type="button" onClick={handleSave} disabled={hasInvalid || saving}
             className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50"
-            style={{ background: 'var(--blue-600)', color: '#fff' }}>
+            style={{ background: 'var(--blue-600)', color: 'var(--text-inverse)' }}>
             {saving ? '저장 중…' : `${totalCount}개 마일스톤 저장`}
           </button>
         </div>
