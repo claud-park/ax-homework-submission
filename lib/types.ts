@@ -287,6 +287,8 @@ export interface CheckUpSession {
   recap_slack_ts?: string | null
   recap_sent_at?: string | null
   recap_sent_by?: string | null
+  /** recap 초안 게시 실패 원인 코드(RecapDraftErrorCode). 마이그레이션 전 DB에는 컬럼이 없을 수 있다. */
+  recap_draft_error?: string | null
   created_at: string
   updated_at: string
   action_items?: SessionActionItem[]
