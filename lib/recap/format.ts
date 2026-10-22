@@ -183,15 +183,18 @@ export function buildSentBlocks(input: {
   championName: string
   sentByLabel: string
   sentAt: Date
+  /** 실제 DM을 받은 Slack 사용자 id. 어디로 갔는지 보이도록 멘션 표기한다(수정 메시지라 알림은 가지 않는다). */
+  recipientSlackId?: string
 }): KnownBlock[] {
-  const { championName, sentByLabel, sentAt } = input
+  const { championName, sentByLabel, sentAt, recipientSlackId } = input
+  const dest = recipientSlackId && /^[UW][A-Z0-9]+$/.test(recipientSlackId) ? ` · 수신: <@${recipientSlackId}> (Slack DM)` : ''
   return [
     {
       type: 'context',
       elements: [
         {
           type: 'mrkdwn',
-          text: `✅ ${escapeSlack(sentByLabel)}님이 ${escapeSlack(championName)} 챔피언에게 발송했어요 (${formatKst(sentAt)})`,
+          text: `✅ ${escapeSlack(sentByLabel)}님이 ${escapeSlack(championName)} 챔피언에게 발송했어요 (${formatKst(sentAt)})${dest}`,
         },
       ],
     },

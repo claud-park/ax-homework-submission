@@ -17,7 +17,7 @@ const DRAFT_TS = '1700000000.000100'
 // Draft text as posted by postRecapDraft (already Slack-escaped by buildRecapText).
 const DRAFT_TEXT = '안녕하세요, A&amp;B 챔피언님!\n\n*요약*\n• 1 &lt; 2 &amp;&amp; 3 &gt; 2'
 
-function makeDeps(result: SendRecapResult = { ok: true, championName: '홍길동', sentAt: new Date('2026-10-21T01:00:00Z') }) {
+function makeDeps(result: SendRecapResult = { ok: true, championName: '홍길동', sentAt: new Date('2026-10-21T01:00:00Z'), slackUserId: 'U123ABC' }) {
   const calls: string[] = []
   const slack = {
     chat: {
@@ -187,6 +187,7 @@ describe('handleRecapAction: recap_send', () => {
     expect(blocks).toHaveLength(1)
     expect(blocks[0].type).toBe('context')
     expect(blocks[0].elements[0].text).toContain('✅ Claud님이 홍길동 챔피언에게 발송했어요')
+    expect(blocks[0].elements[0].text).toContain('수신: <@U123ABC> (Slack DM)')
     expect(slack.chat.postEphemeral).not.toHaveBeenCalled()
   })
 

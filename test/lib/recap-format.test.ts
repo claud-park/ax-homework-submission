@@ -209,6 +209,15 @@ describe('truncateForSlack structure-aware', () => {
   })
 })
 
+describe('buildSentBlocks recipient', () => {
+  it('shows the Slack DM recipient mention when given, omits it for odd ids', () => {
+    const base = { championName: 'c', sentByLabel: 's', sentAt: new Date(0) }
+    expect(JSON.stringify(buildSentBlocks({ ...base, recipientSlackId: 'U0ABC123' }))).toContain('수신: <@U0ABC123> (Slack DM)')
+    expect(JSON.stringify(buildSentBlocks({ ...base, recipientSlackId: 'x> <!channel' }))).not.toContain('수신')
+    expect(JSON.stringify(buildSentBlocks(base))).not.toContain('수신')
+  })
+})
+
 describe('buildSentBlocks time', () => {
   it('renders KST deterministically', () => {
     const s = JSON.stringify(buildSentBlocks({ championName: 'c', sentByLabel: 's', sentAt: new Date('2026-10-21T01:05:00Z') }))

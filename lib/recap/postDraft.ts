@@ -109,6 +109,8 @@ export async function postRecapDraft(deps: PostRecapDraftDeps, sessionId: string
         channel: channelId,
         text: `${championName} 챔피언 recap 초안`,
         blocks,
+        unfurl_links: false,
+        unfurl_media: false,
       })
     } catch (err) {
       const errorCode = classifyRecapDraftError(err)

@@ -11,7 +11,7 @@ export interface SendRecapDeps {
 }
 
 export type SendRecapResult =
-  | { ok: true; championName: string; sentAt: Date }
+  | { ok: true; championName: string; sentAt: Date; slackUserId: string }
   | {
       ok: false
       reason: 'not_found' | 'not_done' | 'already_sent' | 'no_slack_user' | 'dm_failed' | 'stale_draft'
@@ -155,13 +155,13 @@ export async function sendRecapToChampion(
           })
 
     try {
-      await slack.chat.postMessage({ channel: slackUserId, text })
+      await slack.chat.postMessage({ channel: slackUserId, text, unfurl_links: false, unfurl_media: false })
     } catch (err) {
       logDmFailure(sessionId, err)
       await rollback()
       return { ok: false, reason: 'dm_failed' }
     }
-    return { ok: true, championName, sentAt: now }
+    return { ok: true, championName, sentAt: now, slackUserId }
   } catch (err) {
     console.error(`[session ${sessionId}] recap send failed:`, err instanceof Error ? err.message : 'unknown error')
     try {
