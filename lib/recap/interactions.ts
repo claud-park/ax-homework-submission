@@ -155,6 +155,7 @@ async function updateDraftAsSent(
         sentByLabel: adminLabel(adminId),
         sentAt: result.sentAt,
         recipientSlackId: result.slackUserId,
+        destination: result.destination,
       }),
     }),
   )
