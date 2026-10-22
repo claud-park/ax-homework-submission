@@ -97,7 +97,7 @@ export function IssueReportDialog({ milestone, onClose, onSubmit }: IssueReportD
               type="submit"
               disabled={submitting || !form.type || !form.note.trim()}
               className="flex-1 py-2 rounded-lg text-xs font-semibold"
-              style={{ background: 'var(--error)', color: '#fff', opacity: (submitting || !form.type || !form.note.trim()) ? 0.7 : 1 }}
+              style={{ background: 'var(--error)', color: 'var(--text-inverse)', opacity: (submitting || !form.type || !form.note.trim()) ? 0.7 : 1 }}
             >
               보고하기
             </button>
