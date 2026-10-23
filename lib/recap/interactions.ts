@@ -154,8 +154,9 @@ async function updateDraftAsSent(
         championName: result.championName,
         sentByLabel: adminLabel(adminId),
         sentAt: result.sentAt,
-        recipientSlackId: result.slackUserId,
+        recipientSlackId: result.slackUserId ?? undefined,
         destination: result.destination,
+        channelId: result.channelId,
       }),
     }),
   )

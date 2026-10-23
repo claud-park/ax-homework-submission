@@ -6,10 +6,14 @@ type Filter = { op: 'eq' | 'neq' | 'in'; field: string; value: unknown }
 type Call = { table: string; filters: Filter[] }
 
 /** 테이블별 고정 응답 + eq/neq/in 필터를 실제로 적용하는 체이너블 목. 호출 기록을 남긴다. */
-function createSupabaseMock(tables: Record<string, Record<string, unknown>[]>) {
+function createSupabaseMock(
+  tables: Record<string, Record<string, unknown>[]>,
+  failSelect?: (table: string, columns: string) => { code: string; message: string } | null,
+) {
   const calls: Call[] = []
   const from = vi.fn((table: string) => {
     const call: Call = { table, filters: [] }
+    let columns = '*'
     calls.push(call)
     const apply = () =>
       (tables[table] ?? []).filter((row) =>
@@ -20,13 +24,16 @@ function createSupabaseMock(tables: Record<string, Record<string, unknown>[]>) {
         }),
       )
     const builder: Record<string, unknown> = {
-      select: vi.fn(() => builder),
+      select: vi.fn((c: string = '*') => ((columns = c), builder)),
       order: vi.fn(() => builder),
       eq: vi.fn((field: string, value: unknown) => (call.filters.push({ op: 'eq', field, value }), builder)),
       neq: vi.fn((field: string, value: unknown) => (call.filters.push({ op: 'neq', field, value }), builder)),
       in: vi.fn((field: string, value: unknown[]) => (call.filters.push({ op: 'in', field, value }), builder)),
       maybeSingle: vi.fn(() => Promise.resolve({ data: apply()[0] ?? null, error: null })),
-      then: (resolve: (v: unknown) => void) => resolve({ data: apply(), error: null }),
+      then: (resolve: (v: unknown) => void) => {
+        const err = failSelect?.(table, columns) ?? null
+        resolve(err ? { data: null, error: err } : { data: apply(), error: null })
+      },
     }
     return builder
   })
@@ -121,7 +128,7 @@ describe('fetchOneOnOneOverview', () => {
     const result = await fetchOneOnOneOverview(b.supabase, undefined, NOW)
     expect(result.rows).toHaveLength(25)
     expect(b.calls.length).toBe(a.calls.length)
-    expect(b.calls.length).toBe(6) // seasons, 종료일 보정용 seasons, enrollments, users, sessions, bookings
+    expect(b.calls.length).toBe(7) // seasons, 종료일 보정용 seasons, enrollments, users, recap 채널(users), sessions, bookings
   })
 
   it('챔피언이 없으면 후속 쿼리 없이 빈 행', async () => {
@@ -150,5 +157,29 @@ describe('fetchOneOnOneOverview', () => {
     const { supabase } = createSupabaseMock(baseTables(1))
     const result = await fetchOneOnOneOverview(supabase, 'abc', NOW)
     expect(result.season?.id).toBe('s2')
+  })
+
+  it('recap 채널 ID를 행에 싣는다(없으면 null)', async () => {
+    const tables = baseTables(2)
+    tables.users = tables.users.map((u) => (u.id === 'u1' ? { ...u, recap_slack_channel_id: 'C0123ABCD' } : u))
+    const { supabase } = createSupabaseMock(tables)
+    const result = await fetchOneOnOneOverview(supabase, undefined, NOW)
+    expect(result.rows.find((r) => r.userId === 'u1')!.recapChannelId).toBe('C0123ABCD')
+    expect(result.rows.find((r) => r.userId === 'u2')!.recapChannelId).toBeNull()
+  })
+
+  it('recap 채널 컬럼이 없어도(마이그레이션 전) 페이지는 그대로 뜨고 미설정으로 본다', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { supabase } = createSupabaseMock(baseTables(2), (table, columns) =>
+      table === 'users' && columns.includes('recap_slack_channel_id')
+        ? { code: '42703', message: 'column users.recap_slack_channel_id does not exist' }
+        : null,
+    )
+    const result = await fetchOneOnOneOverview(supabase, undefined, NOW)
+    expect(result.rows).toHaveLength(2)
+    expect(result.rows.every((r) => r.recapChannelId === null)).toBe(true)
+    expect(result.rows.find((r) => r.userId === 'u1')).toMatchObject({ name: '홍u1', sessionCount: 1 })
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

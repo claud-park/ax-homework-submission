@@ -1,11 +1,15 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { OneOnOneOverviewClient } from '@/app/admin/one-on-one/OneOnOneOverviewClient'
 import type { OverviewRow, OverviewBooking } from '@/lib/one-on-one/overview'
 import type { Season } from '@/lib/types'
 
 const push = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+const apiFetch = vi.fn()
+vi.mock('@/lib/api-client', () => ({ apiFetch: (...a: unknown[]) => apiFetch(...a) }))
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+vi.mock('sonner', () => ({ toast }))
 
 const season: Season = {
   id: 's2', name: '2기', status: 'active', is_current: true,
@@ -22,7 +26,7 @@ function booking(over: Partial<OverviewBooking>): OverviewBooking {
 
 function row(over: Partial<OverviewRow>): OverviewRow {
   return {
-    userId: 'u1', name: '김하나', department: '기획팀', sessionCount: 0, lastSession: null,
+    userId: 'u1', name: '김하나', department: '기획팀', recapChannelId: null, sessionCount: 0, lastSession: null,
     nextBooking: null, pendingBooking: null, cancelledCount: 0, latestRequestAt: null,
     flags: { missingRecord: false, zeroMeetings: true }, timeline: [], ...over,
   }
@@ -47,7 +51,7 @@ const rows: OverviewRow[] = [
     nextBooking: booking({ id: 'n1', champion_user_id: 'u2' }),
     flags: { missingRecord: false, zeroMeetings: false },
   }),
-  row({ userId: 'u3', name: '박셋', sessionCount: 1, flags: { missingRecord: true, zeroMeetings: false } }),
+  row({ userId: 'u3', name: '박셋', sessionCount: 1, recapChannelId: 'C0SAVED123', flags: { missingRecord: true, zeroMeetings: false } }),
 ]
 
 function renderClient(over: Partial<React.ComponentProps<typeof OneOnOneOverviewClient>> = {}) {
@@ -116,5 +120,73 @@ describe('OneOnOneOverviewClient', () => {
     renderClient()
     fireEvent.change(screen.getByLabelText('시즌'), { target: { value: 's2' } })
     expect(push).toHaveBeenCalledWith('/admin/one-on-one?season=s2')
+  })
+
+  describe('recap 채널', () => {
+    beforeEach(() => {
+      apiFetch.mockReset()
+      toast.success.mockReset()
+      toast.error.mockReset()
+    })
+
+    it('shows the saved channel id or 미설정', () => {
+      renderClient()
+      expect(screen.getByText('recap 채널')).toBeTruthy()
+      expect(screen.getByText('C0SAVED123')).toBeTruthy()
+      expect(screen.getAllByText('미설정')).toHaveLength(2)
+    })
+
+    it('saves a trimmed channel id via the admin API and shows it', async () => {
+      apiFetch.mockResolvedValue({ ok: true, channelId: 'C0NEW12345' })
+      renderClient()
+      fireEvent.click(screen.getByRole('button', { name: '김하나 recap 채널 수정' }))
+      expect(screen.getByText(/채널 세부정보 맨 아래에서 복사/)).toBeTruthy()
+      fireEvent.change(screen.getByLabelText('김하나 recap 채널 ID'), { target: { value: ' C0NEW12345 ' } })
+      fireEvent.click(screen.getByRole('button', { name: '저장' }))
+      await waitFor(() => expect(screen.getByText('C0NEW12345')).toBeTruthy())
+      expect(apiFetch).toHaveBeenCalledWith('/api/admin/users/u1/recap-channel', {
+        method: 'PATCH',
+        body: JSON.stringify({ channelId: 'C0NEW12345' }),
+      })
+      expect(toast.success).toHaveBeenCalled()
+      // 필터 전환으로 다시 그려도 저장값이 유지된다
+      fireEvent.click(screen.getByRole('button', { name: '대기 있음 1' }))
+      expect(screen.getByText('C0NEW12345')).toBeTruthy()
+    })
+
+    it('clears a saved channel id', async () => {
+      apiFetch.mockResolvedValue({ ok: true, channelId: null })
+      renderClient()
+      fireEvent.click(screen.getByRole('button', { name: '박셋 recap 채널 수정' }))
+      fireEvent.click(screen.getByRole('button', { name: '지우기' }))
+      await waitFor(() => expect(screen.queryByText('C0SAVED123')).toBeNull())
+      expect(apiFetch).toHaveBeenCalledWith('/api/admin/users/u3/recap-channel', {
+        method: 'PATCH',
+        body: JSON.stringify({ channelId: null }),
+      })
+      expect(screen.getAllByText('미설정')).toHaveLength(3)
+      expect(toast.success).toHaveBeenCalled()
+    })
+
+    it('rejects an invalid id without calling the API', () => {
+      renderClient()
+      fireEvent.click(screen.getByRole('button', { name: '김하나 recap 채널 수정' }))
+      fireEvent.change(screen.getByLabelText('김하나 recap 채널 ID'), { target: { value: '#general' } })
+      fireEvent.click(screen.getByRole('button', { name: '저장' }))
+      expect(apiFetch).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert').textContent).toMatch(/채널 ID 형식/)
+      expect(toast.error).toHaveBeenCalled()
+    })
+
+    it('shows an error toast and stays in edit mode when the API fails', async () => {
+      apiFetch.mockRejectedValue(new Error('마이그레이션 적용이 필요합니다'))
+      renderClient()
+      fireEvent.click(screen.getByRole('button', { name: '김하나 recap 채널 수정' }))
+      fireEvent.change(screen.getByLabelText('김하나 recap 채널 ID'), { target: { value: 'C0NEW12345' } })
+      fireEvent.click(screen.getByRole('button', { name: '저장' }))
+      await waitFor(() => expect(toast.error).toHaveBeenCalled())
+      expect(String(toast.error.mock.calls[0][0])).toContain('마이그레이션 적용이 필요합니다')
+      expect(screen.getByLabelText('김하나 recap 채널 ID')).toBeTruthy()
+    })
   })
 })

@@ -191,6 +191,17 @@ describe('handleRecapAction: recap_send', () => {
     expect(slack.chat.postEphemeral).not.toHaveBeenCalled()
   })
 
+  it('recap_send to the recap channel shows the channel mention in the sent state', async () => {
+    const { deps, slack } = makeDeps({
+      ok: true, championName: '홍길동', sentAt: new Date('2026-10-21T01:00:00Z'),
+      slackUserId: null, destination: 'channel', channelId: 'C0123ABCD',
+    })
+    await handleRecapAction(deps, blockAction('recap_send'))
+    const arg = (slack.chat.update.mock.calls[0] as unknown[])[0] as Record<string, unknown>
+    const blocks = arg.blocks as { elements: { text: string }[] }[]
+    expect(blocks[0].elements[0].text).toContain('수신: <#C0123ABCD> (채널)')
+  })
+
   it('recap_send already_sent posts an ephemeral notice and does not update', async () => {
     const { deps, slack } = makeDeps({ ok: false, reason: 'already_sent' })
     await handleRecapAction(deps, blockAction('recap_send'))

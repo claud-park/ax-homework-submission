@@ -185,11 +185,18 @@ export function buildSentBlocks(input: {
   sentAt: Date
   /** 실제 DM을 받은 Slack 사용자 id. 어디로 갔는지 보이도록 멘션 표기한다(수정 메시지라 알림은 가지 않는다). */
   recipientSlackId?: string
-  /** 'group'이면 어드민+챔피언 그룹 DM, 아니면 챔피언 1:1 DM. */
-  destination?: 'group' | 'dm'
+  /** 'channel'이면 지정 recap 채널, 'group'이면 어드민+챔피언 그룹 DM, 아니면 챔피언 1:1 DM. */
+  destination?: 'channel' | 'group' | 'dm'
+  /** destination === 'channel'일 때 보낸 채널 id. `<#id>` 채널 멘션으로 표기한다. */
+  channelId?: string
 }): KnownBlock[] {
-  const { championName, sentByLabel, sentAt, recipientSlackId, destination } = input
-  const dest = recipientSlackId && /^[UW][A-Z0-9]+$/.test(recipientSlackId) ? ` · 수신: <@${recipientSlackId}> (${destination === 'group' ? '그룹 DM' : 'Slack DM'})` : ''
+  const { championName, sentByLabel, sentAt, recipientSlackId, destination, channelId } = input
+  let dest = ''
+  if (destination === 'channel') {
+    dest = channelId && /^[CG][A-Z0-9]{8,}$/.test(channelId) ? ` · 수신: <#${channelId}> (채널)` : ''
+  } else if (recipientSlackId && /^[UW][A-Z0-9]+$/.test(recipientSlackId)) {
+    dest = ` · 수신: <@${recipientSlackId}> (${destination === 'group' ? '그룹 DM' : 'Slack DM'})`
+  }
   return [
     {
       type: 'context',

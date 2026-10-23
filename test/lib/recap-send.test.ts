@@ -5,7 +5,17 @@ import { sendRecapToChampion } from '@/lib/recap/sendRecap'
 type Row = Record<string, unknown>
 
 // Stub that really simulates check_up_sessions.recap_sent_at / recap_sent_by state.
-function makeSupabase(opts: { session?: Row | null; claimError?: boolean; sessionReadError?: boolean; itemsError?: boolean } = {}) {
+function makeSupabase(
+  opts: {
+    session?: Row | null
+    claimError?: boolean
+    sessionReadError?: boolean
+    itemsError?: boolean
+    /** users.recap_slack_channel_id 값. 'missing'이면 컬럼 없음(마이그레이션 전) 오류. */
+    recapChannel?: string | null | 'missing'
+    email?: string | null
+  } = {},
+) {
   const session: Row | null =
     opts.session === undefined
       ? {
@@ -20,7 +30,7 @@ function makeSupabase(opts: { session?: Row | null; claimError?: boolean; sessio
           recap_sent_by: null,
         }
       : opts.session
-  const user = { name: '홍길동', email: 'champ@test.io' }
+  const user = { name: '홍길동', email: opts.email === undefined ? 'champ@test.io' : opts.email }
   const items = [{ body: '할 일', is_completed: false, display_order: 0 }]
   const writes: Row[] = []
 
@@ -36,6 +46,14 @@ function makeSupabase(opts: { session?: Row | null; claimError?: boolean; sessio
       q.is = (k: string, v: unknown) => (filters.push([k, v, 'is']), q)
       q.order = () =>
         Promise.resolve(opts.itemsError ? { data: null, error: { message: 'items down' } } : { data: items, error: null })
+      q.maybeSingle = () =>
+        Promise.resolve(
+          table === 'users'
+            ? opts.recapChannel === 'missing'
+              ? { data: null, error: { code: '42703', message: 'column users.recap_slack_channel_id does not exist' } }
+              : { data: { recap_slack_channel_id: opts.recapChannel ?? null }, error: null }
+            : { data: null, error: null },
+        )
       q.single = () =>
         Promise.resolve(
           table === 'users'
@@ -62,14 +80,26 @@ function makeSupabase(opts: { session?: Row | null; claimError?: boolean; sessio
   return { client: client as unknown as SupabaseClient, session, writes }
 }
 
-function makeSlack(opts: { lookup?: 'ok' | 'notfound' | 'throw' | 'nouser'; post?: 'ok' | 'fail'; open?: 'ok' | 'fail' | 'none' } = {}) {
+function makeSlack(
+  opts: {
+    lookup?: 'ok' | 'notfound' | 'throw' | 'nouser'
+    post?: 'ok' | 'fail'
+    open?: 'ok' | 'fail' | 'none'
+    /** 채널(C…/G… 9자 이상) 대상 postMessage만 실패시킨다. */
+    channelPost?: 'not_in_channel' | 'network'
+  } = {},
+) {
   const lookupByEmail = vi.fn(async (_a: { email: string }) => {
     if (opts.lookup === 'notfound') throw Object.assign(new Error('users_not_found'), { data: { error: 'users_not_found' } })
     if (opts.lookup === 'nouser') return { ok: true }
     if (opts.lookup === 'throw') throw new Error('network')
     return { ok: true, user: { id: 'U_CHAMP' } }
   })
-  const postMessage = vi.fn(async (_a: { channel: string; text: string }) => {
+  const postMessage = vi.fn(async (a: { channel: string; text: string; unfurl_links?: boolean; unfurl_media?: boolean }) => {
+    if (opts.channelPost && a.channel.startsWith('C0')) {
+      if (opts.channelPost === 'network') throw Object.assign(new Error('timeout'), { code: 'slack_webapi_request_error' })
+      throw Object.assign(new Error('not_in_channel'), { code: 'slack_webapi_platform_error', data: { error: 'not_in_channel' } })
+    }
     if (opts.post === 'fail') throw new Error('channel_not_found')
     return { ok: true }
   })
@@ -371,6 +401,109 @@ describe('sendRecapToChampion', () => {
       const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
       expect(res).toEqual({ ok: false, reason: 'dm_failed' })
       expect(session?.recap_sent_at ?? null).toBeNull()
+    })
+  })
+
+  describe('recap channel (users.recap_slack_channel_id)', () => {
+    const adminSlackIds = ['U_CLAUD', 'U_JEN']
+    const CH = 'C0123ABCD'
+
+    it('posts to the saved channel with unfurl off and skips the group DM', async () => {
+      const { client, session } = makeSupabase({ recapChannel: CH })
+      const { slack, postMessage, open } = makeSlack({ open: 'ok' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage).toHaveBeenCalledTimes(1)
+      expect(postMessage.mock.calls[0][0]).toMatchObject({ channel: CH, unfurl_links: false, unfurl_media: false })
+      expect(open).not.toHaveBeenCalled()
+      expect(res).toMatchObject({ ok: true, destination: 'channel', channelId: CH, slackUserId: 'U_CHAMP' })
+      expect(session?.recap_sent_at).toBeTruthy()
+    })
+
+    it('falls back to the group DM when Slack rejects the channel, logging the error code', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { client } = makeSupabase({ recapChannel: CH })
+      const { slack, postMessage } = makeSlack({ open: 'ok', channelPost: 'not_in_channel' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage.mock.calls.map((c) => c[0].channel)).toEqual([CH, 'G_GROUP'])
+      expect(res.ok && res.destination).toBe('group')
+      expect(spy.mock.calls.some((c) => String(c[0]).includes('not_in_channel'))).toBe(true)
+      spy.mockRestore()
+    })
+
+    it('falls back to the 1:1 DM when both the channel and the group DM fail', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { client } = makeSupabase({ recapChannel: CH })
+      const { slack, postMessage } = makeSlack({ open: 'fail', channelPost: 'not_in_channel' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage.mock.calls.map((c) => c[0].channel)).toEqual([CH, 'U_CHAMP'])
+      expect(res.ok && res.destination).toBe('dm')
+      spy.mockRestore()
+    })
+
+    it('rolls back the claim when every path fails', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { client, session } = makeSupabase({ recapChannel: CH })
+      const { slack, postMessage } = makeSlack({ open: 'ok', post: 'fail', channelPost: 'not_in_channel' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage).toHaveBeenCalledTimes(2)
+      expect(res).toEqual({ ok: false, reason: 'dm_failed' })
+      expect(session?.recap_sent_at ?? null).toBeNull()
+      spy.mockRestore()
+    })
+
+    it('rolls back with no_slack_user when the channel is rejected and the champion has no Slack user', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { client, session } = makeSupabase({ recapChannel: CH })
+      const { slack, postMessage } = makeSlack({ lookup: 'notfound', channelPost: 'not_in_channel' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage).toHaveBeenCalledTimes(1)
+      expect(res).toEqual({ ok: false, reason: 'no_slack_user' })
+      expect(session?.recap_sent_at ?? null).toBeNull()
+      spy.mockRestore()
+    })
+
+    it('does not fall back on a network error (may have been delivered) and rolls back', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { client, session } = makeSupabase({ recapChannel: CH })
+      const { slack, postMessage } = makeSlack({ open: 'ok', channelPost: 'network' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage).toHaveBeenCalledTimes(1)
+      expect(res).toEqual({ ok: false, reason: 'dm_failed' })
+      expect(session?.recap_sent_at ?? null).toBeNull()
+      spy.mockRestore()
+    })
+
+    it('still sends to the channel when the champion Slack lookup fails or email is empty', async () => {
+      const a = makeSupabase({ recapChannel: CH })
+      const s1 = makeSlack({ lookup: 'throw' })
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const r1 = await sendRecapToChampion({ supabase: a.client, slackClient: s1.slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+      expect(r1).toMatchObject({ ok: true, destination: 'channel', slackUserId: null })
+      const b = makeSupabase({ recapChannel: CH, email: null })
+      const s2 = makeSlack()
+      const r2 = await sendRecapToChampion({ supabase: b.client, slackClient: s2.slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+      expect(s2.lookupByEmail).not.toHaveBeenCalled()
+      expect(r2).toMatchObject({ ok: true, destination: 'channel' })
+      spy.mockRestore()
+    })
+
+    it('treats a missing column (migration not applied) as unset and sends as before', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { client } = makeSupabase({ recapChannel: 'missing' })
+      const { slack, postMessage } = makeSlack({ open: 'ok' })
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage.mock.calls[0][0].channel).toBe('G_GROUP')
+      expect(res.ok && res.destination).toBe('group')
+      expect(spy.mock.calls.some((c) => String(c[0]).includes('recap channel read failed'))).toBe(true)
+      spy.mockRestore()
+    })
+
+    it('ignores a stored value that is not a valid channel id', async () => {
+      const { client } = makeSupabase({ recapChannel: 'C1> <!channel' })
+      const { slack, postMessage } = makeSlack()
+      const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl, adminSlackIds: [] }, { sessionId: 's1', adminId: 'a1' })
+      expect(postMessage.mock.calls[0][0].channel).toBe('U_CHAMP')
+      expect(res.ok && res.destination).toBe('dm')
     })
   })
 })
