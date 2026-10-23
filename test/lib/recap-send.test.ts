@@ -193,6 +193,14 @@ describe('sendRecapToChampion', () => {
     expect(postMessage).not.toHaveBeenCalled()
   })
 
+  it('sends for a manually uploaded note (idle + notes)', async () => {
+    const { client } = makeSupabase({ session: { id: 's1', champion_user_id: 'u1', title: 't', session_date: '2026-10-20', notes: '직접 올린 노트', processing_status: 'idle', recap_sent_at: null, recap_slack_ts: null } })
+    const { slack, postMessage } = makeSlack()
+    const res = await sendRecapToChampion({ supabase: client, slackClient: slack, baseUrl }, { sessionId: 's1', adminId: 'a1' })
+    expect(res.ok).toBe(true)
+    expect(postMessage).toHaveBeenCalledTimes(1)
+  })
+
   it('refuses a session that is not done', async () => {
     const { client, writes } = makeSupabase({ session: { id: 's1', champion_user_id: 'u1', processing_status: 'processing', recap_sent_at: null } })
     const { slack, postMessage } = makeSlack()

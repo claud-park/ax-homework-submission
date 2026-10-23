@@ -3,6 +3,7 @@ import type { WebClient } from '@slack/web-api'
 import { buildDraftBlocks, buildRecapText } from './format'
 import { recapSlack } from './slackClient'
 import { buildNoteUrl, resolveBaseUrl, trimEnv } from './noteUrl'
+import { isRecapEligible } from './eligibility'
 import { classifyRecapDraftError, type RecapDraftErrorCode } from './draftError'
 
 export interface PostRecapDraftDeps {
@@ -67,7 +68,7 @@ export async function postRecapDraft(deps: PostRecapDraftDeps, sessionId: string
       return { posted: false, reason: 'db_error' }
     }
     if (!session) return { posted: false, reason: 'not_found' }
-    if (session.processing_status !== 'done') return { posted: false, reason: 'not_done' }
+    if (!isRecapEligible(session)) return { posted: false, reason: 'not_done' }
     if (deps.refuseIfSent && session.recap_sent_at) return { posted: false, reason: 'already_sent' }
 
     const { data: champion } = await supabase

@@ -229,6 +229,17 @@ describe('postRecapDraft', () => {
     expect(updates).toEqual([])
   })
 
+  it('posts a draft for a manually uploaded note (idle + notes) but not for an empty idle session', async () => {
+    const postMessage = vi.fn().mockResolvedValue({ channel: 'C1', ts: '1.0' })
+    const slackClient = { chat: { postMessage } } as never
+    const ok = makeSupabase({ session: { id: 's1', champion_user_id: 'u1', title: 't', session_date: '2026-10-20', notes: '직접 올린 노트', processing_status: 'idle', recap_sent_at: null } })
+    expect(await postRecapDraft({ supabase: ok.client, slackClient, env }, 's1')).toEqual({ posted: true })
+    expect(postMessage).toHaveBeenCalledTimes(1)
+    const empty = makeSupabase({ session: { id: 's1', champion_user_id: 'u1', notes: '', processing_status: 'idle', recap_sent_at: null } })
+    expect(await postRecapDraft({ supabase: empty.client, slackClient, env }, 's1')).toEqual({ posted: false, reason: 'not_done' })
+    expect(postMessage).toHaveBeenCalledTimes(1)
+  })
+
   it('reports not_found and not_done without writing', async () => {
     const postMessage = vi.fn()
     const slackClient = { chat: { postMessage } } as never

@@ -30,7 +30,7 @@ describe('recapDraftErrorMessage', () => {
 describe('recapRedraftReasonMessage', () => {
   it('고정 reason 문구', () => {
     expect(recapRedraftReasonMessage('already_sent')).toBe('이미 챔피언에게 발송된 recap이에요.')
-    expect(recapRedraftReasonMessage('not_done')).toBe('노트 처리가 끝난 세션에서만 올릴 수 있어요.')
+    expect(recapRedraftReasonMessage('not_done')).toBe('노트 처리가 끝났거나 노트가 입력된 세션에서만 올릴 수 있어요.')
     expect(recapRedraftReasonMessage('not_configured')).toBe('recap 설정이 아직 없어요. 개발 담당자에게 확인을 요청해 주세요.')
     expect(recapRedraftReasonMessage('not_found')).toBe('세션을 찾지 못했어요.')
     expect(recapRedraftReasonMessage('db_error')).toBe('recap 초안을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.')
