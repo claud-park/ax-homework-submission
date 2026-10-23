@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
 import { filterRows, sortRows, type OverviewChip, type OverviewRow, type TimelineEvent } from '@/lib/one-on-one/overview'
 import type { Season } from '@/lib/types'
+import type { SlackBookingsStatus } from '@/lib/data/one-on-one-admin'
 import { RecapChannelCell } from './RecapChannelCell'
 
 interface Props {
@@ -13,7 +14,11 @@ interface Props {
   season: Season | null
   rows: OverviewRow[]
   startDateMissing: boolean
+  /** Slack 봇 예약 상태. 없으면 기능 꺼짐으로 본다. */
+  slack?: SlackBookingsStatus
 }
+
+const STATUS_LABEL: Record<string, string> = { pending: '대기', confirmed: '확정', cancelled: '취소' }
 
 const CHIPS: { key: OverviewChip; label: string }[] = [
   { key: 'all', label: '전체' },
@@ -44,6 +49,14 @@ const BADGE: React.CSSProperties = {
   fontSize: 11, padding: '2px 8px', borderRadius: 4, display: 'inline-block', whiteSpace: 'nowrap',
 }
 
+const SLACK_CHIP: React.CSSProperties = {
+  ...BADGE, marginLeft: 6, padding: '0 6px', background: 'rgba(100,116,139,0.12)', color: 'var(--text-secondary)',
+}
+
+function SlackChip({ source }: { source?: string }) {
+  return source === 'slack' ? <span style={SLACK_CHIP}>Slack</span> : null
+}
+
 function describeEvent(e: TimelineEvent): { label: string; detail: string } {
   switch (e.kind) {
     case 'booking_requested':
@@ -57,7 +70,7 @@ function describeEvent(e: TimelineEvent): { label: string; detail: string } {
   }
 }
 
-export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing }: Props) {
+export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing, slack }: Props) {
   const router = useRouter()
   const [chip, setChip] = useState<OverviewChip>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -111,6 +124,16 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
             style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(217,119,6,0.1)', color: 'var(--amber)' }}
           >
             이 시즌에는 시작일이 없어서 예약을 시즌별로 나누지 못했어요. 모든 기간의 예약이 함께 표시돼요.
+          </div>
+        )}
+
+        {slack?.enabled && slack.error && (
+          <div
+            role="status"
+            className="mb-4 text-xs"
+            style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(217,119,6,0.1)', color: 'var(--amber)' }}
+          >
+            Slack 예약 조회에 실패했어요. 웹 예약만 표시 중입니다.
           </div>
         )}
 
@@ -187,11 +210,17 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
                                   {next.confirmed_by && (
                                     <span style={{ color: 'var(--text-secondary)' }}> · {next.confirmed_by} 확정</span>
                                   )}
+                                  <SlackChip source={next.source} />
                                 </>
                               ) : '—'}
                             </td>
                             <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                              {r.pendingBooking ? `${fmtDateTime(r.pendingBooking.slot_start)} 희망` : '—'}
+                              {r.pendingBooking ? (
+                                <>
+                                  {`${fmtDateTime(r.pendingBooking.slot_start)} 희망`}
+                                  <SlackChip source={r.pendingBooking.source} />
+                                </>
+                              ) : '—'}
                             </td>
                             <td style={{ ...TD, whiteSpace: 'nowrap' }}>{r.cancelledCount}건</td>
                             <td style={{ ...TD, whiteSpace: 'nowrap' }}>{r.latestRequestAt ? fmtDateTime(r.latestRequestAt) : '—'}</td>
@@ -227,7 +256,12 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
                                       return (
                                         <li key={i} className="text-xs" style={{ display: 'flex', gap: 12, color: 'var(--text-primary)' }}>
                                           <span style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap', minWidth: 120 }}>{fmtDateTime(e.at)}</span>
-                                          <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{d.label}</span>
+                                          <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                            {d.label}
+                                            {e.kind !== 'session' && e.source === 'slack' && (
+                                              <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}> (Slack)</span>
+                                            )}
+                                          </span>
                                           <span style={{ color: 'var(--text-secondary)' }}>{d.detail}</span>
                                         </li>
                                       )
@@ -252,6 +286,27 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
               </div>
             )}
           </>
+        )}
+
+        {slack?.enabled && slack.unmapped.length > 0 && (
+          <details className="mt-6" style={{ border: '1px solid var(--border-subtle)', borderRadius: 6, padding: '8px 12px' }}>
+            <summary className="text-xs" style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+              미매핑 Slack 신청 ({slack.unmapped.length})
+            </summary>
+            <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+              Slack 프로필 이메일이 챔피언 계정 이메일과 달라요. 이메일을 맞추면 해당 챔피언 행에 합쳐져요.
+            </p>
+            <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {slack.unmapped.map((u) => (
+                <li key={u.id} className="text-xs" style={{ display: 'flex', gap: 12, color: 'var(--text-primary)' }}>
+                  <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{u.userName}</span>
+                  <span style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>{STATUS_LABEL[u.status] ?? u.status}</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>미팅 {fmtDateTime(u.slotStart)}</span>
+                  <span style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>신청 {fmtDateTime(u.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
       </div>
     </div>

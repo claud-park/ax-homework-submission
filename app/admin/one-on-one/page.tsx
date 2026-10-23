@@ -21,6 +21,7 @@ export default async function AdminOneOnOnePage({
       season={overview.season}
       rows={overview.rows}
       startDateMissing={overview.startDateMissing}
+      slack={overview.slack}
     />
   )
 }

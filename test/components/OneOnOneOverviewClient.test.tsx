@@ -38,8 +38,8 @@ const rows: OverviewRow[] = [
     pendingBooking: booking({ id: 'p1', status: 'pending', confirmed_by: null, slot_start: '2026-10-26T06:00:00Z' }),
     latestRequestAt: '2026-10-20T01:00:00Z',
     timeline: [
-      { kind: 'booking_requested', at: '2026-10-20T01:00:00Z', bookingId: 'p1', slotStart: '2026-10-25T05:00:00Z', status: 'pending' },
-      { kind: 'booking_cancelled', at: '2026-10-21T01:00:00Z', bookingId: 'c1', slotStart: '2026-10-24T05:00:00Z' },
+      { kind: 'booking_requested', at: '2026-10-20T01:00:00Z', bookingId: 'p1', slotStart: '2026-10-25T05:00:00Z', status: 'pending', source: 'web' },
+      { kind: 'booking_cancelled', at: '2026-10-21T01:00:00Z', bookingId: 'c1', slotStart: '2026-10-24T05:00:00Z', source: 'web' },
       {
         kind: 'session', at: '2026-10-22T05:00:00Z', sessionId: 'x', number: 1,
         sessionDate: '2026-10-22', sessionTime: '14:00:00', title: '첫 미팅',
@@ -187,6 +187,59 @@ describe('OneOnOneOverviewClient', () => {
       await waitFor(() => expect(toast.error).toHaveBeenCalled())
       expect(String(toast.error.mock.calls[0][0])).toContain('마이그레이션 적용이 필요합니다')
       expect(screen.getByLabelText('김하나 recap 채널 ID')).toBeTruthy()
+    })
+  })
+
+  describe('Slack 봇 예약', () => {
+    const slackRows: OverviewRow[] = [
+      row({
+        userId: 'u1', name: '김하나',
+        pendingBooking: booking({ id: 'slack:p1', status: 'pending', confirmed_by: null, source: 'slack' }),
+        timeline: [
+          { kind: 'booking_requested', at: '2026-10-20T01:00:00Z', bookingId: 'slack:p1', slotStart: '2026-10-25T05:00:00Z', status: 'pending', source: 'slack' },
+          { kind: 'booking_requested', at: '2026-10-19T01:00:00Z', bookingId: 'w1', slotStart: '2026-10-24T05:00:00Z', status: 'cancelled', source: 'web' },
+        ],
+      }),
+      row({ userId: 'u2', name: '이둘', nextBooking: booking({ id: 'slack:n1', champion_user_id: 'u2', source: 'slack' }) }),
+      row({ userId: 'u3', name: '박셋', nextBooking: booking({ id: 'n3', champion_user_id: 'u3' }) }),
+    ]
+    const unmapped = [
+      { id: 'slack:o1', userName: '외부인', status: 'pending' as const, slotStart: '2026-10-28T05:00:00Z', createdAt: '2026-10-21T00:00:00Z' },
+    ]
+
+    it('Slack 예약에만 Slack 칩을 단다(다음 미팅·대기)', () => {
+      renderClient({ rows: slackRows, slack: { enabled: true, error: false, unmapped: [] } })
+      expect(screen.getAllByText('Slack')).toHaveLength(2)
+    })
+
+    it('타임라인의 Slack 항목에 (Slack) 표시', () => {
+      renderClient({ rows: slackRows, slack: { enabled: true, error: false, unmapped: [] } })
+      fireEvent.click(screen.getByRole('button', { name: /김하나 상세 펼치기/ }))
+      expect(screen.getAllByText('(Slack)')).toHaveLength(1)
+    })
+
+    it('조회 실패 시 배너를 띄운다', () => {
+      const { unmount } = renderClient({ slack: { enabled: true, error: true, unmapped: [] } })
+      expect(screen.getByRole('status').textContent).toBe('Slack 예약 조회에 실패했어요. 웹 예약만 표시 중입니다.')
+      unmount()
+      renderClient({ slack: { enabled: true, error: false, unmapped: [] } })
+      expect(screen.queryByRole('status')).toBeNull()
+    })
+
+    it('미매핑 신청 섹션: 개수·이름·상태·안내를 보여준다', () => {
+      renderClient({ slack: { enabled: true, error: false, unmapped } })
+      expect(screen.getByText('미매핑 Slack 신청 (1)')).toBeTruthy()
+      expect(screen.getByText('외부인')).toBeTruthy()
+      expect(screen.getByText('대기')).toBeTruthy()
+      expect(screen.getByText(/Slack 프로필 이메일이 챔피언 계정 이메일과 달라요/)).toBeTruthy()
+    })
+
+    it('미매핑이 없거나 기능이 꺼져 있으면 섹션을 숨긴다', () => {
+      const { unmount } = renderClient({ slack: { enabled: true, error: false, unmapped: [] } })
+      expect(screen.queryByText(/미매핑 Slack 신청/)).toBeNull()
+      unmount()
+      renderClient({ slack: { enabled: false, error: false, unmapped } })
+      expect(screen.queryByText(/미매핑 Slack 신청/)).toBeNull()
     })
   })
 })
