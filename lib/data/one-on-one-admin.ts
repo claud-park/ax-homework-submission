@@ -5,16 +5,64 @@ import type { Season } from '@/lib/types'
 import { parseName } from '@/lib/utils'
 import {
   buildOneOnOneOverview,
+  isInSeasonWindow,
   type OverviewBooking,
+  type OverviewBookingStatus,
   type OverviewRow,
   type OverviewSession,
 } from '@/lib/one-on-one/overview'
+import {
+  createSchedulerSourceFromEnv,
+  defaultSlackEmailLookup,
+  loadSchedulerBookings,
+  normalizeEmail,
+  type SchedulerSource,
+  type SlackBookingWithEmail,
+  type SlackEmailLookup,
+} from '@/lib/one-on-one/scheduler-bookings'
+
+/** 이메일이 이 시즌 챔피언과 맞지 않은 Slack 봇 신청(시즌 기간 안) */
+export interface UnmappedSlackBooking {
+  id: string
+  userName: string
+  status: OverviewBookingStatus
+  slotStart: string
+  createdAt: string
+}
+
+export interface SlackBookingsStatus {
+  /** 스케줄러 env가 있어 Slack 예약을 읽는 상태 */
+  enabled: boolean
+  /** 스케줄러 DB 또는 Slack 조회 실패 → 웹 예약만 표시 중 */
+  error: boolean
+  unmapped: UnmappedSlackBooking[]
+}
 
 export interface OneOnOneOverviewResult {
   season: Season | null
   rows: OverviewRow[]
   /** 시즌 start_date가 비어 예약 날짜 필터를 끈 상태(안내 배너용) */
   startDateMissing: boolean
+  slack: SlackBookingsStatus
+}
+
+export interface OneOnOneOverviewDeps {
+  /** undefined면 env(SCHEDULER_SUPABASE_*)로 만든다. null이면 Slack 예약을 읽지 않는다. */
+  scheduler?: SchedulerSource | null
+  lookupSlackEmail?: SlackEmailLookup
+}
+
+type SchedulerLoad = { bookings: SlackBookingWithEmail[]; error: boolean }
+
+/** 절대 throw하지 않는다. 실패는 error 플래그로. */
+async function loadSlackSafely(scheduler: SchedulerSource, lookup: SlackEmailLookup): Promise<SchedulerLoad> {
+  try {
+    const { bookings, allLookupsFailed } = await loadSchedulerBookings(scheduler, lookup)
+    return { bookings, error: allLookupsFailed }
+  } catch (e) {
+    console.error('[one-on-one-admin] Slack bookings read failed (web bookings only):', e instanceof Error ? e.message : e)
+    return { bookings: [], error: true }
+  }
 }
 
 function fail(step: string, message: string): never {
@@ -25,6 +73,8 @@ function fail(step: string, message: string): never {
  * 시즌(미지정 시 현재 시즌)의 챔피언별 1-on-1 현황을 조회한다.
  * getCurrentSeasonUserIds는 closed 시즌에 []를 돌려주므로 쓰지 않고 enrollments를 직접 읽는다.
  * 쿼리 수는 챔피언 수와 무관하다(seasons → enrollments → users/recap 채널/sessions/bookings 병렬 bulk `in`).
+ * Slack 봇 예약(스케줄러 DB pending_1on1)은 Slack 프로필 이메일 ↔ users.email로 매핑해 합친다.
+ * 스케줄러/Slack 실패는 throw하지 않고 slack.error로 알린다(웹 예약만 표시).
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -38,7 +88,12 @@ export async function fetchOneOnOneOverview(
   supabase: SupabaseClient,
   seasonId?: string,
   now: Date = new Date(),
+  deps: OneOnOneOverviewDeps = {},
 ): Promise<OneOnOneOverviewResult> {
+  const scheduler = deps.scheduler === undefined ? createSchedulerSourceFromEnv() : deps.scheduler
+  const lookup = deps.lookupSlackEmail ?? defaultSlackEmailLookup
+  const emptySlack: SlackBookingsStatus = { enabled: scheduler !== null, error: false, unmapped: [] }
+
   // UUID가 아닌 값(?season=abc)은 Postgres 22P02를 내므로 현재 시즌으로 되돌린다.
   const validSeasonId = seasonId && UUID_RE.test(seasonId) ? seasonId : undefined
   const seasonQuery = supabase.from('seasons').select('*')
@@ -48,7 +103,7 @@ export async function fetchOneOnOneOverview(
   ).maybeSingle()
   if (seasonErr) fail('season', seasonErr.message)
   const season = (seasonData as Season | null) ?? null
-  if (!season) return { season: null, rows: [], startDateMissing: false }
+  if (!season) return { season: null, rows: [], startDateMissing: false, slack: emptySlack }
 
   const startDateMissing = !season.start_date
 
@@ -72,10 +127,13 @@ export async function fetchOneOnOneOverview(
     .neq('status', 'dropped')
   if (enrollErr) fail('enrollments', enrollErr.message)
   const championIds = ((enrollments ?? []) as { user_id: string }[]).map((e) => e.user_id)
-  if (championIds.length === 0) return { season, rows: [], startDateMissing }
+  if (championIds.length === 0) return { season, rows: [], startDateMissing, slack: emptySlack }
+
+  // 스케줄러 DB·Slack은 별도 클라이언트라 supabase 쿼리 수에 영향이 없다. 아래 bulk 조회와 병렬로 돌린다.
+  const slackPromise: Promise<SchedulerLoad> | null = scheduler ? loadSlackSafely(scheduler, lookup) : null
 
   const [usersRes, channelRes, sessionsRes, bookingsRes] = await Promise.all([
-    supabase.from('users').select('id, name').in('id', championIds),
+    supabase.from('users').select('id, name, email').in('id', championIds),
     // 마이그레이션(20261023000000) 전에는 컬럼이 없을 수 있어 별도 best-effort 조회로 둔다.
     supabase.from('users').select('id, recap_slack_channel_id').in('id', championIds),
     supabase
@@ -101,18 +159,58 @@ export async function fetchOneOnOneOverview(
     }
   }
 
-  const nameById = new Map(((usersRes.data ?? []) as { id: string; name: string }[]).map((u) => [u.id, u.name]))
+  const users = (usersRes.data ?? []) as { id: string; name: string; email: string | null }[]
+  const nameById = new Map(users.map((u) => [u.id, u.name]))
   const champions = championIds.map((userId) => {
     const { displayName, department } = parseName(nameById.get(userId) ?? '(알 수 없음)')
     return { userId, name: displayName, department, recapChannelId: channelById.get(userId) ?? null }
   })
 
+  const webBookings = ((bookingsRes.data ?? []) as OverviewBooking[]).map((b) => ({ ...b, source: 'web' as const }))
+
+  // Slack 예약: 이메일로 이 시즌 챔피언에 매핑. 안 맞으면 시즌 기간 안의 것만 미매핑으로 노출한다.
+  const slack: SlackBookingsStatus = { ...emptySlack }
+  const slackBookings: OverviewBooking[] = []
+  if (slackPromise) {
+    const loaded = await slackPromise
+    slack.error = loaded.error
+    const userIdByEmail = new Map<string, string>()
+    for (const u of users) {
+      const email = normalizeEmail(u.email)
+      if (email) userIdByEmail.set(email, u.id)
+    }
+    for (const b of loaded.bookings) {
+      const userId = b.email ? userIdByEmail.get(b.email) : undefined
+      if (userId) {
+        slackBookings.push({
+          id: b.id,
+          champion_user_id: userId,
+          slot_start: b.slot_start,
+          slot_end: b.slot_end,
+          status: b.status,
+          confirmed_by: b.confirmed_by,
+          created_at: b.created_at,
+          updated_at: b.updated_at,
+          source: 'slack',
+        })
+      } else if (isInSeasonWindow(b.slot_start, season.start_date, endDate)) {
+        slack.unmapped.push({
+          id: b.id,
+          userName: b.userName,
+          status: b.status,
+          slotStart: b.slot_start,
+          createdAt: b.created_at,
+        })
+      }
+    }
+  }
+
   const rows = buildOneOnOneOverview({
     champions,
     sessions: (sessionsRes.data ?? []) as OverviewSession[],
-    bookings: (bookingsRes.data ?? []) as OverviewBooking[],
+    bookings: [...webBookings, ...slackBookings],
     now,
     seasonWindow: { startDate: season.start_date, endDate },
   })
-  return { season, rows, startDateMissing }
+  return { season, rows, startDateMissing, slack }
 }

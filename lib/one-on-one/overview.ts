@@ -4,6 +4,9 @@ import { kstTodayStr } from '@/lib/nudge/overdue'
 
 export type OverviewBookingStatus = 'pending' | 'confirmed' | 'cancelled'
 
+/** 예약 출처: 웹 페이지(one_on_one_bookings) 또는 Slack 봇(스케줄러 pending_1on1) */
+export type BookingSource = 'web' | 'slack'
+
 /** check_up_sessions 중 현황 집계에 필요한 컬럼 */
 export interface OverviewSession {
   id: string
@@ -19,7 +22,7 @@ export interface NumberedSession extends OverviewSession {
   number: number
 }
 
-/** one_on_one_bookings 중 현황 집계에 필요한 컬럼 */
+/** one_on_one_bookings 중 현황 집계에 필요한 컬럼(Slack 예약도 이 형태로 정규화해 합친다) */
 export interface OverviewBooking {
   id: string
   champion_user_id: string
@@ -29,6 +32,8 @@ export interface OverviewBooking {
   confirmed_by: string | null
   created_at: string
   updated_at: string
+  /** 없으면 'web' */
+  source?: BookingSource
 }
 
 export interface OverviewChampion {
@@ -45,9 +50,23 @@ export interface SeasonWindow {
 }
 
 export type TimelineEvent =
-  | { kind: 'booking_requested'; at: string; bookingId: string; slotStart: string; status: OverviewBookingStatus }
-  | { kind: 'booking_confirmed'; at: string; bookingId: string; slotStart: string; confirmedBy: string | null }
-  | { kind: 'booking_cancelled'; at: string; bookingId: string; slotStart: string }
+  | {
+      kind: 'booking_requested'
+      at: string
+      bookingId: string
+      slotStart: string
+      status: OverviewBookingStatus
+      source: BookingSource
+    }
+  | {
+      kind: 'booking_confirmed'
+      at: string
+      bookingId: string
+      slotStart: string
+      confirmedBy: string | null
+      source: BookingSource
+    }
+  | { kind: 'booking_cancelled'; at: string; bookingId: string; slotStart: string; source: BookingSource }
   | {
       kind: 'session'
       at: string
@@ -142,7 +161,15 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
 function buildTimeline(bookings: OverviewBooking[], sessions: NumberedSession[]): TimelineEvent[] {
   const events: TimelineEvent[] = []
   for (const b of bookings) {
-    events.push({ kind: 'booking_requested', at: b.created_at, bookingId: b.id, slotStart: b.slot_start, status: b.status })
+    const source = b.source ?? 'web'
+    events.push({
+      kind: 'booking_requested',
+      at: b.created_at,
+      bookingId: b.id,
+      slotStart: b.slot_start,
+      status: b.status,
+      source,
+    })
     if (b.status === 'confirmed') {
       events.push({
         kind: 'booking_confirmed',
@@ -150,9 +177,10 @@ function buildTimeline(bookings: OverviewBooking[], sessions: NumberedSession[])
         bookingId: b.id,
         slotStart: b.slot_start,
         confirmedBy: b.confirmed_by,
+        source,
       })
     } else if (b.status === 'cancelled') {
-      events.push({ kind: 'booking_cancelled', at: b.updated_at, bookingId: b.id, slotStart: b.slot_start })
+      events.push({ kind: 'booking_cancelled', at: b.updated_at, bookingId: b.id, slotStart: b.slot_start, source })
     }
   }
   for (const s of sessions) {

@@ -1,6 +1,16 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchOneOnOneOverview } from '@/lib/data/one-on-one-admin'
+import type { SchedulerBookingRow, SchedulerSource } from '@/lib/one-on-one/scheduler-bookings'
+
+// 기본 스케줄러 소스는 env에서 만든다. 테스트가 실제 스케줄러 DB에 닿지 않게 env를 비운다.
+beforeEach(() => {
+  vi.stubEnv('SCHEDULER_SUPABASE_URL', '')
+  vi.stubEnv('SCHEDULER_SUPABASE_SERVICE_KEY', '')
+})
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 type Filter = { op: 'eq' | 'neq' | 'in'; field: string; value: unknown }
 type Call = { table: string; filters: Filter[] }
@@ -66,7 +76,7 @@ function baseTables(championCount: number) {
       enrollment('dropped', { status: 'dropped' }),
       enrollment('partner', { role_in_season: 'partner' }),
     ],
-    users: [...ids, 'dropped', 'partner'].map((id) => ({ id, name: `홍${id}/AX팀` })),
+    users: [...ids, 'dropped', 'partner'].map((id) => ({ id, name: `홍${id}/AX팀`, email: `hong.${id}@dreamus.io` })),
     check_up_sessions: [
       { id: 'cs1', champion_user_id: 'u1', season_id: 's2', session_date: '2026-10-05', session_time: '10:00:00', title: 't', created_at: '2026-10-05T01:00:00Z' },
       { id: 'cs-old', champion_user_id: 'u1', season_id: 's1', session_date: '2026-07-05', session_time: null, title: 't', created_at: '2026-07-05T01:00:00Z' },
@@ -82,7 +92,12 @@ describe('fetchOneOnOneOverview', () => {
   it('현재 시즌이 없으면 빈 결과', async () => {
     const { supabase, calls } = createSupabaseMock({ seasons: [season1] })
     const result = await fetchOneOnOneOverview(supabase, undefined, NOW)
-    expect(result).toEqual({ season: null, rows: [], startDateMissing: false })
+    expect(result).toEqual({
+      season: null,
+      rows: [],
+      startDateMissing: false,
+      slack: { enabled: false, error: false, unmapped: [] },
+    })
     expect(calls.map((c) => c.table)).toEqual(['seasons'])
   })
 
@@ -181,5 +196,160 @@ describe('fetchOneOnOneOverview', () => {
     expect(result.rows.find((r) => r.userId === 'u1')).toMatchObject({ name: '홍u1', sessionCount: 1 })
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
+  })
+
+  describe('Slack 봇 예약 합치기', () => {
+    function srow(over: Partial<SchedulerBookingRow> = {}): SchedulerBookingRow {
+      return {
+        id: 'r1',
+        user_slack_id: 'U_U1',
+        user_name: '홍u1',
+        selected_slots: [{ start: '2026-10-28T05:00:00Z', end: '2026-10-28T05:30:00Z', available_admins: ['claud'] }],
+        status: 'pending',
+        confirmed_by: null,
+        confirmed_slot: null,
+        created_at: '2026-10-21T00:00:00Z',
+        ...over,
+      }
+    }
+    const fakeSource = (rows: SchedulerBookingRow[]): SchedulerSource => ({ fetchBookings: async () => rows })
+    const emails: Record<string, string | null> = {
+      U_U1: '  Hong.U1@Dreamus.IO ',
+      U_U2: 'hong.u2@dreamus.io',
+      U_OTHER: 'someone@gmail.com',
+    }
+    const fakeLookup = vi.fn(async (id: string) => {
+      if (id === 'U_BAD') throw new Error('user_not_found')
+      return emails[id] ?? null
+    })
+
+    it('이메일(대소문자·공백 무시)로 챔피언에 매핑해 대기·다음 미팅·취소·타임라인에 반영한다', async () => {
+      const { supabase } = createSupabaseMock(baseTables(2))
+      const scheduler = fakeSource([
+        srow(),
+        srow({
+          id: 'r2',
+          user_slack_id: 'U_U2',
+          status: 'confirmed',
+          confirmed_by: 'jennifer',
+          confirmed_slot: { start: '2026-10-29T05:00:00Z', end: '2026-10-29T06:00:00Z', available_admins: ['jennifer'] },
+        }),
+        srow({ id: 'r3', status: 'cancelled' }),
+        srow({ id: 'r4', status: 'expired' }),
+      ])
+      const result = await fetchOneOnOneOverview(supabase, undefined, NOW, { scheduler, lookupSlackEmail: fakeLookup })
+      expect(result.slack).toEqual({ enabled: true, error: false, unmapped: [] })
+      const u1 = result.rows.find((r) => r.userId === 'u1')!
+      expect(u1.pendingBooking).toMatchObject({ id: 'slack:r1', source: 'slack', champion_user_id: 'u1' })
+      expect(u1.nextBooking?.id).toBe('b1') // 웹 예약 유지
+      expect(u1.cancelledCount).toBe(1)
+      const slackEvents = u1.timeline.filter((e) => e.kind !== 'session' && e.source === 'slack')
+      expect(slackEvents.map((e) => e.kind)).toEqual(['booking_requested', 'booking_requested', 'booking_cancelled'])
+      const u2 = result.rows.find((r) => r.userId === 'u2')!
+      expect(u2.nextBooking).toMatchObject({ id: 'slack:r2', confirmed_by: 'jennifer', source: 'slack' })
+    })
+
+    it('매핑 안 된 Slack 신청은 unmapped로(시즌 기간 안만), 개별 조회 실패도 unmapped', async () => {
+      const { supabase } = createSupabaseMock(baseTables(1))
+      const scheduler = fakeSource([
+        srow({ id: 'o1', user_slack_id: 'U_OTHER', user_name: '외부인' }),
+        srow({ id: 'o2', user_slack_id: 'U_BAD', user_name: '조회실패' }),
+        srow({
+          id: 'o-old',
+          user_slack_id: 'U_OTHER',
+          selected_slots: [{ start: '2026-06-01T05:00:00Z', end: '2026-06-01T05:30:00Z' }],
+        }),
+        srow({ id: 'r1' }),
+      ])
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const result = await fetchOneOnOneOverview(supabase, undefined, NOW, { scheduler, lookupSlackEmail: fakeLookup })
+      spy.mockRestore()
+      expect(result.slack.error).toBe(false)
+      expect(result.slack.unmapped).toEqual([
+        { id: 'slack:o1', userName: '외부인', status: 'pending', slotStart: '2026-10-28T05:00:00Z', createdAt: '2026-10-21T00:00:00Z' },
+        { id: 'slack:o2', userName: '조회실패', status: 'pending', slotStart: '2026-10-28T05:00:00Z', createdAt: '2026-10-21T00:00:00Z' },
+      ])
+      expect(result.rows[0].pendingBooking?.id).toBe('slack:r1')
+    })
+
+    it('시즌 기간 밖 Slack 예약은 집계에서 빠진다', async () => {
+      const { supabase } = createSupabaseMock(baseTables(1))
+      const scheduler = fakeSource([
+        srow({
+          id: 'old',
+          status: 'confirmed',
+          confirmed_slot: { start: '2026-09-10T05:00:00Z', end: '2026-09-10T05:30:00Z' },
+        }),
+      ])
+      const result = await fetchOneOnOneOverview(supabase, undefined, NOW, { scheduler, lookupSlackEmail: fakeLookup })
+      const ids = result.rows[0].timeline.flatMap((e) => (e.kind === 'session' ? [] : [e.bookingId]))
+      expect(ids).not.toContain('slack:old')
+      expect(result.rows[0].flags.missingRecord).toBe(false)
+    })
+
+    it('지난 Slack 확정 예약에 세션 기록이 없으면 누락 의심', async () => {
+      const { supabase } = createSupabaseMock(baseTables(1))
+      const scheduler = fakeSource([
+        srow({
+          id: 'past',
+          status: 'confirmed',
+          confirmed_by: 'claud',
+          confirmed_slot: { start: '2026-10-15T05:00:00Z', end: '2026-10-15T05:30:00Z' },
+        }),
+      ])
+      const result = await fetchOneOnOneOverview(supabase, undefined, NOW, { scheduler, lookupSlackEmail: fakeLookup })
+      expect(result.rows[0].flags.missingRecord).toBe(true)
+    })
+
+    it('스케줄러 조회 실패 시 throw하지 않고 error 플래그 + 웹 예약 유지', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { supabase } = createSupabaseMock(baseTables(1))
+      const scheduler: SchedulerSource = {
+        fetchBookings: async () => {
+          throw new Error('scheduler down')
+        },
+      }
+      const result = await fetchOneOnOneOverview(supabase, undefined, NOW, { scheduler, lookupSlackEmail: fakeLookup })
+      spy.mockRestore()
+      expect(result.slack).toEqual({ enabled: true, error: true, unmapped: [] })
+      expect(result.rows[0].nextBooking?.id).toBe('b1')
+    })
+
+    it('Slack 조회가 전부 실패하면 error 플래그(예약은 미매핑으로 남음)', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { supabase } = createSupabaseMock(baseTables(1))
+      const result = await fetchOneOnOneOverview(supabase, undefined, NOW, {
+        scheduler: fakeSource([srow()]),
+        lookupSlackEmail: async () => {
+          throw new Error('invalid_auth')
+        },
+      })
+      spy.mockRestore()
+      expect(result.slack.error).toBe(true)
+      expect(result.slack.unmapped).toHaveLength(1)
+      expect(result.rows[0].pendingBooking).toBeNull()
+    })
+
+    it('스케줄러 env가 없으면 기능을 끈다(enabled=false, 배너 없음)', async () => {
+      const { supabase } = createSupabaseMock(baseTables(1))
+      const result = await fetchOneOnOneOverview(supabase, undefined, NOW)
+      expect(result.slack).toEqual({ enabled: false, error: false, unmapped: [] })
+    })
+
+    it('Slack 예약을 합쳐도 supabase 쿼리 수는 그대로이고 users는 email을 읽는다', async () => {
+      const a = createSupabaseMock(baseTables(3))
+      await fetchOneOnOneOverview(a.supabase, undefined, NOW, { scheduler: null })
+      const b = createSupabaseMock(baseTables(3))
+      await fetchOneOnOneOverview(b.supabase, undefined, NOW, {
+        scheduler: fakeSource([srow(), srow({ id: 'x', user_slack_id: 'U_OTHER' })]),
+        lookupSlackEmail: fakeLookup,
+      })
+      expect(b.calls.length).toBe(a.calls.length)
+      expect(b.calls.length).toBe(7)
+      const usersSelect = (b.supabase.from as ReturnType<typeof vi.fn>).mock.results
+        .filter((_, i) => b.calls[i].table === 'users')
+        .map((r) => (r.value.select as ReturnType<typeof vi.fn>).mock.calls[0][0] as string)
+      expect(usersSelect.some((c) => c.includes('email'))).toBe(true)
+    })
   })
 })
