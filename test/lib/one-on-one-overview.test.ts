@@ -246,6 +246,7 @@ function row(p: Partial<OverviewRow> & { userId: string }): OverviewRow {
   return {
     name: p.userId,
     department: '',
+    recapChannelId: null,
     sessionCount: 0,
     lastSession: null,
     nextBooking: null,

@@ -219,6 +219,23 @@ describe('buildSentBlocks recipient', () => {
   })
 })
 
+describe('buildSentBlocks channel destination', () => {
+  const base = { championName: 'c', sentByLabel: 's', sentAt: new Date(0) }
+  it('shows the channel mention for channel sends', () => {
+    const s = JSON.stringify(buildSentBlocks({ ...base, recipientSlackId: 'U0ABC123', destination: 'channel', channelId: 'C0123ABCD' }))
+    expect(s).toContain('수신: <#C0123ABCD> (채널)')
+    expect(s).not.toContain('<@U0ABC123>')
+  })
+  it('omits the recipient for an invalid or missing channel id', () => {
+    expect(JSON.stringify(buildSentBlocks({ ...base, destination: 'channel', channelId: 'C1> <!channel' }))).not.toContain('수신')
+    expect(JSON.stringify(buildSentBlocks({ ...base, destination: 'channel' }))).not.toContain('수신')
+  })
+  it('keeps the DM wording for group and dm', () => {
+    expect(JSON.stringify(buildSentBlocks({ ...base, recipientSlackId: 'U0ABC123', destination: 'dm' }))).toContain('수신: <@U0ABC123> (Slack DM)')
+    expect(JSON.stringify(buildSentBlocks({ ...base, recipientSlackId: 'U0ABC123', destination: 'group' }))).toContain('수신: <@U0ABC123> (그룹 DM)')
+  })
+})
+
 describe('buildSentBlocks time', () => {
   it('renders KST deterministically', () => {
     const s = JSON.stringify(buildSentBlocks({ championName: 'c', sentByLabel: 's', sentAt: new Date('2026-10-21T01:05:00Z') }))

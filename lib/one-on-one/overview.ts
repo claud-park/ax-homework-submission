@@ -35,6 +35,8 @@ export interface OverviewChampion {
   userId: string
   name: string
   department: string
+  /** recap을 보낼 Slack 채널 ID(users.recap_slack_channel_id). 미설정·컬럼 없음이면 null. */
+  recapChannelId?: string | null
 }
 
 export interface SeasonWindow {
@@ -67,6 +69,8 @@ export interface OverviewRow {
   userId: string
   name: string
   department: string
+  /** recap을 보낼 Slack 채널 ID. 미설정이면 null. */
+  recapChannelId: string | null
   sessionCount: number
   lastSession: NumberedSession | null
   nextBooking: OverviewBooking | null
@@ -218,6 +222,7 @@ export function buildOneOnOneOverview(input: BuildOverviewInput): OverviewRow[] 
       userId: c.userId,
       name: c.name,
       department: c.department,
+      recapChannelId: c.recapChannelId ?? null,
       sessionCount: numbered.length,
       lastSession: numbered.length > 0 ? numbered[numbered.length - 1] : null,
       nextBooking,

@@ -24,7 +24,7 @@ function fail(step: string, message: string): never {
 /**
  * 시즌(미지정 시 현재 시즌)의 챔피언별 1-on-1 현황을 조회한다.
  * getCurrentSeasonUserIds는 closed 시즌에 []를 돌려주므로 쓰지 않고 enrollments를 직접 읽는다.
- * 쿼리 수는 챔피언 수와 무관하다(seasons → enrollments → users/sessions/bookings 병렬 bulk `in`).
+ * 쿼리 수는 챔피언 수와 무관하다(seasons → enrollments → users/recap 채널/sessions/bookings 병렬 bulk `in`).
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -74,8 +74,10 @@ export async function fetchOneOnOneOverview(
   const championIds = ((enrollments ?? []) as { user_id: string }[]).map((e) => e.user_id)
   if (championIds.length === 0) return { season, rows: [], startDateMissing }
 
-  const [usersRes, sessionsRes, bookingsRes] = await Promise.all([
+  const [usersRes, channelRes, sessionsRes, bookingsRes] = await Promise.all([
     supabase.from('users').select('id, name').in('id', championIds),
+    // 마이그레이션(20261023000000) 전에는 컬럼이 없을 수 있어 별도 best-effort 조회로 둔다.
+    supabase.from('users').select('id, recap_slack_channel_id').in('id', championIds),
     supabase
       .from('check_up_sessions')
       .select('id, champion_user_id, session_date, session_time, title, created_at')
@@ -90,10 +92,19 @@ export async function fetchOneOnOneOverview(
   if (sessionsRes.error) fail('sessions', sessionsRes.error.message)
   if (bookingsRes.error) fail('bookings', bookingsRes.error.message)
 
+  const channelById = new Map<string, string | null>()
+  if (channelRes.error) {
+    console.error('[one-on-one-admin] recap channel read failed (treated as unset):', channelRes.error.message)
+  } else {
+    for (const u of (channelRes.data ?? []) as { id: string; recap_slack_channel_id: string | null }[]) {
+      channelById.set(u.id, u.recap_slack_channel_id ?? null)
+    }
+  }
+
   const nameById = new Map(((usersRes.data ?? []) as { id: string; name: string }[]).map((u) => [u.id, u.name]))
   const champions = championIds.map((userId) => {
     const { displayName, department } = parseName(nameById.get(userId) ?? '(알 수 없음)')
-    return { userId, name: displayName, department }
+    return { userId, name: displayName, department, recapChannelId: channelById.get(userId) ?? null }
   })
 
   const rows = buildOneOnOneOverview({

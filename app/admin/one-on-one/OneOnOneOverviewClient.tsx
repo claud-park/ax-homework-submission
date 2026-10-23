@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { DesktopOnlyNotice } from '@/components/DesktopOnlyNotice'
 import { filterRows, sortRows, type OverviewChip, type OverviewRow, type TimelineEvent } from '@/lib/one-on-one/overview'
 import type { Season } from '@/lib/types'
+import { RecapChannelCell } from './RecapChannelCell'
 
 interface Props {
   seasons: Season[]
@@ -60,6 +61,8 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
   const router = useRouter()
   const [chip, setChip] = useState<OverviewChip>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // 저장 후 서버 재조회 없이 반영(필터 전환으로 행이 다시 그려져도 유지된다).
+  const [channelOverrides, setChannelOverrides] = useState<Record<string, string | null>>({})
 
   const visible = sortRows(filterRows(rows, chip))
   const toggle = (id: string) =>
@@ -148,7 +151,7 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border-subtle)' }}>
                       <th scope="col" style={{ ...TH, width: 28 }} aria-label="펼치기" />
-                      {['부서', '이름', '회차', '마지막 미팅', '다음 미팅', '대기 중 신청', '취소 건수', '최근 신청', '플래그'].map((h) => (
+                      {['부서', '이름', '회차', '마지막 미팅', '다음 미팅', '대기 중 신청', '취소 건수', '최근 신청', '플래그', 'recap 채널'].map((h) => (
                         <th key={h} scope="col" style={TH}>{h}</th>
                       ))}
                     </tr>
@@ -202,11 +205,19 @@ export function OneOnOneOverviewClient({ seasons, season, rows, startDateMissing
                                 )}
                               </div>
                             </td>
+                            <td style={TD}>
+                              <RecapChannelCell
+                                userId={r.userId}
+                                name={r.name}
+                                channelId={r.userId in channelOverrides ? channelOverrides[r.userId] : r.recapChannelId}
+                                onSaved={(id) => setChannelOverrides((prev) => ({ ...prev, [r.userId]: id }))}
+                              />
+                            </td>
                           </tr>
                           {open && (
                             <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-secondary)' }}>
                               <td />
-                              <td colSpan={9} style={{ padding: '12px' }}>
+                              <td colSpan={10} style={{ padding: '12px' }}>
                                 {r.timeline.length === 0 ? (
                                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>아직 신청이나 세션 기록이 없어요.</p>
                                 ) : (

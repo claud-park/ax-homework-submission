@@ -3,6 +3,7 @@ import type { WebClient } from '@slack/web-api'
 import { buildRecapText, escapeSlack, truncateForSlack } from './format'
 import { recapSlack } from './slackClient'
 import { buildNoteUrl, resolveBaseUrl } from './noteUrl'
+import { isRecapChannelId } from './channelId'
 
 export interface SendRecapDeps {
   supabase: SupabaseClient
@@ -19,7 +20,16 @@ function defaultAdminSlackIds(): string[] {
 }
 
 export type SendRecapResult =
-  | { ok: true; championName: string; sentAt: Date; slackUserId: string; destination: 'group' | 'dm' }
+  | {
+      ok: true
+      championName: string
+      sentAt: Date
+      /** 챔피언 Slack user id. 채널로 보냈고 이메일 조회가 실패했으면 null. */
+      slackUserId: string | null
+      destination: 'channel' | 'group' | 'dm'
+      /** destination === 'channel'일 때 보낸 채널 id */
+      channelId?: string
+    }
   | {
       ok: false
       reason: 'not_found' | 'not_done' | 'already_sent' | 'no_slack_user' | 'dm_failed' | 'stale_draft'
@@ -44,6 +54,34 @@ function buildOverrideText(override: string, noteUrl: string): string {
   return [body, linkLine].filter(Boolean).join('\n\n')
 }
 
+function slackErrorCode(err: unknown): string {
+  const e = err as { code?: string; data?: { error?: string }; message?: string }
+  return e?.data?.error ?? e?.code ?? e?.message ?? 'unknown'
+}
+
+/**
+ * 챔피언에게 지정된 recap 채널 id를 읽는다. 마이그레이션 전이라 컬럼이 없거나 조회가 실패하면
+ * 로그만 남기고 미설정(null)으로 본다 — 기존 발송 경로를 절대 막지 않는다.
+ */
+async function readRecapChannelId(supabase: SupabaseClient, userId: string, sessionId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('recap_slack_channel_id')
+      .eq('id', userId)
+      .maybeSingle()
+    if (error) {
+      console.error(`[session ${sessionId}] recap channel read failed (treated as unset):`, error.message)
+      return null
+    }
+    const v = (data as { recap_slack_channel_id?: unknown } | null)?.recap_slack_channel_id
+    return isRecapChannelId(v) ? v : null
+  } catch (err) {
+    console.error(`[session ${sessionId}] recap channel read failed (treated as unset):`, err instanceof Error ? err.message : 'unknown')
+    return null
+  }
+}
+
 function logDmFailure(sessionId: string, err: unknown) {
   const e = err as { code?: string; data?: { error?: string }; message?: string }
   if (e?.code === 'slack_webapi_platform_error') {
@@ -56,7 +94,8 @@ function logDmFailure(sessionId: string, err: unknown) {
 }
 
 /**
- * 챔피언에게 recap DM을 보낸다. 중복 발송은 recap_sent_at 원자적 선점으로 막는다.
+ * 챔피언에게 recap을 보낸다. 지정된 recap 채널이 있으면 그 채널로, 없거나 Slack이 거절하면
+ * 그룹 DM(어드민+챔피언) → 1:1 DM 순으로 보낸다. 중복 발송은 recap_sent_at 원자적 선점으로 막는다.
  * 절대 throw하지 않는다.
  */
 export async function sendRecapToChampion(
@@ -114,7 +153,8 @@ export async function sendRecapToChampion(
       return { ok: false, reason: 'dm_failed' }
     }
     const email = typeof champion?.email === 'string' ? champion.email.trim() : ''
-    if (!email) return { ok: false, reason: 'no_slack_user' }
+    const recapChannelId = await readRecapChannelId(supabase, session.champion_user_id, sessionId)
+    if (!email && !recapChannelId) return { ok: false, reason: 'no_slack_user' }
 
     const championName: string = champion?.name ?? '챔피언'
     const noteUrl = buildNoteUrl({ baseUrl, sessionId })
@@ -136,15 +176,13 @@ export async function sendRecapToChampion(
     claimedAt = nowIso
 
     let slackUserId: string | undefined
-    try {
-      const res = await slack.users.lookupByEmail({ email })
-      slackUserId = res.user?.id
-    } catch (err) {
-      console.error(`[session ${sessionId}] recap Slack user lookup failed:`, err instanceof Error ? err.message : 'unknown error')
-    }
-    if (!slackUserId) {
-      await rollback()
-      return { ok: false, reason: 'no_slack_user' }
+    if (email) {
+      try {
+        const res = await slack.users.lookupByEmail({ email })
+        slackUserId = res.user?.id
+      } catch (err) {
+        console.error(`[session ${sessionId}] recap Slack user lookup failed:`, err instanceof Error ? err.message : 'unknown error')
+      }
     }
 
     const text =
@@ -162,13 +200,45 @@ export async function sendRecapToChampion(
             noteUrl,
           })
 
+    // 1순위: 어드민이 지정한 recap 채널(봇 초대 완료된 비공개 채널). 실패하면 그룹 DM/1:1 DM으로 폴백.
+    if (recapChannelId) {
+      try {
+        await slack.chat.postMessage({ channel: recapChannelId, text, unfurl_links: false, unfurl_media: false })
+        return {
+          ok: true,
+          championName,
+          sentAt: now,
+          slackUserId: slackUserId ?? null,
+          destination: 'channel',
+          channelId: recapChannelId,
+        }
+      } catch (err) {
+        // Slack이 거절한 경우(not_in_channel, channel_not_found, is_archived 등)만 폴백한다.
+        // 네트워크/타임아웃 등은 이미 전달됐을 수 있어 DM으로 또 보내면 중복이 되므로 기존처럼 실패 처리한다.
+        if ((err as { code?: string })?.code !== 'slack_webapi_platform_error') {
+          logDmFailure(sessionId, err)
+          await rollback()
+          return { ok: false, reason: 'dm_failed' }
+        }
+        console.error(
+          `[session ${sessionId}] recap channel ${recapChannelId} rejected by Slack (${slackErrorCode(err)}), falling back to DM`,
+        )
+      }
+    }
+
+    if (!slackUserId) {
+      await rollback()
+      return { ok: false, reason: 'no_slack_user' }
+    }
+
     // 어드민(claud, jennifer)+챔피언이 함께 있는 그룹 DM으로 보낸다. 열기에 실패하면(권한 미부여 등) 챔피언 1:1 DM으로 폴백.
     let channel = slackUserId
     let destination: 'group' | 'dm' = 'dm'
-    const adminIds = (deps.adminSlackIds ?? defaultAdminSlackIds()).filter((id) => id !== slackUserId)
+    const championSlackId = slackUserId
+    const adminIds = (deps.adminSlackIds ?? defaultAdminSlackIds()).filter((id) => id !== championSlackId)
     if (adminIds.length > 0 && slack.conversations) {
       try {
-        const users = Array.from(new Set([...adminIds, slackUserId])).join(',')
+        const users = Array.from(new Set([...adminIds, championSlackId])).join(',')
         const opened = await slack.conversations.open({ users })
         if (opened.channel?.id) {
           channel = opened.channel.id
