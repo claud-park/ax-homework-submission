@@ -16,6 +16,7 @@ import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } fro
 import { useSessionActionItems } from '@/components/sessions/useSessionActionItems'
 import { useSessionNotes } from '@/components/sessions/useSessionNotes'
 import { useConfirm } from '@/components/ui/confirm'
+import { isRecapEligible } from '@/lib/recap/eligibility'
 
 interface Props {
   sessionId: string
@@ -362,7 +363,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
       )}
 
       {/* Recap draft banner / re-post button — done, not yet sent to the champion */}
-      {session.processing_status === 'done' && session.recap_draft_error && (
+      {isRecapEligible(session) && session.recap_draft_error && (
         <div
           className="rounded-xl border p-3 mb-4 flex items-center justify-between gap-3"
           style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
@@ -384,7 +385,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
           )}
         </div>
       )}
-      {session.processing_status === 'done' && !session.recap_sent_at && !session.recap_slack_ts && !session.recap_draft_error && (
+      {isRecapEligible(session) && !session.recap_sent_at && !session.recap_draft_error && (!session.recap_slack_ts || session.processing_status === 'idle') && (
         <div className="mb-4 flex justify-end">
   <button
     onClick={redraftRecap}
@@ -393,7 +394,7 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
     style={{ background: 'var(--blue-600)', color: '#fff', border: 'none', cursor: 'pointer' }}
   >
     <RefreshCw className={`h-3 w-3 ${redrafting ? 'animate-spin' : ''}`} />
-    {redrafting ? '올리는 중...' : 'recap 초안 다시 올리기'}
+    {redrafting ? '올리는 중...' : session.recap_slack_ts ? 'recap 초안 다시 올리기' : 'recap 초안 올리기'}
   </button>
         </div>
       )}

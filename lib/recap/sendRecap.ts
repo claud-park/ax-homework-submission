@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WebClient } from '@slack/web-api'
 import { buildRecapText, escapeSlack, truncateForSlack } from './format'
 import { recapSlack } from './slackClient'
+import { isRecapEligible } from './eligibility'
 import { buildNoteUrl, resolveBaseUrl } from './noteUrl'
 import { isRecapChannelId } from './channelId'
 
@@ -133,7 +134,7 @@ export async function sendRecapToChampion(
       return { ok: false, reason: 'dm_failed' }
     }
     if (!session) return { ok: false, reason: 'not_found' }
-    if (session.processing_status !== 'done') return { ok: false, reason: 'not_done' }
+    if (!isRecapEligible(session)) return { ok: false, reason: 'not_done' }
     if (expectedDraftTs !== undefined && expectedDraftTs !== session.recap_slack_ts) {
       return { ok: false, reason: 'stale_draft' }
     }

@@ -21,7 +21,7 @@ export function recapDraftErrorMessage(code: string | null | undefined): string 
 export function recapRedraftReasonMessage(reason: string | null | undefined, errorCode?: string | null): string {
   switch (reason) {
     case 'already_sent': return '이미 챔피언에게 발송된 recap이에요.'
-    case 'not_done': return '노트 처리가 끝난 세션에서만 올릴 수 있어요.'
+    case 'not_done': return '노트 처리가 끝났거나 노트가 입력된 세션에서만 올릴 수 있어요.'
     case 'not_configured': return 'recap 설정이 아직 없어요. 개발 담당자에게 확인을 요청해 주세요.'
     case 'not_found': return '세션을 찾지 못했어요.'
     case 'db_error': return 'recap 초안을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'
