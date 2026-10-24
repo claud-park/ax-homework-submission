@@ -201,6 +201,31 @@ function buildTimeline(bookings: OverviewBooking[], sessions: NumberedSession[])
     .map(({ e }) => e)
 }
 
+/** 세션 기록이 미팅 후 며칠 늦게 입력돼도(기본 세션 날짜 = 입력한 날) 같은 미팅으로 본다. */
+const RECORD_LAG_DAYS = 7
+
+function addDays(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+/**
+ * 지난 confirmed 예약마다 [미팅 KST 날짜, +7일] 안의 세션을 일대일로 맞춰 보고(이른 예약부터, 이른 세션부터),
+ * 짝이 없는 예약이 하나라도 있으면 true. 한 세션이 두 예약을 가리지 않는다.
+ */
+function hasUnmatchedPastBooking(bookings: OverviewBooking[], sessions: { session_date: string }[]): boolean {
+  const unused = sessions.map((s) => s.session_date).sort()
+  const ordered = [...bookings].sort((a, b) => a.slot_start.localeCompare(b.slot_start))
+  for (const b of ordered) {
+    const from = kstDateOf(b.slot_start)
+    const to = addDays(from, RECORD_LAG_DAYS)
+    const idx = unused.findIndex((d) => d >= from && d <= to)
+    if (idx === -1) return true
+    unused.splice(idx, 1)
+  }
+  return false
+}
+
 export function buildOneOnOneOverview(input: BuildOverviewInput): OverviewRow[] {
   const { champions, sessions, bookings, now, seasonWindow } = input
   const nowMs = now.getTime()
@@ -223,7 +248,7 @@ export function buildOneOnOneOverview(input: BuildOverviewInput): OverviewRow[] 
   return champions.map((c) => {
     const numbered = numberSessions(sessionsByUser.get(c.userId) ?? [])
     const userBookings = bookingsByUser.get(c.userId) ?? []
-    const sessionDates = new Set(numbered.map((s) => s.session_date))
+    const pastConfirmed: OverviewBooking[] = []
 
     let nextBooking: OverviewBooking | null = null
     let pendingBooking: OverviewBooking | null = null
@@ -240,11 +265,12 @@ export function buildOneOnOneOverview(input: BuildOverviewInput): OverviewRow[] 
         cancelledCount += 1
       } else if (slotMs > nowMs) {
         if (!nextBooking || slotMs < new Date(nextBooking.slot_start).getTime()) nextBooking = b
-      } else if (kstDateOf(b.slot_start) < todayKst && !sessionDates.has(kstDateOf(b.slot_start))) {
+      } else if (kstDateOf(b.slot_start) < todayKst) {
         // 당일 미팅은 세션 기록이 늦게 올라올 수 있어 다음 날부터 누락 의심으로 본다.
-        missingRecord = true
+        pastConfirmed.push(b)
       }
     }
+    missingRecord = hasUnmatchedPastBooking(pastConfirmed, numbered)
 
     return {
       userId: c.userId,
