@@ -162,6 +162,33 @@ describe('buildOneOnOneOverview', () => {
     expect(future.flags.missingRecord).toBe(false)
   })
 
+  it('missingRecord: 세션이 미팅 며칠 뒤 날짜로 입력돼도(7일 이내) 같은 미팅으로 본다', () => {
+    const slot = '2026-10-12T01:30:00Z' // KST 10-12
+    const late = build([session({ id: 's1', session_date: '2026-10-13' })], [booking({ id: 'c1', status: 'confirmed', slot_start: slot })])[0]
+    expect(late.flags.missingRecord).toBe(false)
+    const tooLate = build([session({ id: 's1', session_date: '2026-10-20' })], [booking({ id: 'c1', status: 'confirmed', slot_start: slot })])[0]
+    expect(tooLate.flags.missingRecord).toBe(true)
+  })
+
+  it('missingRecord: 한 세션은 한 예약에만 대응한다', () => {
+    const two = build(
+      [session({ id: 's1', session_date: '2026-10-16' })],
+      [
+        booking({ id: 'c1', status: 'confirmed', slot_start: '2026-10-14T05:00:00Z' }),
+        booking({ id: 'c2', status: 'confirmed', slot_start: '2026-10-15T05:00:00Z' }),
+      ],
+    )[0]
+    expect(two.flags.missingRecord).toBe(true)
+    const both = build(
+      [session({ id: 's1', session_date: '2026-10-16' }), session({ id: 's2', session_date: '2026-10-17' })],
+      [
+        booking({ id: 'c1', status: 'confirmed', slot_start: '2026-10-14T05:00:00Z' }),
+        booking({ id: 'c2', status: 'confirmed', slot_start: '2026-10-15T05:00:00Z' }),
+      ],
+    )[0]
+    expect(both.flags.missingRecord).toBe(false)
+  })
+
   it('같은 날 pending+confirmed+cancelled 혼재', () => {
     const slot = '2026-10-15T05:00:00Z'
     const [row] = build(
