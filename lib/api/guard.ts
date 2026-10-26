@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import type { User } from '@supabase/supabase-js'
 import { verifyJWT, verifyAdmin } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { isEnrolledInCurrentSeason } from '@/lib/data/season'
+import { getCurrentSeasonId, isEnrolledInCurrentSeason } from '@/lib/data/season'
 
 /**
  * API 라우트 인증 가드.
@@ -74,7 +74,15 @@ export async function requireCurrentEnrollment(
 
   const supabase = createServiceClient()
   const enrolled = await isEnrolledInCurrentSeason(supabase, user.id, role)
-  if (!enrolled) return forbidden('현재 시즌에 참여 중이 아닙니다')
+  if (!enrolled) {
+    // 진단용: 거절된 요청이 누구(id·이메일)의 어떤 시즌 판정이었는지 남긴다(토큰·개인 민감정보 제외).
+    const seasonId = await getCurrentSeasonId(supabase)
+    console.warn(
+      `[guard] requireCurrentEnrollment denied: user=${user.id} email=${user.email ?? ''} ` +
+      `role=${role} currentSeason=${seasonId ?? 'none'} appAdmin=${user.app_metadata?.is_admin === true}`,
+    )
+    return forbidden('현재 시즌에 참여 중이 아닙니다')
+  }
 
   return user
 }
