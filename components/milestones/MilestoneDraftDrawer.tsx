@@ -37,6 +37,7 @@ export default function MilestoneDraftDrawer({
   const [prompt, setPrompt] = useState('')
   const [useCharter, setUseCharter] = useState(true)
   const [startDate, setStartDate] = useState(today())
+  const [endDate, setEndDate] = useState('')
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [instruction, setInstruction] = useState('')
@@ -45,6 +46,7 @@ export default function MilestoneDraftDrawer({
 
   if (!open) return null
 
+  const invalidRange = !!endDate && endDate < startDate
   const hasInvalid = rows.length === 0 || rows.some(r => !r.title.trim() ||
     (r.children ?? []).some(c => !c.title.trim()))
   const totalCount = rows.reduce((sum, r) => sum + 1 + (r.children?.length ?? 0), 0)
@@ -54,7 +56,7 @@ export default function MilestoneDraftDrawer({
     try {
       const { milestones } = await apiFetch<{ milestones: Scheduled[] }>('/api/milestones/generate', {
         method: 'POST',
-        body: JSON.stringify({ prompt, useCharter, startDate, charter_id: charterId }),
+        body: JSON.stringify({ prompt, useCharter, startDate, endDate: endDate || undefined, charter_id: charterId }),
       })
       setRows(milestones.map(m => toDraft(m, 'ai')))
     } catch {
@@ -117,7 +119,7 @@ export default function MilestoneDraftDrawer({
     try {
       const { milestones } = await apiFetch<{ milestones: Scheduled[] }>('/api/milestones/refine', {
         method: 'POST',
-        body: JSON.stringify({ milestones: rows, startDate, instruction }),
+        body: JSON.stringify({ milestones: rows, startDate, endDate: endDate || undefined, instruction }),
       })
       setRows(milestones.map(m => toDraft(m, 'ai')))
       setRecentInstructions(prev => [instruction.trim(), ...prev].slice(0, 2))
@@ -164,11 +166,20 @@ export default function MilestoneDraftDrawer({
                 <input type="checkbox" checked={useCharter} onChange={e => setUseCharter(e.target.checked)} />
                 과제정의서 내용 활용
               </label>
-              <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                시작일 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                  style={{ fontSize: 13, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }} />
-              </label>
-              <button type="button" onClick={handleGenerate} disabled={generating}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  시작일 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                    style={{ fontSize: 13, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }} />
+                </label>
+                <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  종료일 <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)}
+                    style={{ fontSize: 13, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text-primary)' }} />
+                </label>
+              </div>
+              {invalidRange && (
+                <span className="text-xs" style={{ color: 'var(--error)' }}>종료일은 시작일 이후여야 해요.</span>
+              )}
+              <button type="button" onClick={handleGenerate} disabled={generating || invalidRange}
                 className="text-xs px-4 py-1.5 rounded-lg font-semibold disabled:opacity-50 self-start flex items-center gap-1.5"
                 style={{ background: 'var(--blue-600)', color: 'var(--text-inverse)' }}>
                 {generating ? (<><Spinner size="sm" className="text-white" /> 생성 중…</>) : '✨ 생성'}

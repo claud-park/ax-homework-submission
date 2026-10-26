@@ -8,7 +8,7 @@ import {
   buildGenerationPrompt,
   type CharterContent,
 } from '@/lib/milestone-ai'
-import { scheduleRelativeMilestones } from '@/lib/milestone-schedule'
+import { fitToWorkingDays, scheduleRelativeMilestones, workingDaysBetween } from '@/lib/milestone-schedule'
 import { getCurrentSeasonIdOrNil } from '@/lib/data/season'
 
 const MODEL = process.env.MILESTONE_AI_MODEL ?? 'claude-haiku-4-5'
@@ -26,6 +26,14 @@ export async function POST(req: NextRequest) {
       ? rawStart
       : new Date().toISOString().slice(0, 10)
 
+  const rawEnd: unknown = body?.endDate
+  const endDate: string | null =
+    typeof rawEnd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawEnd) ? rawEnd : null
+  const totalDays = endDate ? workingDaysBetween(startDate, endDate) : 0
+  if (endDate && totalDays < 1) {
+    return NextResponse.json({ error: 'invalid_date_range' }, { status: 400 })
+  }
+
   let charter: CharterContent = {}
   if (useCharter) {
     const charter_id: string | undefined = body?.charter_id
@@ -41,7 +49,7 @@ export async function POST(req: NextRequest) {
     charter = (data?.content as CharterContent) ?? {}
   }
 
-  const fullPrompt = buildGenerationPrompt(charter, prompt)
+  const fullPrompt = buildGenerationPrompt(charter, prompt, totalDays || undefined)
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -50,7 +58,10 @@ export async function POST(req: NextRequest) {
         output: Output.object({ schema: GenerationOutputSchema }),
         prompt: fullPrompt,
       })
-      const scheduled = scheduleRelativeMilestones(startDate, output.milestones)
+      const scheduled = scheduleRelativeMilestones(
+        startDate,
+        totalDays ? fitToWorkingDays(output.milestones, totalDays) : output.milestones,
+      )
       return NextResponse.json({ milestones: scheduled })
     } catch {
       if (attempt === 1) {

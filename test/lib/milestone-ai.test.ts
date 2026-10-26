@@ -40,4 +40,8 @@ describe('milestone-ai', () => {
     expect(p).toContain('베타를 2주로 늘려줘')
     expect(p).toContain('offset_days')
   })
+  it('prompt states the working-day window when an end date is given', () => {
+    const p = buildGenerationPrompt({}, undefined, 20)
+    expect(p).toContain('20 working days')
+  })
 })

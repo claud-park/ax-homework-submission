@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { nextWorkingDay, addWorkingDays, scheduleRelativeMilestones, draftToRelative } from '@/lib/milestone-schedule'
+import { nextWorkingDay, addWorkingDays, scheduleRelativeMilestones, draftToRelative, fitToWorkingDays, workingDaysBetween } from '@/lib/milestone-schedule'
 
 describe('milestone schedule', () => {
   it('nextWorkingDay rolls a Saturday to Monday', () => {
@@ -48,5 +48,22 @@ describe('milestone schedule', () => {
     const back = draftToRelative([{ title: 'X', start_date: null, due_date: null }], '2026-06-16')
     expect(back[0].offset_days).toBe(0)
     expect(back[0].duration_days).toBe(1)
+  })
+})
+
+describe('fitToWorkingDays / workingDaysBetween', () => {
+  it('clamps offset and duration into the window, including children', () => {
+    const fitted = fitToWorkingDays([
+      { title: 'A', offset_days: 0, duration_days: 30,
+        children: [{ title: 'A1', offset_days: 25, duration_days: 10 }] },
+      { title: 'B', offset_days: 50, duration_days: 5 },
+    ], 10)
+    expect(fitted[0].duration_days).toBe(10)
+    expect(fitted[0].children![0]).toMatchObject({ offset_days: 9, duration_days: 1 })
+    expect(fitted[1]).toMatchObject({ offset_days: 9, duration_days: 1 })
+  })
+  it('counts working days from the next working day of start to end', () => {
+    // 2026-10-26 (Mon) .. 2026-10-30 (Fri)
+    expect(workingDaysBetween('2026-10-26', '2026-10-30')).toBe(5)
   })
 })

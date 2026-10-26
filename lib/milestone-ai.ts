@@ -39,7 +39,11 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-export function buildGenerationPrompt(charter: CharterContent, userPrompt?: string): string {
+export function buildGenerationPrompt(
+  charter: CharterContent,
+  userPrompt?: string,
+  totalWorkingDays?: number,
+): string {
   const lines: string[] = [
     '당신은 프로젝트 매니저입니다. 아래 정보를 바탕으로 실행 가능한 마일스톤 계획을 만드세요.',
     '규칙:',
@@ -47,6 +51,9 @@ export function buildGenerationPrompt(charter: CharterContent, userPrompt?: stri
     '- 5~8개의 최상위 마일스톤. 필요하면 각 항목에 1단계 깊이의 children을 둡니다.',
     '- 제목은 한국어로 간결하게.',
   ]
+  if (totalWorkingDays && totalWorkingDays > 0) {
+    lines.push(`- 전체 일정은 총 ${totalWorkingDays} working days입니다. 모든 항목은 offset_days + duration_days가 ${totalWorkingDays}를 넘지 않아야 하며, 마지막 마일스톤이 종료일에 맞춰 끝나도록 전체 기간을 고르게 배분하세요.`)
+  }
   const charterLines = FIELD_LABELS
     .filter(([k]) => charter[k] && stripHtml(charter[k]!))
     .map(([k, label]) => `- ${label}: ${stripHtml(charter[k]!)}`)
@@ -61,13 +68,20 @@ export function buildGenerationPrompt(charter: CharterContent, userPrompt?: stri
   return lines.join('\n')
 }
 
-export function buildRefinePrompt(milestones: RelativeMilestone[], instruction: string): string {
+export function buildRefinePrompt(
+  milestones: RelativeMilestone[],
+  instruction: string,
+  totalWorkingDays?: number,
+): string {
   const lines: string[] = [
     '당신은 프로젝트 매니저입니다. 아래 기존 마일스톤 계획을 사용자 요청에 맞게 수정하세요.',
     '규칙:',
     '- 절대 날짜를 만들지 마세요. offset_days(프로젝트 시작 기준 시작 오프셋, working days)와 duration_days(기간, working days)로만 표현합니다.',
     '- 변경이 없는 항목도 포함해 전체 마일스톤 목록을 반환합니다.',
     '- 제목은 한국어로 간결하게. children은 1단계 깊이까지.',
+    ...(totalWorkingDays && totalWorkingDays > 0
+      ? [`- 전체 일정은 총 ${totalWorkingDays} working days입니다. 모든 항목은 offset_days + duration_days가 ${totalWorkingDays}를 넘지 않아야 합니다.`]
+      : []),
     '',
     '[현재 마일스톤]',
     JSON.stringify(milestones, null, 2),
