@@ -57,6 +57,22 @@ export function scheduleRelativeMilestones(
   return milestones.map(m => scheduleOne(projectStart, m, holidays))
 }
 
+// Clamp relative milestones so every one starts and ends within `totalDays` working days.
+export function fitToWorkingDays(milestones: RelativeMilestone[], totalDays: number): RelativeMilestone[] {
+  const total = Math.max(1, totalDays)
+  const one = (m: RelativeMilestone): RelativeMilestone => {
+    const offset_days = Math.min(Math.max(0, m.offset_days), total - 1)
+    const duration_days = Math.max(1, Math.min(m.duration_days, total - offset_days))
+    return { ...m, offset_days, duration_days, children: m.children?.map(one) }
+  }
+  return milestones.map(one)
+}
+
+// Working days in [startDate, endDate], with startDate rolled forward to the next working day.
+export function workingDaysBetween(startDate: string, endDate: string, holidays: Holidays = HOLIDAYS_FALLBACK): number {
+  return countWorkingDays(nextWorkingDay(startDate, holidays), endDate, holidays)
+}
+
 export interface DraftLike {
   title: string
   description?: string
