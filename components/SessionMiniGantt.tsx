@@ -66,8 +66,9 @@ export function SessionMiniGantt({ milestones, sessionDate, bare, hideHeader }: 
   // Date header labels: windowStart + 0..6 days
   const headerDates = Array.from({ length: totalDays }, (_, i) => addDays(windowStart, i))
 
-  // Position of session date within window (0-100%)
-  const sessionPct = (daysBetween(windowStart, sessionDate) / (totalDays - 1)) * 100
+  // 날짜 헤더는 7칸 균등 분할 — 막대·세션선도 같은 칸 기준으로 배치 (i번째 날 = [i/7, (i+1)/7])
+  const cellPct = 100 / totalDays
+  const sessionPct = (daysBetween(windowStart, sessionDate) + 0.5) * cellPct
 
   return (
     <div
@@ -150,9 +151,10 @@ export function SessionMiniGantt({ milestones, sessionDate, bare, hideHeader }: 
             const clampedStart = mStart < windowStart ? windowStart : mStart
             const clampedEnd = mEnd > windowEnd ? windowEnd : mEnd
 
-            const leftPct = (daysBetween(windowStart, clampedStart) / (totalDays - 1)) * 100
-            const rightPct = (daysBetween(windowStart, clampedEnd) / (totalDays - 1)) * 100
-            const widthPct = Math.max(rightPct - leftPct, 100 / totalDays)
+            const startIdx = daysBetween(windowStart, clampedStart)
+            const endIdx = daysBetween(windowStart, clampedEnd)
+            const leftPct = startIdx * cellPct
+            const widthPct = (endIdx - startIdx + 1) * cellPct
 
             return (
               <div
