@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api-client'
 import type { ChampionProject, CharterSubmission, MilestoneStatus } from '@/lib/types'
 import { parseName } from '@/lib/utils'
+import { orderMilestonesForGantt } from '@/lib/gantt-order'
 import { ArrowLeft } from 'lucide-react'
 
 const STATUS_LABEL: Record<MilestoneStatus, string> = {
@@ -49,9 +50,8 @@ export default function ChampionDetailPage() {
   if (!data) return null
 
   const { displayName, department } = parseName(data.user.name)
-  const sortedMilestones = [...data.milestones].sort((a, b) =>
-    (a.start_date ?? '').localeCompare(b.start_date ?? '')
-  )
+  // 부모 마일스톤 바로 아래에 서브 마일스톤이 오도록 묶어서 정렬 (내 과제정의서와 동일한 순서)
+  const sortedMilestones = orderMilestonesForGantt(data.milestones)
 
   return (
     <div>
@@ -105,7 +105,11 @@ export default function ChampionDetailPage() {
               <div
                 key={m.id}
                 className="flex items-center justify-between p-3 rounded-xl border"
-                style={{ background: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}
+                style={{
+                  background: 'var(--surface-primary)',
+                  borderColor: 'var(--border-subtle)',
+                  marginLeft: m.parent_milestone_id ? 20 : 0,
+                }}
               >
                 <div>
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{m.title}</p>
