@@ -24,19 +24,21 @@ function buildInlineRe(): RegExp {
   const L = '\\p{L}\\p{N}'
   return new RegExp(
     [
-      // 1 image  2 url
+      // 1 backslash escape (CommonMark): must stay first so the char never acts as a marker
+      '\\\\([!-\\/:-@\\[-`{-~])',
+      // 2 image  3 url
       '!\\[([^\\]]*)\\]\\(([^)\\s]+)(?:\\s+"[^"]*")?\\)',
-      // 3 label  4 url
+      // 4 label  5 url
       '\\[([^\\]]+)\\]\\(([^)\\s]+)(?:\\s+"[^"]*")?\\)',
-      // 5 inline code
+      // 6 inline code
       '`([^`]+)`',
-      // 6 bold (**)
+      // 7 bold (**)
       '\\*\\*(?=\\S)(.+?)(?<=\\S)\\*\\*',
-      // 7 bold (__)
+      // 8 bold (__)
       `(?<![${L}_])__(?=\\S)(.+?)(?<=\\S)__(?![${L}_])`,
-      // 8 italic (*): ASCII-word neighbours (2*3, a*b*c) are left alone, Hangul is fine
+      // 9 italic (*): ASCII-word neighbours (2*3, a*b*c) are left alone, Hangul is fine
       '(?<![A-Za-z0-9*/])\\*(?=[^\\s*])(.+?)(?<=[^\\s*])\\*(?!\\*)',
-      // 9 italic (_): snake_case, _private_name and URL paths are left alone
+      // 10 italic (_): snake_case, _private_name and URL paths are left alone
       '(?<![A-Za-z0-9_/])_(?=[^\\s_])(.+?)(?<=[^\\s_])_(?![A-Za-z0-9_])',
     ].join('|'),
     'gu',
@@ -64,15 +66,21 @@ function wrapSpan(marker: string, inner: string, offset: number, whole: string, 
   return `${before}${marker}${inner}${marker}${after}`
 }
 
+/** CommonMark: backslash + ASCII punctuation -> the literal char. */
+function unescapeMd(text: string): string {
+  return text.replace(/\\([!-/:-@[-`{-~])/g, '$1')
+}
+
 function inline(text: string, getRe: ReFactory, stripBold = false): string {
   const re = getRe()
-  if (!re) return stripBold ? text.replace(/\*\*/g, '') : text
+  if (!re) return unescapeMd(stripBold ? text.replace(/\*\*/g, '') : text)
   return text.replace(re, (...args: unknown[]) => {
     const m = args[0] as string
-    const g = args.slice(1, 10) as (string | undefined)[]
-    const offset = args[10] as number
-    const whole = args[11] as string
-    const [imgAlt, imgUrl, label, url, code, bold1, bold2, it1, it2] = g
+    const g = args.slice(1, 11) as (string | undefined)[]
+    const offset = args[11] as number
+    const whole = args[12] as string
+    const [escaped, imgAlt, imgUrl, label, url, code, bold1, bold2, it1, it2] = g
+    if (escaped !== undefined) return escaped
     if (imgUrl !== undefined) return imgAlt ? `${imgAlt} (${imgUrl})` : imgUrl
     if (url !== undefined) return `${inline(label!, getRe, stripBold)} (${url})`
     if (code !== undefined) return code

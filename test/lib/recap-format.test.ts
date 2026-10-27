@@ -25,6 +25,21 @@ describe('extractAiSummary', () => {
 
 describe('toSlackMrkdwn', () => {
   it('converts bold', () => expect(toSlackMrkdwn('**a**')).toBe('*a*'))
+  it('unescapes markdown backslash escapes as literal text', () => {
+    expect(toSlackMrkdwn('\\[중요\\] 자료')).toBe('[중요] 자료')
+    expect(toSlackMrkdwn('A\\*B')).toBe('A*B')
+    expect(toSlackMrkdwn('\\- x')).toBe('- x')
+    expect(toSlackMrkdwn('1\\. x')).toBe('1. x')
+    expect(toSlackMrkdwn('\\#x')).toBe('#x')
+    expect(toSlackMrkdwn('\\> q')).toBe('&gt; q')
+    expect(toSlackMrkdwn('\\*\\*a\\*\\*')).toBe('**a**')
+    expect(toSlackMrkdwn('a\\&b')).toBe('a&amp;b')
+    expect(toSlackMrkdwn('\\[a\\](https://e.com)')).toBe('[a](https://e.com)')
+    expect(toSlackMrkdwn('끝\\')).toBe('끝\\')
+  })
+  it('leaves escape-free link lines unchanged', () => {
+    expect(toSlackMrkdwn('[링크](https://e.com/a_b)')).toBe('<https://e.com/a_b|링크>')
+  })
   it('inserts U+200B after closing bold before a letter/digit', () => {
     expect(toSlackMrkdwn('**내용**을 확인')).toBe('*내용*\u200B을 확인')
     expect(toSlackMrkdwn('**v**2')).toBe('*v*\u200B2')

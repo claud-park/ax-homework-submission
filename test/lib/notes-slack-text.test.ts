@@ -130,4 +130,29 @@ describe('notesToSlackText', () => {
     )
     expect(notesToSlackText(`내${AI_DIVIDER}요약`, failing)).toBe(`내\n\n${HR}\n*🤖 AI 요약*\n\n요약`)
   })
+  it('unescapes CommonMark backslash escapes', () => {
+    expect(notesToSlackText('\\[중요\\] 자료')).toBe('[중요] 자료')
+    expect(notesToSlackText('A\\*B')).toBe('A*B')
+    expect(notesToSlackText('\\*별표\\*')).toBe('*별표*')
+    expect(notesToSlackText('\\- 대시')).toBe('- 대시')
+    expect(notesToSlackText('1\\. 시작')).toBe('1. 시작')
+    expect(notesToSlackText('\\# 해시')).toBe('# 해시')
+    expect(notesToSlackText('snake\\_case\\_name')).toBe('snake_case_name')
+    expect(notesToSlackText('\\`x\\` 입니다')).toBe('`x` 입니다')
+    expect(notesToSlackText('a\\\\b')).toBe('a\\b')
+    expect(notesToSlackText('끝\\')).toBe('끝\\')
+    expect(notesToSlackText('\\가나')).toBe('\\가나')
+    expect(notesToSlackText('[라벨\\_x](http://a.com)')).toBe('라벨_x (http://a.com)')
+  })
+
+  it('unescapes in the regex-unavailable fallback', () => {
+    expect(notesToSlackText('\\- x\n\\[a\\]\n1\\. y', () => null)).toBe('- x\n[a]\n1. y')
+  })
+
+  it('converts a TipTap-style saved note', () => {
+    const saved = '## 💬 피드백\n- **중요** \\[긴급\\] A\\*B\n- \\- 대시\n\n1\\. 시작\n\n\\_x\\_ 와 \\*y\\*'
+    expect(notesToSlackText(saved)).toBe(
+      '*💬 피드백*\n• *중요* [긴급] A*B\n• - 대시\n\n1. 시작\n\n_x_ 와 *y*',
+    )
+  })
 })
