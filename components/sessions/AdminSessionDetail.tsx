@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { RecordingPanel } from '@/components/sessions/RecordingPanel'
 import { MarkdownView } from '@/components/MarkdownView'
+import { CopySlackButton } from '@/components/sessions/CopySlackButton'
 import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
 import { parseName } from '@/lib/utils'
 import type { CheckUpSession, SessionActionItem, SessionComment, Milestone } from '@/lib/types'
@@ -502,13 +503,16 @@ export function AdminSessionDetail({ sessionId, currentAdminId, onBack, onDelete
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>📝 미팅 노트</p>
           {!isEditingNotes && (
-            <button
-              onClick={() => setIsEditingNotes(true)}
-              className="text-xs font-semibold px-2 py-1 rounded-md"
-              style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
-            >
-              수정
-            </button>
+            <div className="flex items-center gap-3">
+              <CopySlackButton notes={notes} />
+              <button
+                onClick={() => setIsEditingNotes(true)}
+                className="text-xs font-semibold px-2 py-1 rounded-md"
+                style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              >
+                수정
+              </button>
+            </div>
           )}
         </div>
         {isEditingNotes ? (

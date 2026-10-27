@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api-client'
 import { toast } from 'sonner'
 import { SessionMiniGantt } from '@/components/SessionMiniGantt'
 import { MarkdownView } from '@/components/MarkdownView'
+import { CopySlackButton } from '@/components/sessions/CopySlackButton'
 import { SessionNotesEditor } from '@/components/sessions/SessionNotesEditor'
 import { useSessionNotes } from '@/components/sessions/useSessionNotes'
 import { useSessionActionItems } from '@/components/sessions/useSessionActionItems'
@@ -141,13 +142,16 @@ export function ChampionSessionDetail({ sessionId, currentUserId }: Props) {
         <div className="flex items-center justify-between mb-3">
           <h2 className={labelClass} style={{ ...labelStyle, marginBottom: 0 }}>미팅 노트</h2>
           {!isEditingNotes && (
-            <button
-              onClick={() => setIsEditingNotes(true)}
-              className="flex items-center gap-1 text-xs"
-              style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-            >
-              <Pencil className="h-3 w-3" /> 수정
-            </button>
+            <div className="flex items-center gap-3">
+              <CopySlackButton notes={session.notes ?? ''} />
+              <button
+                onClick={() => setIsEditingNotes(true)}
+                className="flex items-center gap-1 text-xs"
+                style={{ color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                <Pencil className="h-3 w-3" /> 수정
+              </button>
+            </div>
           )}
         </div>
         {isEditingNotes ? (

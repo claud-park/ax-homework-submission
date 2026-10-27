@@ -25,6 +25,41 @@ describe('extractAiSummary', () => {
 
 describe('toSlackMrkdwn', () => {
   it('converts bold', () => expect(toSlackMrkdwn('**a**')).toBe('*a*'))
+  it('unescapes markdown backslash escapes as literal text', () => {
+    expect(toSlackMrkdwn('\\[중요\\] 자료')).toBe('[중요] 자료')
+    expect(toSlackMrkdwn('A\\*B')).toBe('A*B')
+    expect(toSlackMrkdwn('\\- x')).toBe('- x')
+    expect(toSlackMrkdwn('1\\. x')).toBe('1. x')
+    expect(toSlackMrkdwn('\\#x')).toBe('#x')
+    expect(toSlackMrkdwn('\\> q')).toBe('&gt; q')
+    expect(toSlackMrkdwn('\\*\\*a\\*\\*')).toBe('**a**')
+    expect(toSlackMrkdwn('a\\&b')).toBe('a&amp;b')
+    expect(toSlackMrkdwn('\\[a\\](https://e.com)')).toBe('[a](https://e.com)')
+    expect(toSlackMrkdwn('끝\\')).toBe('끝\\')
+  })
+  it('leaves escape-free link lines unchanged', () => {
+    expect(toSlackMrkdwn('[링크](https://e.com/a_b)')).toBe('<https://e.com/a_b|링크>')
+  })
+  it('inserts U+200B after closing bold before a letter/digit', () => {
+    expect(toSlackMrkdwn('**내용**을 확인')).toBe('*내용*\u200B을 확인')
+    expect(toSlackMrkdwn('**v**2')).toBe('*v*\u200B2')
+  })
+  it('inserts U+200B before opening bold after a letter/digit', () => {
+    expect(toSlackMrkdwn('A사**내용**')).toBe('A사\u200B*내용*')
+    expect(toSlackMrkdwn('A사**내용**을')).toBe('A사\u200B*내용*\u200B을')
+  })
+  it('adds no U+200B next to space, punctuation, line edges', () => {
+    expect(toSlackMrkdwn('**a**, **b** c.')).toBe('*a*, *b* c.')
+    expect(toSlackMrkdwn('(**a**)')).toBe('(*a*)')
+  })
+  it('handles back-to-back bolds', () => {
+    expect(toSlackMrkdwn('**a****b**')).toBe('*a**b*')
+  })
+  it('keeps truncation invariants with the extra char', () => {
+    const out = truncateForSlack(toSlackMrkdwn('**내용**을 '.repeat(600)))
+    expect(out.length).toBeLessThanOrEqual(2900)
+    expect(out.endsWith('…')).toBe(true)
+  })
   it('converts list bullets', () => {
     expect(toSlackMrkdwn('- x\n* y')).toBe('• x\n• y')
   })
@@ -272,5 +307,48 @@ describe('recap budget after escaping', () => {
   it('does not strip odd characters from a short name', () => {
     const t = buildRecapText({ ...base, championName: 'Q&A *팀', actionItems: [] })
     expect(t).toContain('Q&amp;A *팀 챔피언님')
+  })
+})
+
+describe('toSlackMrkdwn with sectioned notes', () => {
+  it('converts the sectioned note structure', () => {
+    const md = [
+      '## 🗣️ 논의 주제',
+      '### 1. 주제 제목',
+      '- 핵심 내용',
+      '  - 세부 내용',
+      '### 2. 두 번째 주제',
+      '- **Admin**이 일정 공유',
+      '',
+      '## 💬 피드백',
+      '- 피드백 내용',
+      '',
+      '## 🤨 고민·요청 사항',
+      '- 고민 내용',
+      '',
+      '## 🤝 합의 사항',
+      '1. 합의 내용',
+      '2. 두 번째 합의',
+    ].join('\n')
+    expect(toSlackMrkdwn(md)).toBe(
+      [
+        '*🗣️ 논의 주제*',
+        '*1. 주제 제목*',
+        '• 핵심 내용',
+        '  • 세부 내용',
+        '*2. 두 번째 주제*',
+        '• *Admin*\u200B이 일정 공유',
+        '',
+        '*💬 피드백*',
+        '• 피드백 내용',
+        '',
+        '*🤨 고민·요청 사항*',
+        '• 고민 내용',
+        '',
+        '*🤝 합의 사항*',
+        '1. 합의 내용',
+        '2. 두 번째 합의',
+      ].join('\n'),
+    )
   })
 })
