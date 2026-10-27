@@ -25,6 +25,26 @@ describe('extractAiSummary', () => {
 
 describe('toSlackMrkdwn', () => {
   it('converts bold', () => expect(toSlackMrkdwn('**a**')).toBe('*a*'))
+  it('inserts U+200B after closing bold before a letter/digit', () => {
+    expect(toSlackMrkdwn('**내용**을 확인')).toBe('*내용*\u200B을 확인')
+    expect(toSlackMrkdwn('**v**2')).toBe('*v*\u200B2')
+  })
+  it('inserts U+200B before opening bold after a letter/digit', () => {
+    expect(toSlackMrkdwn('A사**내용**')).toBe('A사\u200B*내용*')
+    expect(toSlackMrkdwn('A사**내용**을')).toBe('A사\u200B*내용*\u200B을')
+  })
+  it('adds no U+200B next to space, punctuation, line edges', () => {
+    expect(toSlackMrkdwn('**a**, **b** c.')).toBe('*a*, *b* c.')
+    expect(toSlackMrkdwn('(**a**)')).toBe('(*a*)')
+  })
+  it('handles back-to-back bolds', () => {
+    expect(toSlackMrkdwn('**a****b**')).toBe('*a**b*')
+  })
+  it('keeps truncation invariants with the extra char', () => {
+    const out = truncateForSlack(toSlackMrkdwn('**내용**을 '.repeat(600)))
+    expect(out.length).toBeLessThanOrEqual(2900)
+    expect(out.endsWith('…')).toBe(true)
+  })
   it('converts list bullets', () => {
     expect(toSlackMrkdwn('- x\n* y')).toBe('• x\n• y')
   })
@@ -302,7 +322,7 @@ describe('toSlackMrkdwn with sectioned notes', () => {
         '• 핵심 내용',
         '  • 세부 내용',
         '*2. 두 번째 주제*',
-        '• *Admin*이 일정 공유',
+        '• *Admin*\u200B이 일정 공유',
         '',
         '*💬 피드백*',
         '• 피드백 내용',

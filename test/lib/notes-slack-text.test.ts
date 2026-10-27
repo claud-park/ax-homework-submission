@@ -54,16 +54,21 @@ describe('notesToSlackText', () => {
     expect(notesToSlackText('A & B < C > D')).toBe('A & B < C > D')
   })
 
-  it('(f) leaves no markdown syntax', () => {
-    const fixtures = [
-      SECTION_NOTE,
-      `메모${AI_DIVIDER}${SECTION_NOTE}`,
-      '- [ ] a\n- [x] b\n**굵게** [l](http://x.y) ![i](http://x.y/i.png)\n---\n> q\n## **제목**',
+  it('(f) leaves no markdown syntax and matches exact output', () => {
+    const fixtures: Array<[string, string]> = [
+      [SECTION_NOTE, notesToSlackText(SECTION_NOTE)],
+      [`메모${AI_DIVIDER}${SECTION_NOTE}`, `메모\n\n${HR}\n*🤖 AI 요약*\n\n${notesToSlackText(SECTION_NOTE)}`],
+      [
+        '- [ ] a\n- [x] b\n**굵게** [l](http://x.y) ![i](http://x.y/i.png)\n---\n> q\n## **제목**',
+        `☐ a\n☑ b\n*굵게* l (http://x.y) i (http://x.y/i.png)\n${HR}\nq\n*제목*`,
+      ],
     ]
-    for (const f of fixtures) {
-      const out = notesToSlackText(f)
+    for (const [input, expected] of fixtures) {
+      const out = notesToSlackText(input)
+      expect(out).toBe(expected)
       for (const bad of ['##', '**', '---', '](', '- [']) expect(out).not.toContain(bad)
     }
+    expect(notesToSlackText(SECTION_NOTE).startsWith('*🗣️ 논의 주제*\n*1. 주제 제목*\n• 핵심 내용')).toBe(true)
   })
 
   it('(g) returns empty string for empty or whitespace', () => {
@@ -85,12 +90,44 @@ describe('notesToSlackText', () => {
 
   it('(j) handles inline emphasis precedence safely', () => {
     expect(notesToSlackText('## **굵은** 제목')).toBe('*굵은 제목*')
-    expect(notesToSlackText('**내용**을 확인')).toBe('*내용*을 확인')
+    expect(notesToSlackText('**내용**을 확인')).toBe('*내용*\u200B을 확인')
     expect(notesToSlackText('- **핵심**: 설명')).toBe('• *핵심*: 설명')
-    expect(notesToSlackText('**굵게**와 *기울임*')).toBe('*굵게*와 _기울임_')
+    expect(notesToSlackText('**굵게**와 *기울임*')).toBe('*굵게*\u200B와 _기울임_')
     expect(notesToSlackText('__굵게__ 와 _기울임_')).toBe('*굵게* 와 _기울임_')
     expect(notesToSlackText('snake_case_name 과 2*3')).toBe('snake_case_name 과 2*3')
     expect(notesToSlackText('a*b*c 그리고 my_var_x')).toBe('a*b*c 그리고 my_var_x')
     expect(notesToSlackText('`a*b*` 와 `**x**`')).toBe('a*b* 와 **x**')
+  })
+  it('pads bold/italic spans with U+200B only next to letters/digits', () => {
+    expect(notesToSlackText('A사**내용**')).toBe('A사\u200B*내용*')
+    expect(notesToSlackText('A사**내용**을')).toBe('A사\u200B*내용*\u200B을')
+    expect(notesToSlackText('**a**, **b** c. (**d**)')).toBe('*a*, *b* c. (*d*)')
+    expect(notesToSlackText('**시작** 중간 **끝**')).toBe('*시작* 중간 *끝*')
+    expect(notesToSlackText('**a** **b**')).toBe('*a* *b*')
+    expect(notesToSlackText('**가**나**다**')).toBe('*가*\u200B나\u200B*다*')
+    expect(notesToSlackText('_x_를 확인')).toBe('_x_\u200B를 확인')
+    expect(notesToSlackText('*x*를 확인')).toBe('_x_\u200B를 확인')
+    expect(notesToSlackText('- **내용**을')).toBe('• *내용*\u200B을')
+  })
+
+  it('keeps underscores inside URLs', () => {
+    expect(notesToSlackText('[문서](https://a.com/a_b_c)')).toBe('문서 (https://a.com/a_b_c)')
+    expect(notesToSlackText('보세요 https://a.com/my_page_x/y_z 입니다')).toBe(
+      '보세요 https://a.com/my_page_x/y_z 입니다',
+    )
+    expect(notesToSlackText('https://a.com/_x_/')).toBe('https://a.com/_x_/')
+  })
+
+  it('documents current behaviour for link labels with brackets (unsupported)', () => {
+    expect(notesToSlackText('[문서 [v2]](https://a.com/x)')).toBe('[문서 [v2]](https://a.com/x)')
+  })
+
+  it('falls back to line-level conversion when the inline regex cannot be built', () => {
+    const failing = () => null
+    const input = '## **제목**\n- **핵심**을 [l](http://x.y)\n  - 하위\n\n---\n1. 항목'
+    expect(notesToSlackText(input, failing)).toBe(
+      `*제목*\n• **핵심**을 [l](http://x.y)\n  ◦ 하위\n\n${HR}\n1. 항목`,
+    )
+    expect(notesToSlackText(`내${AI_DIVIDER}요약`, failing)).toBe(`내\n\n${HR}\n*🤖 AI 요약*\n\n요약`)
   })
 })

@@ -27,6 +27,18 @@ export function unescapeSlack(text: string): string {
   return text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
 }
 
+let alnumRe: RegExp | undefined
+function isAlnum(ch: string): boolean {
+  if (!alnumRe) {
+    try {
+      alnumRe = new RegExp('[\\p{L}\\p{N}]', 'u')
+    } catch {
+      alnumRe = /[A-Za-z0-9\uAC00-\uD7A3]/
+    }
+  }
+  return alnumRe.test(ch)
+}
+
 export function toSlackMrkdwn(md: string): string {
   return md
     .split('\n')
@@ -36,7 +48,12 @@ export function toSlackMrkdwn(md: string): string {
       const heading = l.match(/^#{1,6}\s+(.*)$/)
       if (heading) return `*${heading[1].replace(/\*\*/g, '').trim()}*`
       l = l.replace(/^(\s*)[-*]\s+/, '$1• ')
-      l = l.replace(/\*\*(.+?)\*\*/g, '*$1*')
+      l = l.replace(/\*\*(.+?)\*\*/g, (m, inner: string, offset: number, whole: string) => {
+        // Slack bold needs a boundary outside the markers: add U+200B next to letters/digits.
+        const before = isAlnum(whole.charAt(offset - 1)) ? '\u200B' : ''
+        const after = isAlnum(whole.charAt(offset + m.length)) ? '\u200B' : ''
+        return `${before}*${inner}*${after}`
+      })
       // Links are built after escaping: the angle brackets are ours; url/label are already escaped.
       l = l.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s|]+)\)/g, '<$2|$1>')
       return l
