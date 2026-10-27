@@ -274,3 +274,46 @@ describe('recap budget after escaping', () => {
     expect(t).toContain('Q&amp;A *팀 챔피언님')
   })
 })
+
+describe('toSlackMrkdwn with sectioned notes', () => {
+  it('converts the sectioned note structure', () => {
+    const md = [
+      '## 🗣️ 논의 주제',
+      '### 1. 주제 제목',
+      '- 핵심 내용',
+      '  - 세부 내용',
+      '### 2. 두 번째 주제',
+      '- **Admin**이 일정 공유',
+      '',
+      '## 💬 피드백',
+      '- 피드백 내용',
+      '',
+      '## 🤨 고민·요청 사항',
+      '- 고민 내용',
+      '',
+      '## 🤝 합의 사항',
+      '1. 합의 내용',
+      '2. 두 번째 합의',
+    ].join('\n')
+    expect(toSlackMrkdwn(md)).toBe(
+      [
+        '*🗣️ 논의 주제*',
+        '*1. 주제 제목*',
+        '• 핵심 내용',
+        '  • 세부 내용',
+        '*2. 두 번째 주제*',
+        '• *Admin*이 일정 공유',
+        '',
+        '*💬 피드백*',
+        '• 피드백 내용',
+        '',
+        '*🤨 고민·요청 사항*',
+        '• 고민 내용',
+        '',
+        '*🤝 합의 사항*',
+        '1. 합의 내용',
+        '2. 두 번째 합의',
+      ].join('\n'),
+    )
+  })
+})
