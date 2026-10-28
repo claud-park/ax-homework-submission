@@ -10,7 +10,6 @@ import {
 import { MobileMilestoneCard } from '@/components/MobileMilestoneCard'
 import { MilestoneRow } from '@/components/milestones/MilestoneRow'
 import { MilestoneSummary } from '@/components/milestones/MilestoneSummary'
-import { StageStepper } from '@/components/milestones/StageStepper'
 import { IssueReportDialog } from '@/components/milestones/IssueReportDialog'
 import {
   deriveStage, fmtRange, groupByParent, isIssuePending, matchesFilter, summarize,
@@ -310,20 +309,9 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
               return (
                 <div key={g.parent?.id ?? 'loose'} className="flex flex-col gap-2">
                   {g.parent && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{g.parent.title}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>{g.done}/{g.items.length}</span>
-                      </div>
-                      <StageStepper
-                        stage={deriveStage(g.parent)}
-                        size="md"
-                        busy={busy.has(g.parent.id)}
-                        disabled={!charterApproved}
-                        disabledReason="과제정의서 승인 후 진행할 수 있습니다"
-                        onStart={() => handleStart(g.parent!.id)}
-                        onComplete={() => handleComplete(g.parent!.id)}
-                      />
+                    <div className="flex items-center gap-2">
+                      <span className="truncate" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{g.parent.title}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>{g.done}/{g.items.length}</span>
                     </div>
                   )}
                   {g.visible.length === 0 ? emptyFilter : g.visible.map(m => (
@@ -336,7 +324,7 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
         )}
       </div>
 
-      {/* 데스크톱: 요약 카드 → 그룹(헤더 + 행) */}
+      {/* 데스크톱: 요약 카드 → 그룹(헤더 + 행). 하위가 있는 상위(0 depth)는 헤더만 두고 단계 전환은 하위(1 depth) 행에서만 한다. */}
       <div data-testid="milestones-desktop" className="hidden md:flex flex-col" style={{ height: 'calc(100vh - 100px)', minHeight: 0 }}>
         <div className="flex-1 overflow-y-auto pb-8">
           {published.length === 0 ? emptyAll : (
@@ -388,15 +376,6 @@ export function MilestonesClient({ initialMilestones, charterApproved: initialCh
                           {g.done}/{g.items.length} 완료
                         </span>
                       </button>
-                      <StageStepper
-                        stage={deriveStage(parent)}
-                        size="sm"
-                        busy={busy.has(parent.id)}
-                        disabled={!charterApproved}
-                        disabledReason="과제정의서 승인 후 진행할 수 있습니다"
-                        onStart={() => handleStart(parent.id)}
-                        onComplete={() => handleComplete(parent.id)}
-                      />
                     </div>
                     {open && (g.visible.length === 0 ? emptyFilter
                       : g.visible.map(m => <MilestoneRow key={m.id} m={m} busy={busy.has(m.id)} {...rowHandlers} />))}
