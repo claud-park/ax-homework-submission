@@ -147,7 +147,7 @@ describe('MilestonesClient status view', () => {
     expect(within(desktop).queryByText('순항 작업')).not.toBeInTheDocument()
   })
 
-  it('parent with children renders a group header with its own stepper; childless top-level renders as a plain row', () => {
+  it('parent with children renders a group header without a stepper; childless top-level renders as a plain row with one', () => {
     const parent = { ...base, id: 'p', title: '상위 단계', status: 'not_started', is_manual_progress: false } as Milestone
     const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p' } as Milestone
     const loose = { ...base, id: 'l', title: '단독 작업' } as Milestone
@@ -156,10 +156,8 @@ describe('MilestonesClient status view', () => {
     const header = within(desktop).getByRole('button', { name: /상위 단계/ })
     expect(header).toHaveAttribute('aria-expanded', 'true')
     expect(within(desktop).getByText('0/1 완료')).toBeInTheDocument()
-    // parent stepper + child row stepper + loose row stepper
-    expect(within(desktop).getAllByRole('group', { name: '진행 단계' })).toHaveLength(3)
-    // parent stepper (not_started) offers 시작 and is not inside the collapse button
-    expect(within(header).queryByRole('group', { name: '진행 단계' })).not.toBeInTheDocument()
+    // 하위가 있는 상위에는 스테퍼를 두지 않는다: child row stepper + loose row stepper
+    expect(within(desktop).getAllByRole('group', { name: '진행 단계' })).toHaveLength(2)
     // childless top-level: no group header
     expect(within(desktop).queryByRole('button', { name: /단독 작업/ })).not.toBeInTheDocument()
     expect(within(desktop).getByText('단독 작업')).toBeInTheDocument()
@@ -167,7 +165,32 @@ describe('MilestonesClient status view', () => {
     fireEvent.click(header)
     expect(header).toHaveAttribute('aria-expanded', 'false')
     expect(within(desktop).queryByText('하위 작업')).not.toBeInTheDocument()
-    expect(within(desktop).getAllByRole('group', { name: '진행 단계' })).toHaveLength(2)
+    expect(within(desktop).getAllByRole('group', { name: '진행 단계' })).toHaveLength(1)
+  })
+
+  it('in-progress parent with delayed children: only child rows carry a stepper and their 시작 is enabled', () => {
+    const parent = { ...base, id: 'p', title: '상위 단계', status: 'in_progress', is_manual_progress: true, start_date: '2026-05-01', due_date: '2026-05-20' } as Milestone
+    const c1 = { ...base, id: 'c1', title: '하위 지연 작업', parent_milestone_id: 'p', status: 'delayed', is_manual_progress: false, start_date: '2026-05-01', due_date: '2026-05-10' } as Milestone
+    const c2 = { ...base, id: 'c2', title: '하위 시작 지연', parent_milestone_id: 'p', status: 'not_started', is_manual_progress: false, start_date: '2026-05-15', due_date: '2026-06-10' } as Milestone
+    const desktop = renderClient([parent, c1, c2])
+
+    const groups = within(desktop).getAllByRole('group', { name: '진행 단계' })
+    expect(groups).toHaveLength(2)
+    for (const g of groups) {
+      const start = within(g).getByRole('button', { name: '시작' })
+      expect(start).toBeEnabled()
+      expect(start).not.toHaveAttribute('aria-disabled')
+    }
+    // 상위 헤더에는 ✓ 시작(비활성) 세그먼트가 없다
+    expect(within(desktop).queryAllByRole('button', { name: '완료로' })).toHaveLength(0)
+  })
+
+  it('mobile: parent with children shows no parent stepper', () => {
+    const parent = { ...base, id: 'p', title: '상위 단계', status: 'not_started', is_manual_progress: false } as Milestone
+    const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p' } as Milestone
+    const mobile = renderMobile([parent, child])
+    expect(within(mobile).getByText('상위 단계')).toBeInTheDocument()
+    expect(within(mobile).getAllByRole('group', { name: '진행 단계' })).toHaveLength(1)
   })
 
   it('summary and chips count only group items, not the parent header', () => {
@@ -227,17 +250,6 @@ describe('MilestonesClient status view', () => {
     expect(within(desktop).getByPlaceholderText('진행 상황을 간단히 메모해주세요')).toHaveValue('새 노트 초안')
   })
 
-  it('mobile parent group header renders the parent stepper and completes it', async () => {
-    const parent = { ...base, id: 'p', title: '상위 단계', status: 'in_progress', is_manual_progress: true } as Milestone
-    const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p', status: 'not_started', is_manual_progress: false } as Milestone
-    mockApiFetch.mockResolvedValue({ milestone: { ...parent, is_manual_completed: true }, parentUpdated: null })
-    const mobile = renderMobile([parent, child])
-
-    // parent in_progress -> its stepper offers 완료로 (the child is not_started, so only the parent has it)
-    fireEvent.click(within(mobile).getByRole('button', { name: '완료로' }))
-    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith('/api/milestones/p', expect.objectContaining({ method: 'PATCH' })))
-  })
-
   it('a newer transition dismisses the previous undo toast and the stale undo is refused', async () => {
     const m = { ...base, status: 'not_started', is_manual_progress: false } as Milestone
     reflectPatches(m)
@@ -271,25 +283,6 @@ describe('MilestonesClient status view', () => {
     expect(toast.dismiss).not.toHaveBeenCalled()
     unmount()
     expect(toast.dismiss).toHaveBeenCalledWith('t1')
-  })
-
-  it('a child change that updates the parent invalidates the parent\'s stale undo', async () => {
-    const parent = { ...base, id: 'p', title: '상위 단계', status: 'in_progress', is_manual_progress: true } as Milestone
-    const child = { ...base, id: 'c1', title: '하위 작업', parent_milestone_id: 'p', status: 'not_started', is_manual_progress: false } as Milestone
-    const desktop = renderClient([parent, child])
-    mockApiFetch.mockResolvedValueOnce({ milestone: { ...parent, is_manual_completed: true }, parentUpdated: null })
-    fireEvent.click(within(desktop).getByRole('button', { name: '완료로' }))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
-    const parentUndo = (toast.success as Mock).mock.calls[0][1]
-
-    mockApiFetch.mockResolvedValueOnce({ milestone: { ...child, is_manual_progress: true, status: 'in_progress' }, parentUpdated: { ...parent, is_manual_completed: true } })
-    fireEvent.click(within(desktop).getAllByRole('button', { name: /시작/ }).find(b => !(b as HTMLButtonElement).disabled)!)
-    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2))
-
-    const before = mockApiFetch.mock.calls.length
-    parentUndo.action.onClick()
-    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('이미 다른 변경이 있어 되돌릴 수 없습니다.'))
-    expect(mockApiFetch.mock.calls.length).toBe(before)
   })
 
   it('undo while the same milestone is busy shows an info toast and sends nothing', async () => {
